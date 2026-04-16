@@ -1,24 +1,35 @@
-// ============================================
-// Login Page
-// ============================================
-
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/AuthProvider";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
+function getRoleRedirect(role: string): string {
+  if (role === "admin") return "/admin";
+  if (role === "worker") return "/worker";
+  return "/dashboard";
+}
+
 export default function LoginPage() {
-  const { signIn } = useAuthContext();
+  const { signIn, userProfile, loading } = useAuthContext();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Wait for profile to load, THEN redirect based on actual role
+  useEffect(() => {
+    if (!loading && userProfile) {
+      const path = getRoleRedirect(userProfile.role);
+      console.log(`✅ Role: "${userProfile.role}" → redirecting to: ${path}`);
+      router.replace(path);
+    }
+  }, [userProfile, loading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,19 +38,15 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password);
-      // Auth state change will trigger profile fetch and redirect
-      // We'll wait a moment for the profile to load
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 500);
+      // Redirect handled by useEffect above once profile loads
     } catch (err: unknown) {
-      const firebaseError = err as { code?: string };
-      if (firebaseError.code === "auth/user-not-found" || firebaseError.code === "auth/wrong-password") {
+      const fe = err as { code?: string };
+      if (fe.code === "auth/user-not-found" || fe.code === "auth/wrong-password" || fe.code === "auth/invalid-credential") {
         setError("Invalid email or password.");
-      } else if (firebaseError.code === "auth/invalid-credential") {
-        setError("Invalid email or password.");
-      } else if (firebaseError.code === "auth/too-many-requests") {
+      } else if (fe.code === "auth/too-many-requests") {
         setError("Too many attempts. Please try again later.");
+      } else if (fe.code === "auth/user-disabled") {
+        setError("This account has been disabled.");
       } else {
         setError("Failed to sign in. Please try again.");
       }
@@ -47,25 +54,38 @@ export default function LoginPage() {
     }
   };
 
+  // Show spinner while redirecting after successful login
+  if (!loading && userProfile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Redirecting…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen gradient-bg grid-pattern flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
               </svg>
             </div>
-            <span className="text-2xl font-bold text-white">CampusIQ</span>
+            <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+              UniFix
+            </span>
           </Link>
           <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
-          <p className="text-sm text-gray-400">Sign in to your account to continue</p>
+          <p className="text-sm text-gray-400">Sign in — you&apos;ll be redirected based on your role</p>
         </div>
 
-        {/* Login Form */}
-        <div className="glass rounded-2xl p-8">
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               label="Email Address"
@@ -80,7 +100,6 @@ export default function LoginPage() {
                 </svg>
               }
             />
-
             <Input
               label="Password"
               type="password"
@@ -109,10 +128,7 @@ export default function LoginPage() {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
               Don&apos;t have an account?{" "}
-              <Link
-                href="/register"
-                className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
-              >
+              <Link href="/register" className="text-purple-400 hover:text-purple-300 font-medium transition-colors">
                 Create one
               </Link>
             </p>

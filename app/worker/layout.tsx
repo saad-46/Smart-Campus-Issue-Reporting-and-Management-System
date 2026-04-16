@@ -1,15 +1,15 @@
 import TopNav from "@/components/TopNav";
-import AdminGuard from "@/components/AdminGuard";
+import WorkerGuard from "@/components/WorkerGuard";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function WorkerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AdminGuard>
+    <WorkerGuard>
       <div className="min-h-screen page-bg">
         <TopNav />
         <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           {children}
         </main>
       </div>
-    </AdminGuard>
+    </WorkerGuard>
   );
 }

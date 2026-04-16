@@ -18,6 +18,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
+  isWorker: boolean;
   isAuthenticated: boolean;
 }
 

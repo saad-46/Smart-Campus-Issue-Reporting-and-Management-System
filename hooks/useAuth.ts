@@ -1,9 +1,3 @@
-// ============================================
-// useAuth Hook — Firebase Authentication State
-// ============================================
-// Provides auth state, user profile, and auth methods
-// throughout the application via React context.
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -20,21 +14,23 @@ import { User, UserRole } from "@/types";
 export function useAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
+  // Start true — stays true until BOTH auth state AND profile are resolved
   const [loading, setLoading] = useState(true);
 
-  // Listen to Firebase auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
 
       if (user) {
-        // Fetch the user's profile from Firestore
+        // Fetch profile — keep loading=true until this resolves
         const profile = await getUserProfile(user.uid);
+        console.log("👤 Profile loaded:", profile?.role, "uid:", user.uid);
         setUserProfile(profile);
       } else {
         setUserProfile(null);
       }
 
+      // Only mark loading done AFTER profile is fetched
       setLoading(false);
     });
 
@@ -42,34 +38,24 @@ export function useAuth() {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    setLoading(true);
+    // Do NOT touch loading here — let onAuthStateChanged handle it
     try {
-      console.log("🔐 useAuth: Starting sign in...");
       await authSignIn(email, password);
-      console.log("✅ useAuth: Sign in successful");
+      // onAuthStateChanged will fire, fetch profile, then set loading=false
     } catch (error) {
-      console.error("❌ useAuth: Sign in error:", error);
-      // Re-throw the error so the component can handle it
       throw error;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   const signUp = useCallback(
     async (email: string, password: string, name: string, role: UserRole) => {
-      setLoading(true);
       try {
-        console.log("🚀 useAuth: Starting signup...");
         const profile = await authSignUp(email, password, name, role);
+        // Profile is already set by signUp, onAuthStateChanged will also fire
         setUserProfile(profile);
-        console.log("✅ useAuth: Signup successful, profile set");
+        console.log("✅ Signup complete, role:", profile.role);
       } catch (error) {
-        console.error("❌ useAuth: Signup error:", error);
-        // Re-throw the error so the component can handle it
         throw error;
-      } finally {
-        setLoading(false);
       }
     },
     []
@@ -88,6 +74,7 @@ export function useAuth() {
     signUp,
     signOut,
     isAdmin: userProfile?.role === "admin",
+    isWorker: userProfile?.role === "worker",
     isAuthenticated: !!firebaseUser,
   };
 }

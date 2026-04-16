@@ -98,16 +98,20 @@ if (isConfigValid) {
   console.log("📦 Project ID:", firebaseConfig.projectId);
 }
 
+import { getStorage, FirebaseStorage } from "firebase/storage";
+
 // Initialize Firebase app
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
+let storage: FirebaseStorage;
 
 try {
   // Initialize Firebase only once
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   auth = getAuth(app);
   db = getFirestore(app);
+  storage = getStorage(app);
 
   if (isConfigValid) {
     console.log("🔥 Firebase initialized successfully");
@@ -117,5 +121,5 @@ try {
   throw new Error("Firebase initialization failed. Check your configuration.");
 }
 
-export { auth, db };
+export { auth, db, storage };
 export default app;

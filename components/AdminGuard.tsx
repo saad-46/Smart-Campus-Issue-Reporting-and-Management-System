@@ -10,8 +10,12 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (!loading) {
-      if (!isAuthenticated) router.push("/login");
-      else if (userProfile && userProfile.role !== "admin") router.push("/dashboard");
+      if (!isAuthenticated) router.replace("/login");
+      else if (userProfile && userProfile.role !== "admin") {
+        // Send workers to their dashboard, users to theirs
+        const path = userProfile.role === "worker" ? "/worker" : "/dashboard";
+        router.replace(path);
+      }
     }
   }, [loading, isAuthenticated, userProfile, router]);
 
@@ -40,10 +44,13 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
             This area is restricted to administrators only.
           </p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => {
+              const path = userProfile?.role === "worker" ? "/worker" : "/dashboard";
+              router.replace(path);
+            }}
             className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/25"
           >
-            Go to Dashboard
+            Go to My Dashboard
           </button>
         </div>
       </div>

@@ -111,3 +111,36 @@ export async function analyzeIssue(
     priority: detectedPriority,
   };
 }
+
+/**
+ * Parse a free‑form chat message into a full issue payload.
+ * Simple heuristic: first sentence → title, rest → description.
+ * Extract location by looking for patterns like "block A" or "room 101".
+ */
+export async function parseChatMessage(message: string): Promise<{
+  title: string;
+  description: string;
+  location: string;
+  category: string;
+  priority: Priority;
+}> {
+  // Basic split – first period as title delimiter
+  const [first, ...rest] = message.split(/[.!?]\s+/);
+  const title = first?.trim() || "Untitled Issue";
+  const description = rest.length ? rest.join(" ").trim() : "";
+
+  // Location extraction (very naive)
+  const locationMatch = message.match(/(block\s+[a-zA-Z0-9]+|room\s+[a-zA-Z0-9]+)/i);
+  const location = locationMatch ? locationMatch[0] : "Unknown";
+
+  // Re‑use existing analysis for category & priority
+  const analysis = await analyzeIssue(message);
+
+  return {
+    title,
+    description,
+    location,
+    category: analysis.category,
+    priority: analysis.priority,
+  };
+}

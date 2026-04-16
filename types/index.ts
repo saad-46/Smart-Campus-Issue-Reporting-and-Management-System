@@ -3,7 +3,7 @@
 // ============================================
 
 /** User roles in the system */
-export type UserRole = "user" | "admin";
+export type UserRole = "user" | "admin" | "worker";
 
 /** Issue priority levels */
 export type Priority = "Low" | "Medium" | "High";
@@ -32,8 +32,14 @@ export interface Issue {
   createdBy: string;       // User ID
   createdByName: string;   // Display name for convenience
   assignedTo: string;      // Admin User ID (empty if unassigned)
+  imageUrl?: string;       // base64 or URL
   createdAt: Date;
   updatedAt: Date;
+  startedAt?: Date;
+  resolvedAt?: Date;
+  upvotes: number;
+  upvotedBy: string[]; // user IDs who upvoted
+  escalated?: boolean; // true if escalated by engine
 }
 
 /** Result returned from AI analysis service */
@@ -47,4 +53,14 @@ export interface CreateIssueData {
   title: string;
   description: string;
   location: string;
+}
+
+/** Chat message attached to an Issue */
+export interface ChatMessage {
+  id: string;
+  text: string;
+  authorId: string;
+  authorName: string;
+  authorRole: UserRole;
+  createdAt: Date;
 }

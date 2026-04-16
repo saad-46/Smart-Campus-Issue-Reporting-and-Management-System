@@ -7,6 +7,7 @@
 import {
   collection,
   doc,
+  runTransaction,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -43,6 +44,12 @@ function docToIssue(docId: string, data: Record<string, unknown>): Issue {
     updatedAt: data.updatedAt instanceof Timestamp
       ? data.updatedAt.toDate()
       : new Date(data.updatedAt as string),
+    upvotes: (data.upvotes as number) || 0,
+    upvotedBy: (data.upvotedBy as string[]) || [],
+    escalated: (data.escalated as boolean) || false,
+    startedAt: data.startedAt instanceof Timestamp ? data.startedAt.toDate() : undefined,
+    resolvedAt: data.resolvedAt instanceof Timestamp ? data.resolvedAt.toDate() : undefined,
+    imageUrl: (data.imageUrl as string) || "",
   };
 }
 
@@ -54,7 +61,8 @@ export async function createIssue(
   userId: string,
   userName: string,
   category: string,
-  priority: Priority
+  priority: Priority,
+  imageUrl?: string
 ): Promise<string> {
   const now = Timestamp.now();
 
@@ -70,6 +78,10 @@ export async function createIssue(
     assignedTo: "",
     createdAt: now,
     updatedAt: now,
+    upvotes: 0,
+    upvotedBy: [],
+    escalated: false,
+    imageUrl: imageUrl || "",
   });
 
   return docRef.id;
@@ -92,6 +104,24 @@ export function subscribeToAllIssues(
       docToIssue(doc.id, doc.data() as Record<string, unknown>)
     );
     callback(issues);
+  });
+}
+
+/**
+ * Subscribe to a SINGLE issue in real-time (for issue detail page).
+ * Returns an unsubscribe function.
+ */
+export function subscribeToSingleIssue(
+  issueId: string,
+  callback: (issue: Issue | null) => void
+): () => void {
+  const docRef = doc(db, ISSUES_COLLECTION, issueId);
+  return onSnapshot(docRef, (snapshot) => {
+    if (snapshot.exists()) {
+      callback(docToIssue(snapshot.id, snapshot.data() as Record<string, unknown>));
+    } else {
+      callback(null);
+    }
   });
 }
 
@@ -124,10 +154,18 @@ export async function updateIssueStatus(
   issueId: string,
   status: IssueStatus
 ): Promise<void> {
-  await updateDoc(doc(db, ISSUES_COLLECTION, issueId), {
+  const updates: Record<string, any> = {
     status,
     updatedAt: Timestamp.now(),
-  });
+  };
+
+  if (status === "In Progress") {
+    updates.startedAt = Timestamp.now();
+  } else if (status === "Resolved") {
+    updates.resolvedAt = Timestamp.now();
+  }
+
+  await updateDoc(doc(db, ISSUES_COLLECTION, issueId), updates);
 }
 
 /**
@@ -135,11 +173,10 @@ export async function updateIssueStatus(
  */
 export async function assignIssue(
   issueId: string,
-  adminId: string
+  assigneeId: string
 ): Promise<void> {
   await updateDoc(doc(db, ISSUES_COLLECTION, issueId), {
-    assignedTo: adminId,
-    status: "In Progress" as IssueStatus,
+    assignedTo: assigneeId,
     updatedAt: Timestamp.now(),
   });
 }
@@ -163,4 +200,33 @@ export async function getAllIssues(): Promise<Issue[]> {
   return snapshot.docs.map((doc) =>
     docToIssue(doc.id, doc.data() as Record<string, unknown>)
   );
+}
+
+/**
+ * Upvote or remove upvote for an issue by a user.
+ * Uses a transaction to ensure atomicity.
+ */
+export async function toggleUpvote(issueId: string, userId: string): Promise<void> {
+  const issueRef = doc(db, ISSUES_COLLECTION, issueId);
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(issueRef);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const upvotedBy: string[] = data.upvotedBy || [];
+    let upvotes = data.upvotes || 0;
+    if (upvotedBy.includes(userId)) {
+      // remove upvote
+      upvotedBy.splice(upvotedBy.indexOf(userId), 1);
+      upvotes = Math.max(0, upvotes - 1);
+    } else {
+      upvotedBy.push(userId);
+      upvotes = upvotes + 1;
+    }
+    const updates: any = { upvotes, upvotedBy };
+    // Auto‑promote priority if threshold reached (default 5)
+    if (upvotes >= 5 && data.priority !== "High") {
+      updates.priority = "High" as Priority;
+    }
+    transaction.update(issueRef, updates);
+  });
 }
