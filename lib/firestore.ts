@@ -51,6 +51,9 @@ function docToIssue(docId: string, data: Record<string, unknown>): Issue {
     resolvedAt: data.resolvedAt instanceof Timestamp ? data.resolvedAt.toDate() : undefined,
     imageUrl: (data.imageUrl as string) || "",
     imageUrls: (data.imageUrls as string[]) || [],
+    claimAmount: (data.claimAmount as number) || 0,
+    claimStatus: (data.claimStatus as Issue["claimStatus"]) || undefined,
+    receiptUrl: (data.receiptUrl as string) || "",
   };
 }
 
@@ -169,6 +172,26 @@ export async function updateIssueStatus(
   } else if (status === "Resolved") {
     updates.resolvedAt = Timestamp.now();
   }
+
+  await updateDoc(doc(db, ISSUES_COLLECTION, issueId), updates);
+}
+
+/**
+ * Submit a bill and resolve the issue.
+ */
+export async function submitBill(
+  issueId: string,
+  amount: number,
+  receiptUrl: string
+): Promise<void> {
+  const updates: Record<string, any> = {
+    status: "Resolved" as IssueStatus,
+    resolvedAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    claimAmount: amount,
+    claimStatus: "pending",
+    receiptUrl: receiptUrl
+  };
 
   await updateDoc(doc(db, ISSUES_COLLECTION, issueId), updates);
 }

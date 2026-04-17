@@ -35,10 +35,7 @@ export default function TopNav() {
   const links = isAdmin
     ? []
     : isWorker
-    ? [
-        { href: "/worker", label: "My Tasks" },
-        { href: "/dashboard?tab=report", label: "Report Issue" },
-      ]
+    ? []
     : [
         { href: "/dashboard", label: "My Issues" },
         { href: "/dashboard?tab=report", label: "Report Issue" },
