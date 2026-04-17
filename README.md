@@ -11,13 +11,10 @@
 
 ## Team Details
 
-- **Team Name:**
-- **Team Lead:**
+- **Team Name: Solo Dev**
+- **Team Lead: Saad Riyaz Mohammed**
 - **Team Members:**
-  - Member 1:
-  - Member 2:
-  - Member 3:
-  - Member 4:
+  - Member 1: Saad Riyaz Mohammed
 
 ---
 
