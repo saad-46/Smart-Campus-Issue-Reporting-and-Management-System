@@ -18,6 +18,7 @@ export interface User {
   email: string;
   role: UserRole;
   createdAt: Date;
+  earnings?: number; // Total money earned by the worker
 }
 
 /** Campus issue report */
@@ -40,6 +41,9 @@ export interface Issue {
   upvotes: number;
   upvotedBy: string[]; // user IDs who upvoted
   escalated?: boolean; // true if escalated by engine
+  receiptUrl?: string; // Uploaded expense receipt
+  claimAmount?: number; // Cost of repair claimed by worker
+  claimStatus?: "pending" | "approved" | "rejected"; // Status of the receipt
 }
 
 /** Result returned from AI analysis service */
@@ -64,3 +68,26 @@ export interface ChatMessage {
   authorRole: UserRole;
   createdAt: Date;
 }
+
+/** Financial Tracker: Budget Source */
+export interface Budget {
+  id: string;
+  totalAvailable: number;
+  totalSpent: number;
+  updatedAt: Date;
+}
+
+/** Financial Tracker: Transactions */
+export interface Transaction {
+  id: string;
+  workerId: string;
+  workerName: string;
+  amount: number;
+  type: "receipt" | "direct";
+  issueId?: string;
+  note?: string;
+  status: "pending" | "approved" | "rejected";
+  receiptUrl?: string; // If a receipt was attached
+  createdAt: Date;
+}
+

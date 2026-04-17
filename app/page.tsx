@@ -97,7 +97,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-16">
 
             {/* Report Issue → /login */}
-            <Link href="/login" className="group">
+            <Link href="/login?role=user" className="group">
               <div className="p-6 rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-white dark:bg-blue-500/10 shadow-sm dark:shadow-none hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-500/20 hover:scale-[1.03] transition-all duration-300">
                 <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/20 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-200 dark:group-hover:bg-blue-500/30 transition-colors">
                   <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +113,7 @@ export default function LandingPage() {
             </Link>
 
             {/* Worker Login → /login */}
-            <Link href="/login" className="group">
+            <Link href="/login?role=worker" className="group">
               <div className="p-6 rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-white dark:bg-emerald-500/10 shadow-sm dark:shadow-none hover:shadow-md hover:border-emerald-400 dark:hover:border-emerald-500/50 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 hover:scale-[1.03] transition-all duration-300">
                 <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-500/30 transition-colors">
                   <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,7 +129,7 @@ export default function LandingPage() {
             </Link>
 
             {/* Admin Login → /login */}
-            <Link href="/login" className="group">
+            <Link href="/login?role=admin" className="group">
               <div className="p-6 rounded-2xl border border-purple-200 dark:border-purple-500/30 bg-white dark:bg-purple-500/10 shadow-sm dark:shadow-none hover:shadow-md hover:border-purple-400 dark:hover:border-purple-500/50 hover:bg-purple-50 dark:hover:bg-purple-500/20 hover:scale-[1.03] transition-all duration-300">
                 <div className="w-12 h-12 bg-purple-100 dark:bg-purple-500/20 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/30 transition-colors">
                   <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

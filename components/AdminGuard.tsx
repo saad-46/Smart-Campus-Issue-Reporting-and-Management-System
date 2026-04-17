@@ -12,9 +12,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     if (!loading) {
       if (!isAuthenticated) router.replace("/login");
       else if (userProfile && userProfile.role !== "admin") {
-        // Send workers to their dashboard, users to theirs
-        const path = userProfile.role === "worker" ? "/worker" : "/dashboard";
-        router.replace(path);
+        router.replace("/dashboard");
       }
     }
   }, [loading, isAuthenticated, userProfile, router]);
@@ -45,8 +43,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
           </p>
           <button
             onClick={() => {
-              const path = userProfile?.role === "worker" ? "/worker" : "/dashboard";
-              router.replace(path);
+              router.replace("/dashboard");
             }}
             className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/25"
           >

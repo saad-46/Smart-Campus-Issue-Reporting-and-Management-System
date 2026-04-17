@@ -8,11 +8,7 @@ import { UserRole } from "@/types";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
-function getRoleRedirect(role: string): string {
-  if (role === "admin") return "/admin";
-  if (role === "worker") return "/worker";
-  return "/dashboard";
-}
+// Routing constants handled inline now
 
 export default function RegisterPage() {
   const { signUp, userProfile, loading } = useAuthContext();
@@ -37,19 +33,23 @@ export default function RegisterPage() {
     if (!initialLoadDone.current) {
       initialLoadDone.current = true;
       // If already logged in when page loads, redirect away
-      if (userProfile) {
-        const path = getRoleRedirect(userProfile.role);
-        console.log(`Already logged in as "${userProfile.role}" → ${path}`);
-        router.replace(path);
+      if (userProfile && userProfile.role) {
+        const role = userProfile.role;
+        console.log("User Role:", role);
+        if (role === "admin") router.push("/admin");
+        else if (role === "worker") router.push("/worker");
+        else router.push("/dashboard");
       }
       return;
     }
 
     // After initial load: only redirect if we just signed up
-    if (justSignedUp.current && userProfile) {
-      const path = getRoleRedirect(userProfile.role);
-      console.log(`✅ Signed up as "${userProfile.role}" → ${path}`);
-      router.replace(path);
+    if (justSignedUp.current && userProfile && userProfile.role) {
+      const role = userProfile.role;
+      console.log("User Role:", role);
+      if (role === "admin") router.push("/admin");
+      else if (role === "worker") router.push("/worker");
+      else router.push("/dashboard");
     }
   }, [userProfile, loading, router]);
 

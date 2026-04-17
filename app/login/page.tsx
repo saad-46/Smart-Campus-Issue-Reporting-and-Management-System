@@ -7,11 +7,7 @@ import { useAuthContext } from "@/components/AuthProvider";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
-function getRoleRedirect(role: string): string {
-  if (role === "admin") return "/admin";
-  if (role === "worker") return "/worker";
-  return "/dashboard";
-}
+// Routing constants handled inline now
 
 export default function LoginPage() {
   const { signIn, userProfile, loading } = useAuthContext();
@@ -24,10 +20,19 @@ export default function LoginPage() {
 
   // Wait for profile to load, THEN redirect based on actual role
   useEffect(() => {
-    if (!loading && userProfile) {
-      const path = getRoleRedirect(userProfile.role);
-      console.log(`✅ Role: "${userProfile.role}" → redirecting to: ${path}`);
-      router.replace(path);
+    if (!loading) {
+      if (!userProfile || !userProfile.role) return;
+      
+      const role = userProfile.role;
+      console.log("User Role:", role);
+
+      if (role === "admin") {
+        router.push("/admin");
+      } else if (role === "worker") {
+        router.push("/worker");
+      } else {
+        router.push("/dashboard"); // USER
+      }
     }
   }, [userProfile, loading, router]);
 

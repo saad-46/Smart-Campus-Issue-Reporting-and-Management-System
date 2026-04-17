@@ -17,12 +17,9 @@ export default function TopNav() {
     router.replace("/");
   };
 
-  // Role-aware nav links
+  // Role-aware nav links (Admin gets empty tabs)
   const links = isAdmin
-    ? [
-        { href: "/admin", label: "Dashboard" },
-        { href: "/dashboard/report", label: "Report Issue" },
-      ]
+    ? []
     : isWorker
     ? [
         { href: "/worker", label: "My Tasks" },
@@ -72,7 +69,27 @@ export default function TopNav() {
         </nav>
 
         {/* Right side */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          
+          {/* Admin Export Button */}
+          {isAdmin && (
+            <div className="relative group">
+              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 border border-gray-200 dark:border-white/10 rounded-lg text-sm font-medium transition-all duration-300 group-hover:shadow-md">
+                <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Export Report
+              </button>
+              {/* Dropdown UI mapped later dynamically in AdminPage or simply trigger event listener */}
+              <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 flex flex-col overflow-hidden">
+                <button onClick={() => window.dispatchEvent(new CustomEvent('EXPORT_CSV'))} className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 font-medium border-b border-gray-100 dark:border-white/5 transition-colors tracking-wide truncate">
+                  CSV Data
+                </button>
+                <button onClick={() => window.dispatchEvent(new CustomEvent('EXPORT_EXCEL'))} className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 font-medium transition-colors tracking-wide truncate">
+                  Excel Data
+                </button>
+              </div>
+            </div>
+          )}
+
           <ThemeToggle />
 
           {isAuthenticated && userProfile && (
