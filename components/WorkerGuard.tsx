@@ -11,8 +11,11 @@ export default function WorkerGuard({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!loading) {
       if (!isAuthenticated) router.push("/login");
-      else if (userProfile && userProfile.role !== "worker" && userProfile.role !== "admin") {
-        router.push("/dashboard");
+      else if (userProfile) {
+        const activeRole = localStorage.getItem("role") || userProfile.activeRole || userProfile.role;
+        if (activeRole !== "worker" && activeRole !== "admin") {
+          router.push("/dashboard");
+        }
       }
     }
   }, [loading, isAuthenticated, userProfile, router]);
@@ -25,9 +28,10 @@ export default function WorkerGuard({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!loading && isAuthenticated && userProfile &&
-      userProfile.role !== "worker" && userProfile.role !== "admin") {
-    return (
+  if (!loading && isAuthenticated && userProfile) {
+    const activeRole = typeof window !== "undefined" ? localStorage.getItem("role") || userProfile.activeRole || userProfile.role : userProfile.activeRole || userProfile.role;
+    if (activeRole !== "worker" && activeRole !== "admin") {
+      return (
       <div className="page-bg min-h-screen flex items-center justify-center px-4">
         <div className="glass p-8 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -50,9 +54,9 @@ export default function WorkerGuard({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!loading && isAuthenticated && userProfile &&
-      (userProfile.role === "worker" || userProfile.role === "admin")) {
-    return <>{children}</>;
+  if (!loading && isAuthenticated && userProfile) {
+    const activeRole = typeof window !== "undefined" ? localStorage.getItem("role") || userProfile.activeRole || userProfile.role : userProfile.activeRole || userProfile.role;
+    if (activeRole === "worker" || activeRole === "admin") return <>{children}</>;
   }
 
   return (

@@ -10,6 +10,7 @@ import Link from "next/link";
 interface IssueCardProps {
   issue: Issue;
   showActions?: boolean;
+  viewContext?: "my-issues" | "explore";
   onStatusChange?: (issueId: string, status: Issue["status"]) => void;
   onAssign?: (issueId: string) => void;
 }
@@ -20,7 +21,7 @@ const priorityBorder: Record<string, string> = {
   Low: "border-l-emerald-500",
 };
 
-export default function IssueCard({ issue, showActions = false, onStatusChange, onAssign }: IssueCardProps) {
+export default function IssueCard({ issue, showActions = false, viewContext = "my-issues", onStatusChange, onAssign }: IssueCardProps) {
   const [showImageModal, setShowImageModal] = useState(false);
 
   return (
@@ -30,7 +31,7 @@ export default function IssueCard({ issue, showActions = false, onStatusChange, 
         border-l-4 ${priorityBorder[issue.priority]}
         border-t border-r border-b border-gray-800/60
         rounded-2xl p-5 
-        hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-1
+        hover:scale-105 hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10
         transition-all duration-300 ease-out flex flex-col h-full
       `}>
         {/* Header row */}
@@ -50,24 +51,34 @@ export default function IssueCard({ issue, showActions = false, onStatusChange, 
         </div>
 
         {/* Upvote + trending */}
-        <div className="mb-3">
-          <UpvoteButton
-            issueId={issue.id}
-            upvotes={issue.upvotes ?? 0}
-            upvotedBy={issue.upvotedBy ?? []}
-          />
-        </div>
-
-        {/* Image */}
-        {issue.imageUrl && (
-          <div className="mb-3">
-            <img
-              src={issue.imageUrl}
-              alt={issue.title}
-              className="w-full h-44 object-cover rounded-xl border border-gray-200 dark:border-white/10 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setShowImageModal(true)}
+        {viewContext === "explore" && (
+          <div className="mb-3 flex items-center justify-between">
+            <UpvoteButton
+              issueId={issue.id}
+              upvotes={issue.upvotes ?? 0}
+              upvotedBy={issue.upvotedBy ?? []}
             />
-            <p className="text-xs text-gray-400 mt-1 text-center">Click to enlarge</p>
+          </div>
+        )}
+
+        {/* Images Preview */}
+        {(issue.imageUrls?.length ? issue.imageUrls : issue.imageUrl ? [issue.imageUrl] : []).length > 0 && (
+          <div className="mb-3">
+            <div className={`grid gap-2 ${issue.imageUrls && issue.imageUrls.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+              {(issue.imageUrls?.length ? issue.imageUrls : [issue.imageUrl as string]).slice(0, 2).map((url, i) => (
+                <img
+                  key={i}
+                  src={url}
+                  alt={issue.title}
+                  className="w-full h-44 object-cover rounded-xl border border-gray-200 dark:border-white/10 cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => setShowImageModal(true)}
+                />
+              ))}
+            </div>
+            {issue.imageUrls && issue.imageUrls.length > 2 && (
+              <p className="text-xs text-gray-400 mt-2 text-center">+{issue.imageUrls.length - 2} more image(s)</p>
+            )}
+            <p className="text-[10px] text-gray-500 mt-1 text-center">Click to enlarge</p>
           </div>
         )}
 
@@ -144,8 +155,8 @@ export default function IssueCard({ issue, showActions = false, onStatusChange, 
 
         {/* Global Details Forwarder */}
         <div className="mt-4 pt-4 border-t border-gray-800/40">
-          <Link href={`/issues/${issue.id}`} className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors border border-gray-700">
-            View Issue Details & Discuss
+          <Link href={`/issues/${issue.id}`} className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500 text-white transition-all shadow-lg shadow-purple-500/20">
+            View Issue Details & Chat
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
           </Link>
         </div>

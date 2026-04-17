@@ -16,7 +16,9 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole; // legacy role fallback
+  roles?: UserRole[];
+  activeRole?: UserRole;
   createdAt: Date;
   earnings?: number; // Total money earned by the worker
 }
@@ -33,7 +35,8 @@ export interface Issue {
   createdBy: string;       // User ID
   createdByName: string;   // Display name for convenience
   assignedTo: string;      // Admin User ID (empty if unassigned)
-  imageUrl?: string;       // base64 or URL
+  imageUrl?: string;       // legacy base64 or URL
+  imageUrls?: string[];    // NEW: Array of images
   createdAt: Date;
   updatedAt: Date;
   startedAt?: Date;

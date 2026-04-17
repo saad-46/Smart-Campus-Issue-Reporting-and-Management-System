@@ -105,8 +105,12 @@ function IssueDetailContent() {
               </span>
             </div>
 
-            {issue.imageUrl && (
-              <img src={issue.imageUrl} alt="Issue" className="w-full rounded-xl object-cover border border-gray-800 shadow-md max-h-64" />
+            {(issue.imageUrls?.length ? issue.imageUrls : issue.imageUrl ? [issue.imageUrl] : []).length > 0 && (
+              <div className={`grid gap-2 ${(issue.imageUrls || []).length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                {(issue.imageUrls?.length ? issue.imageUrls : [issue.imageUrl as string]).map((url, i) => (
+                  <img key={i} src={url} alt={`Issue image ${i+1}`} className="w-full rounded-xl object-cover border border-gray-800 shadow-md max-h-64 cursor-pointer hover:opacity-90" />
+                ))}
+              </div>
             )}
 
             <div>
@@ -136,7 +140,27 @@ function IssueDetailContent() {
             <p className="text-xs text-gray-500 mt-1">Communicate directly regarding this issue.</p>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 custom-scrollbar bg-gray-950/20">
+          {(() => {
+            const activeRole = localStorage.getItem("role") || userProfile?.activeRole || userProfile?.role;
+            const canChat = userProfile?.id === issue.createdBy || activeRole === "worker" || activeRole === "admin";
+            
+            if (!canChat) {
+              return (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-gray-500">
+                  <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                  </div>
+                  <h3 className="text-white font-medium mb-2">Restricted Access</h3>
+                  <p className="text-sm max-w-sm">
+                    Chat is strictly limited to the original author and assigned workers / admins to protect privacy.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <>
+                <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 custom-scrollbar bg-gray-950/20">
             {messages.length === 0 ? (
               <div className="h-full flex items-center justify-center flex-col text-gray-500">
                 <svg className="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -184,8 +208,11 @@ function IssueDetailContent() {
             >
               Send
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-            </button>
-          </form>
+                </button>
+              </form>
+            </>
+          );
+        })()}
         </div>
       </div>
     </div>

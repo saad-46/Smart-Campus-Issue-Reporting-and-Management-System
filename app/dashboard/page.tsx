@@ -8,91 +8,98 @@ import IssueCard from "@/components/IssueCard";
 import ChatReporter from "@/components/ChatReporter";
 import Button from "@/components/ui/Button";
 import { Issue } from "@/types";
-import { subscribeToUserIssues } from "@/lib/firestore";
+import { subscribeToUserIssues, subscribeToAllIssues } from "@/lib/firestore";
 
 const STATUS_ORDER: Record<string, number> = { "In Progress": 0, "Open": 1, "Resolved": 2 };
 const CATEGORIES = ["All", "Infrastructure", "Electrical", "Cleanliness", "Safety", "Technology", "Others"];
 
-type Tab = "issues" | "chat";
+type Tab = "my-issues" | "explore";
 
 function DashboardContent() {
   const { userProfile } = useAuthContext();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("issues");
+  const [tab, setTab] = useState<Tab>("my-issues");
+  const [globalIssues, setGlobalIssues] = useState<Issue[]>([]);
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    if (!userProfile) return;
-    const unsub = subscribeToUserIssues(userProfile.id, (data) => {
-      setIssues(data);
-      setLoading(false);
+    if (!userProfile?.id) return;
+    let active = true;
+    const unsubUser = subscribeToUserIssues(userProfile.id, (data) => {
+      if (active) {
+        setIssues(data);
+        if (tab === "my-issues") setLoading(false);
+      }
     });
-    return () => unsub();
-  }, [userProfile]);
+    const unsubGlobal = subscribeToAllIssues((data) => {
+      if (active) {
+        setGlobalIssues(data);
+        if (tab === "explore") setLoading(false);
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubUser();
+      unsubGlobal();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.id, tab]);
+
+  const currentData = tab === "my-issues" ? issues : globalIssues;
 
   const filteredIssues = useMemo(() => {
-    return issues
-      .filter((i) => {
-        const cat = categoryFilter === "All" || i.category.toLowerCase() === categoryFilter.toLowerCase();
-        const st = statusFilter === "all" || i.status === statusFilter;
-        return cat && st;
-      })
-      .sort((a, b) => {
+    let base = currentData.filter((i) => {
+      const cat = categoryFilter === "All" || i.category.toLowerCase() === categoryFilter.toLowerCase();
+      const st = statusFilter === "all" || i.status === statusFilter;
+      return cat && st;
+    });
+
+    if (tab === "explore") {
+      base = base.sort((a, b) => b.upvotes - a.upvotes);
+    } else {
+      base = base.sort((a, b) => {
         const d = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
         return d !== 0 ? d : b.createdAt.getTime() - a.createdAt.getTime();
       });
-  }, [issues, categoryFilter, statusFilter]);
+    }
+    return base;
+  }, [currentData, categoryFilter, statusFilter, tab]);
 
-  const openCount = issues.filter((i) => i.status === "Open").length;
-  const inProgressCount = issues.filter((i) => i.status === "In Progress").length;
-  const resolvedCount = issues.filter((i) => i.status === "Resolved").length;
+  const openCount = currentData.filter((i) => i.status === "Open").length;
+  const inProgressCount = currentData.filter((i) => i.status === "In Progress").length;
+  const resolvedCount = currentData.filter((i) => i.status === "Resolved").length;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Issues</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Track and report campus issues</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Community & Reports</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Track your issues and explore community reports.</p>
         </div>
-        <Link href="/dashboard/report">
-          <Button>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Report via Form
-          </Button>
-        </Link>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-gray-100 dark:bg-white/5 rounded-xl mb-6 w-fit">
-        {(["issues", "chat"] as Tab[]).map((t) => (
+        {(["my-issues", "explore"] as Tab[]).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => { setTab(t); setLoading(true); setTimeout(() => setLoading(false), 500); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
               tab === t
                 ? "bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
-            {t === "issues" ? "📋 My Issues" : "🤖 AI Reporter"}
+            {t === "my-issues" ? "📋 My Issues" : "🌍 Explore Issues"}
           </button>
         ))}
       </div>
 
-      {tab === "chat" ? (
-        <div className="max-w-2xl">
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Describe your issue in plain English — our AI will extract the details and submit it for you.
-          </p>
-          <ChatReporter onIssueCreated={() => setTab("issues")} />
-        </div>
-      ) : (
-        <>
+
           {/* Stat cards */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             {[
@@ -112,7 +119,7 @@ function DashboardContent() {
           </div>
 
           {/* Category tabs */}
-          {issues.length > 0 && (
+          {currentData.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-6">
               {CATEGORIES.map((cat) => (
                 <button
@@ -144,7 +151,7 @@ function DashboardContent() {
               <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-gray-500 dark:text-gray-400">Loading your issues…</p>
             </div>
-          ) : issues.length === 0 ? (
+          ) : currentData.length === 0 ? (
             <div className="text-center py-20">
               <div className="w-16 h-16 bg-gray-100 dark:bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,9 +160,11 @@ function DashboardContent() {
               </div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No issues yet</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Use the AI Reporter tab or the form to get started</p>
-              <button onClick={() => setTab("chat")} className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity">
-                Try AI Reporter 🤖
-              </button>
+              <Link href="/dashboard/report">
+                <button className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity">
+                  Report a Problem →
+                </button>
+              </Link>
             </div>
           ) : filteredIssues.length === 0 ? (
             <div className="text-center py-12">
@@ -167,15 +176,13 @@ function DashboardContent() {
           ) : (
             <div className="space-y-4">
               <p className="text-xs text-gray-400 dark:text-gray-500">
-                {filteredIssues.length} of {issues.length} issues · sorted by status
+                {filteredIssues.length} of {currentData.length} issues · sorted by {tab === "explore" ? "upvotes" : "status"}
               </p>
               {filteredIssues.map((issue) => (
-                <IssueCard key={issue.id} issue={issue} />
+                <IssueCard key={issue.id} issue={issue} viewContext={tab} />
               ))}
             </div>
           )}
-        </>
-      )}
     </div>
   );
 }

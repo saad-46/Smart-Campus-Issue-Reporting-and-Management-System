@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
 import {
   signIn as authSignIn,
   signUp as authSignUp,
@@ -14,7 +15,7 @@ import { User, UserRole } from "@/types";
 export function useAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
-  // Start true — stays true until BOTH auth state AND profile are resolved
+  // loading stays TRUE until both Firebase auth state AND Firestore profile are resolved
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,15 +23,22 @@ export function useAuth() {
       setFirebaseUser(user);
 
       if (user) {
-        // Fetch profile — keep loading=true until this resolves
-        const profile = await getUserProfile(user.uid);
-        console.log("👤 Profile loaded:", profile?.role, "uid:", user.uid);
-        setUserProfile(profile);
+        try {
+          const profile = await getUserProfile(user.uid);
+          console.log("✅ Role loaded from Firestore:", profile?.activeRole || profile?.role, "| uid:", user.uid);
+          setUserProfile(profile);
+          if (profile) {
+            localStorage.setItem("role", profile.activeRole || profile.role);
+          }
+        } catch (err) {
+          console.error("❌ Failed to load user profile:", err);
+          setUserProfile(null);
+        }
       } else {
         setUserProfile(null);
       }
 
-      // Only mark loading done AFTER profile is fetched
+      // CRITICAL: only set loading=false AFTER profile fetch completes
       setLoading(false);
     });
 
@@ -38,25 +46,15 @@ export function useAuth() {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    // Do NOT touch loading here — let onAuthStateChanged handle it
-    try {
-      await authSignIn(email, password);
-      // onAuthStateChanged will fire, fetch profile, then set loading=false
-    } catch (error) {
-      throw error;
-    }
+    // Don't touch loading here — onAuthStateChanged handles it
+    await authSignIn(email, password);
   }, []);
 
   const signUp = useCallback(
     async (email: string, password: string, name: string, role: UserRole) => {
-      try {
-        const profile = await authSignUp(email, password, name, role);
-        // Profile is already set by signUp, onAuthStateChanged will also fire
-        setUserProfile(profile);
-        console.log("✅ Signup complete, role:", profile.role);
-      } catch (error) {
-        throw error;
-      }
+      const profile = await authSignUp(email, password, name, role);
+      setUserProfile(profile);
+      console.log("✅ Signup complete, role:", profile.role);
     },
     []
   );
@@ -64,7 +62,19 @@ export function useAuth() {
   const signOut = useCallback(async () => {
     await authSignOut();
     setUserProfile(null);
+    localStorage.removeItem("role");
   }, []);
+
+  const switchRole = useCallback(async (role: UserRole) => {
+    if (!firebaseUser) return;
+    try {
+      await updateDoc(doc(db, "users", firebaseUser.uid), { activeRole: role });
+      localStorage.setItem("role", role);
+      setUserProfile((prev) => prev ? { ...prev, activeRole: role } as User : null);
+    } catch (e) {
+      console.error("Failed to switch role", e);
+    }
+  }, [firebaseUser]);
 
   return {
     user: firebaseUser,
@@ -73,8 +83,9 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
-    isAdmin: userProfile?.role === "admin",
-    isWorker: userProfile?.role === "worker",
+    switchRole,
+    isAdmin: (userProfile?.activeRole || userProfile?.role) === "admin",
+    isWorker: (userProfile?.activeRole || userProfile?.role) === "worker",
     isAuthenticated: !!firebaseUser,
   };
 }

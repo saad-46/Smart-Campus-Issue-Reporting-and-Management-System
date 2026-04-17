@@ -18,7 +18,8 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (!loading && isAuthenticated && userProfile) {
-      router.replace(getRoleRedirect(userProfile.role));
+      const activeRole = localStorage.getItem("role") || userProfile.activeRole || userProfile.role;
+      router.replace(getRoleRedirect(activeRole));
     }
   }, [isAuthenticated, userProfile, loading, router]);
 

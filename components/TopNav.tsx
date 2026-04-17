@@ -11,6 +11,20 @@ export default function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState("");
+  const { switchRole } = useAuthContext();
+
+  const handleSwitchRole = async (role: "user" | "worker" | "admin") => {
+    if (!switchRole) return;
+    await switchRole(role);
+    setToastMsg(`Switched to ${role.charAt(0).toUpperCase() + role.slice(1)} Dashboard`);
+    setTimeout(() => setToastMsg(""), 3000);
+    
+    // Route based on role
+    if (role === "admin") router.push("/admin");
+    else if (role === "worker") router.push("/worker");
+    else router.push("/dashboard");
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -103,8 +117,27 @@ export default function TopNav() {
                   {userProfile.name}
                 </span>
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border capitalize ${roleBadge}`}>
-                  {userProfile.role}
+                  {userProfile.activeRole || userProfile.role}
                 </span>
+              </div>
+
+              {/* Role Switcher */}
+              <div className="hidden sm:block relative group">
+                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg text-sm font-medium transition-all duration-300">
+                  <span className="capitalize">{userProfile.activeRole || userProfile.role} Mode</span>
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div className="absolute right-0 top-full mt-2 w-36 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 flex flex-col overflow-hidden">
+                  <button onClick={() => handleSwitchRole("user")} className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 font-medium border-b border-gray-100 dark:border-white/5 transition-colors tracking-wide truncate">
+                    User Mode
+                  </button>
+                  <button onClick={() => handleSwitchRole("worker")} className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 font-medium border-b border-gray-100 dark:border-white/5 transition-colors tracking-wide truncate">
+                    Worker Mode
+                  </button>
+                  <button onClick={() => handleSwitchRole("admin")} className="px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 font-medium transition-colors tracking-wide truncate">
+                    Admin Mode
+                  </button>
+                </div>
               </div>
 
               {/* Sign out */}
@@ -160,6 +193,14 @@ export default function TopNav() {
               Sign Out
             </button>
           )}
+        </div>
+      )}
+      {toastMsg && (
+        <div className="fixed bottom-4 right-4 bg-gray-900 border border-gray-700 text-white px-5 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 transition-all duration-300">
+          <div className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <span className="font-medium text-sm">{toastMsg}</span>
         </div>
       )}
     </header>

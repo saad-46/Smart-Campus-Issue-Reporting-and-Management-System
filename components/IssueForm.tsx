@@ -11,6 +11,7 @@ import Textarea from "@/components/ui/Textarea";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { PriorityBadge } from "@/components/ui/Badge";
+import ImageEditor from "@/components/ImageEditor";
 
 const MAX_SIZE_MB = 5;
 const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -23,7 +24,8 @@ export default function IssueForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
-  const [imagePreview, setImagePreview] = useState("");
+  const [images, setImages] = useState<string[]>([]);
+  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
   const [imageError, setImageError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,14 +49,35 @@ export default function IssueForm() {
     }
 
     const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result as string);
+    reader.onloadend = () => setImages((prev) => [...prev, reader.result as string]);
     reader.readAsDataURL(file);
+    if (fileRef.current) fileRef.current.value = "";
   };
 
-  const removeImage = () => {
-    setImagePreview("");
-    setImageError("");
-    if (fileRef.current) fileRef.current.value = "";
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleEditorSave = (editedImage: string) => {
+    if (editingImageIndex !== null) {
+      setImages((prev) => {
+        const copy = [...prev];
+        copy[editingImageIndex] = editedImage;
+        return copy;
+      });
+    }
+    setEditingImageIndex(null);
+  };
+  
+  // Helper to convert base64 to File for upload
+  const dataURLtoFile = (dataurl: string, filename: string) => {
+    const arr = dataurl.split(",");
+    const mime = arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) u8arr[n] = bstr.charCodeAt(n);
+    return new File([u8arr], filename, { type: mime });
   };
 
   // ── Step 1: AI analysis ─────────────────────────────────────
@@ -83,12 +106,17 @@ export default function IssueForm() {
     setIsSubmitting(true);
     setError("");
     try {
-      let finalImageUrl = imagePreview || undefined;
+      let finalImageUrls: string[] = [];
 
-      // Intercept and upload to real storage if file exists
-      if (fileRef.current?.files?.[0]) {
+      // Intercept and upload to real storage if data strings exist
+      if (images.length > 0) {
         const { uploadImage } = await import("@/services/storageService");
-        finalImageUrl = await uploadImage(fileRef.current.files[0], "issues");
+        finalImageUrls = await Promise.all(
+          images.map((base64Data, idx) => {
+            const file = dataURLtoFile(base64Data, `issue-${idx}.jpg`);
+            return uploadImage(file, "issues");
+          })
+        );
       }
 
       await createIssue(
@@ -97,7 +125,7 @@ export default function IssueForm() {
         userProfile.name,
         aiResult.category,
         aiResult.priority,
-        finalImageUrl
+        finalImageUrls
       );
       router.push("/dashboard");
     } catch {
@@ -149,14 +177,19 @@ export default function IssueForm() {
               <p className="text-xs text-gray-400">Location</p>
               <p className="text-sm text-gray-900 dark:text-white">{location}</p>
             </div>
-            {imagePreview && (
+            {images.length > 0 && (
               <div>
-                <p className="text-xs text-gray-400 mb-2">Attached Image</p>
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="w-full max-h-48 object-cover rounded-xl border border-gray-200 dark:border-gray-700"
-                />
+                <p className="text-xs text-gray-400 mb-2">Attached Images ({images.length})</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {images.map((img, i) => (
+                    <img
+                      key={i}
+                      src={img}
+                      alt={`Preview ${i + 1}`}
+                      className="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-700"
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -215,54 +248,66 @@ export default function IssueForm() {
       {/* ── Image Upload ── */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Attach Image <span className="text-gray-400 font-normal">(optional · JPG/PNG/WebP · max 5 MB)</span>
+          Attach Images <span className="text-gray-400 font-normal">(optional · multiple allowed)</span>
         </label>
 
-        {imagePreview ? (
-          <div className="relative">
-            <img
-              src={imagePreview}
-              alt="Preview"
-              className="w-full h-56 object-cover rounded-xl border border-gray-200 dark:border-gray-700"
-            />
-            <button
-              type="button"
-              onClick={removeImage}
-              className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors shadow-lg"
-              aria-label="Remove image"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg">
-              ✓ Image attached
-            </div>
+        {images.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            {images.map((img, idx) => (
+              <div key={idx} className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                <img
+                  src={img}
+                  alt={`Preview ${idx + 1}`}
+                  className="w-full h-32 object-cover"
+                />
+                
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingImageIndex(idx)}
+                    className="p-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-full transition-colors"
+                    title="Edit/Draw"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                    title="Remove"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        ) : (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/jpg,image/png,image/webp"
-              onChange={handleImageChange}
-              className="hidden"
-              id="issue-image"
-            />
-            <label
-              htmlFor="issue-image"
-              className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-500/5 transition-all duration-200 group"
-            >
-              <svg className="w-10 h-10 text-gray-400 group-hover:text-purple-500 transition-colors mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-purple-500 transition-colors">
-                Click to upload a photo
-              </p>
-              <p className="text-xs text-gray-400 mt-1">JPG, PNG or WebP up to 5 MB</p>
-            </label>
-          </>
         )}
+
+        <div className="flex gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            onChange={handleImageChange}
+            className="hidden"
+            id="issue-image"
+            multiple={false}
+          />
+          <label
+            htmlFor="issue-image"
+            className="flex-1 flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-500/5 transition-all group text-center"
+          >
+            <svg className="w-6 h-6 text-gray-400 group-hover:text-purple-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            <span className="text-xs text-gray-500 font-medium">Upload File</span>
+          </label>
+          
+          <label className="flex-1 flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/5 transition-all group text-center">
+            <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} className="hidden" />
+            <svg className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span className="text-xs text-gray-500 font-medium">Take Photo</span>
+          </label>
+        </div>
 
         {imageError && (
           <p className="mt-2 text-sm text-red-500">{imageError}</p>
@@ -280,6 +325,14 @@ export default function IssueForm() {
       <p className="text-xs text-gray-400 text-center">
         AI will automatically categorize your issue and assign a priority level
       </p>
+      
+      {editingImageIndex !== null && (
+        <ImageEditor
+          imageUrl={images[editingImageIndex]}
+          onSave={handleEditorSave}
+          onCancel={() => setEditingImageIndex(null)}
+        />
+      )}
     </form>
   );
 }

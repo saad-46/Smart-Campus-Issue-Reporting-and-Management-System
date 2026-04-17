@@ -109,19 +109,22 @@ function WorkerContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userProfile) return;
-
+    if (!userProfile?.id) return;
+    let active = true;
     const unsubscribe = subscribeToAllIssues((allIssues) => {
-      // Get issues assigned to the worker OR unassigned issues
-      const myIssues = allIssues.filter(i => 
+      if (!active) return;
+      const myIssues = allIssues.filter(i =>
         (i.assignedTo === userProfile.id || !i.assignedTo) && i.status !== "Resolved"
       );
       setAssignedIssues(myIssues);
       setLoading(false);
     });
-
-    return () => unsubscribe();
-  }, [userProfile]);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.id]);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">

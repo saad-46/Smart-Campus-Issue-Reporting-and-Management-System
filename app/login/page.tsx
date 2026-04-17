@@ -7,7 +7,7 @@ import { useAuthContext } from "@/components/AuthProvider";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
-// Routing constants handled inline now
+// Routing constants handled inside useEffect
 
 export default function LoginPage() {
   const { signIn, userProfile, loading } = useAuthContext();
@@ -17,41 +17,48 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // Track whether this is a fresh login (not a page load while already signed in)
+  const [justSignedIn, setJustSignedIn] = useState(false);
 
-  // Wait for profile to load, THEN redirect based on actual role
+  // Only auto-redirect if the user JUST signed in — not on page load
   useEffect(() => {
-    if (!loading) {
-      if (!userProfile || !userProfile.role) return;
-      
-      const role = userProfile.role;
-      console.log("User Role:", role);
+    if (loading) return;
+    if (!justSignedIn) return;   // ← key: don't redirect on initial load
+    if (!userProfile) return;
 
-      if (role === "admin") {
-        router.push("/admin");
-      } else if (role === "worker") {
-        router.push("/worker");
-      } else {
-        router.push("/dashboard"); // USER
-      }
+    // Persist role into localStorage right away to sync the layout fast
+    const newRole = userProfile.activeRole || userProfile.role || "user";
+    localStorage.setItem("role", newRole);
+
+    const role = localStorage.getItem("role");
+    console.log(`✅ activeRole="${role}" → Redirecting`);
+
+    if (role === "admin") {
+      router.push("/admin");
+    } else if (role === "worker") {
+      router.push("/worker");
+    } else {
+      router.push("/dashboard"); // USER
     }
-  }, [userProfile, loading, router]);
+  }, [loading, userProfile, justSignedIn, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
-
     try {
       await signIn(email, password);
-      // Redirect handled by useEffect above once profile loads
+      setJustSignedIn(true); // allow redirect now
     } catch (err: unknown) {
       const fe = err as { code?: string };
-      if (fe.code === "auth/user-not-found" || fe.code === "auth/wrong-password" || fe.code === "auth/invalid-credential") {
+      if (
+        fe.code === "auth/user-not-found" ||
+        fe.code === "auth/wrong-password" ||
+        fe.code === "auth/invalid-credential"
+      ) {
         setError("Invalid email or password.");
       } else if (fe.code === "auth/too-many-requests") {
         setError("Too many attempts. Please try again later.");
-      } else if (fe.code === "auth/user-disabled") {
-        setError("This account has been disabled.");
       } else {
         setError("Failed to sign in. Please try again.");
       }
@@ -59,13 +66,38 @@ export default function LoginPage() {
     }
   };
 
-  // Show spinner while redirecting after successful login
+  // Already logged in — show options instead of form
   if (!loading && userProfile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Redirecting…</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center px-4">
+        <div className="w-full max-w-sm text-center">
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-xl">
+            <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <p className="text-white font-bold text-lg mb-1">Already signed in</p>
+            <p className="text-gray-400 text-sm mb-1">{userProfile.email}</p>
+            <span className="inline-block px-3 py-1 bg-white/10 rounded-full text-xs text-gray-300 capitalize mb-6">
+              Role: <strong className="text-white">{userProfile.role}</strong>
+            </span>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => router.replace(getRedirectPath(userProfile.role))}
+                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white text-sm font-bold rounded-xl transition-all"
+              >
+                Go to My Dashboard →
+              </button>
+              <Link
+                href="/switch-role"
+                className="block w-full py-3 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold rounded-xl transition-all border border-white/10"
+              >
+                🎭 Switch Role (Demo)
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -74,7 +106,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 mb-6">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
@@ -87,7 +118,7 @@ export default function LoginPage() {
             </span>
           </Link>
           <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
-          <p className="text-sm text-gray-400">Sign in — you&apos;ll be redirected based on your role</p>
+          <p className="text-sm text-gray-400">Sign in to continue</p>
         </div>
 
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-xl">

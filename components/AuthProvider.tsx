@@ -20,6 +20,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isWorker: boolean;
   isAuthenticated: boolean;
+  switchRole: (role: UserRole) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

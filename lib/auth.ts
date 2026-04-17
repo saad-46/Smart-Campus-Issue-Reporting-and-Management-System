@@ -41,7 +41,9 @@ export async function signUp(
       id: credential.user.uid,
       name,
       email,
-      role,
+      role, // keep legacy field for safety
+      roles: ["user", "worker", "admin"],
+      activeRole: role,
       createdAt: new Date(),
     };
 

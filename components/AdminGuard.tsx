@@ -9,26 +9,28 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (!isAuthenticated) router.replace("/login");
-      else if (userProfile && userProfile.role !== "admin") {
-        router.replace("/dashboard");
-      }
+    if (loading) return;
+    if (!isAuthenticated) {
+      router.replace("/login");
+      return;
+    }
+    if (userProfile && userProfile.role !== "admin") {
+      const path = userProfile.role === "worker" ? "/worker" : "/dashboard";
+      router.replace(path);
     }
   }, [loading, isAuthenticated, userProfile, router]);
 
   if (loading) {
     return (
       <div className="page-bg min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Loading...</p>
-        </div>
+        <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  if (!loading && isAuthenticated && userProfile && userProfile.role !== "admin") {
+  if (!isAuthenticated || !userProfile) return null;
+
+  if (userProfile.role !== "admin") {
     return (
       <div className="page-bg min-h-screen flex items-center justify-center px-4">
         <div className="glass p-8 max-w-md w-full text-center">
@@ -43,9 +45,10 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
           </p>
           <button
             onClick={() => {
-              router.replace("/dashboard");
+              const path = userProfile.role === "worker" ? "/worker" : "/dashboard";
+              router.replace(path);
             }}
-            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/25"
+            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white rounded-xl transition-all shadow-lg shadow-purple-500/25"
           >
             Go to My Dashboard
           </button>
@@ -54,13 +57,5 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     );
   }
 
-  if (!loading && isAuthenticated && userProfile?.role === "admin") {
-    return <>{children}</>;
-  }
-
-  return (
-    <div className="page-bg min-h-screen flex items-center justify-center">
-      <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  return <>{children}</>;
 }

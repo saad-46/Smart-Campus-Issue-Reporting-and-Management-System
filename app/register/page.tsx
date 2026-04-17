@@ -33,22 +33,22 @@ export default function RegisterPage() {
     if (!initialLoadDone.current) {
       initialLoadDone.current = true;
       // If already logged in when page loads, redirect away
-      if (userProfile && userProfile.role) {
-        const role = userProfile.role;
-        console.log("User Role:", role);
-        if (role === "admin") router.push("/admin");
-        else if (role === "worker") router.push("/worker");
+      if (userProfile) {
+        const activeRole = localStorage.getItem("role") || userProfile.activeRole || userProfile.role;
+        console.log("User Role:", activeRole);
+        if (activeRole === "admin") router.push("/admin");
+        else if (activeRole === "worker") router.push("/worker");
         else router.push("/dashboard");
       }
       return;
     }
 
     // After initial load: only redirect if we just signed up
-    if (justSignedUp.current && userProfile && userProfile.role) {
-      const role = userProfile.role;
-      console.log("User Role:", role);
-      if (role === "admin") router.push("/admin");
-      else if (role === "worker") router.push("/worker");
+    if (justSignedUp.current && userProfile) {
+      const activeRole = localStorage.getItem("role") || userProfile.activeRole || userProfile.role;
+      console.log("User Role:", activeRole);
+      if (activeRole === "admin") router.push("/admin");
+      else if (activeRole === "worker") router.push("/worker");
       else router.push("/dashboard");
     }
   }, [userProfile, loading, router]);

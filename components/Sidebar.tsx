@@ -104,7 +104,7 @@ export default function Sidebar() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{userProfile?.name}</p>
               <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border capitalize ${roleBadgeColor}`}>
-                {userProfile?.role}
+                {userProfile?.activeRole || userProfile?.role}
               </span>
             </div>
           </div>

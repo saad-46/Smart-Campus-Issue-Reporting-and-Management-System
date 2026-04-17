@@ -50,6 +50,7 @@ function docToIssue(docId: string, data: Record<string, unknown>): Issue {
     startedAt: data.startedAt instanceof Timestamp ? data.startedAt.toDate() : undefined,
     resolvedAt: data.resolvedAt instanceof Timestamp ? data.resolvedAt.toDate() : undefined,
     imageUrl: (data.imageUrl as string) || "",
+    imageUrls: (data.imageUrls as string[]) || [],
   };
 }
 
@@ -62,7 +63,7 @@ export async function createIssue(
   userName: string,
   category: string,
   priority: Priority,
-  imageUrl?: string
+  imageUrls?: string[]
 ): Promise<string> {
   const now = Timestamp.now();
 
@@ -81,7 +82,8 @@ export async function createIssue(
     upvotes: 0,
     upvotedBy: [],
     escalated: false,
-    imageUrl: imageUrl || "",
+    imageUrl: imageUrls?.[0] || "", // fallback legacy support
+    imageUrls: imageUrls || [],
   });
 
   return docRef.id;
@@ -127,23 +129,26 @@ export function subscribeToSingleIssue(
 
 /**
  * Subscribe to issues created by a specific user (for user dashboard).
+ * Sorts in memory to avoid requiring a composite Firestore index.
  * Returns an unsubscribe function.
  */
 export function subscribeToUserIssues(
   userId: string,
   callback: (issues: Issue[]) => void
 ): () => void {
+  // Only use `where` — no `orderBy` — to avoid needing a composite index
   const q = query(
     collection(db, ISSUES_COLLECTION),
-    where("createdBy", "==", userId),
-    orderBy("createdAt", "desc")
+    where("createdBy", "==", userId)
   );
 
   return onSnapshot(q, (snapshot) => {
-    const issues = snapshot.docs.map((doc) =>
-      docToIssue(doc.id, doc.data() as Record<string, unknown>)
-    );
+    const issues = snapshot.docs
+      .map((doc) => docToIssue(doc.id, doc.data() as Record<string, unknown>))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); // sort newest first in memory
     callback(issues);
+  }, (error) => {
+    console.error("subscribeToUserIssues error:", error.code, error.message);
   });
 }
 
