@@ -37,11 +37,11 @@ export default function TopNav() {
     : isWorker
     ? [
         { href: "/worker", label: "My Tasks" },
-        { href: "/dashboard/report", label: "Report Issue" },
+        { href: "/dashboard?tab=report", label: "Report Issue" },
       ]
     : [
         { href: "/dashboard", label: "My Issues" },
-        { href: "/dashboard/report", label: "Report Issue" },
+        { href: "/dashboard?tab=report", label: "Report Issue" },
       ];
 
   const roleBadge = isAdmin
