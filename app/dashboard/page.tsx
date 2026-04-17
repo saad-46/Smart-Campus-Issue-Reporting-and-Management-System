@@ -8,6 +8,7 @@ import IssueCard from "@/components/IssueCard";
 import ChatReporter from "@/components/ChatReporter";
 import IssueForm from "@/components/IssueForm";
 import Button from "@/components/ui/Button";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import { Issue } from "@/types";
 import { subscribeToUserIssues, subscribeToAllIssues } from "@/lib/firestore";
 

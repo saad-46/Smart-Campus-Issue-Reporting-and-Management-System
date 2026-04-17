@@ -9,14 +9,13 @@ export default function WorkerGuard({ children }: { children: React.ReactNode })
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (!isAuthenticated) router.push("/login");
-      else if (userProfile) {
-        const activeRole = localStorage.getItem("role") || userProfile.activeRole || userProfile.role;
-        if (activeRole !== "worker" && activeRole !== "admin") {
-          router.push("/dashboard");
-        }
-      }
+    if (loading) return;
+    if (!isAuthenticated) {
+      router.replace("/login");
+      return;
+    }
+    if (userProfile && userProfile.role !== "worker" && userProfile.role !== "admin") {
+      router.replace("/dashboard");
     }
   }, [loading, isAuthenticated, userProfile, router]);
 
@@ -28,10 +27,10 @@ export default function WorkerGuard({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!loading && isAuthenticated && userProfile) {
-    const activeRole = typeof window !== "undefined" ? localStorage.getItem("role") || userProfile.activeRole || userProfile.role : userProfile.activeRole || userProfile.role;
-    if (activeRole !== "worker" && activeRole !== "admin") {
-      return (
+  if (!isAuthenticated || !userProfile) return null;
+
+  if (userProfile.role !== "worker" && userProfile.role !== "admin") {
+    return (
       <div className="page-bg min-h-screen flex items-center justify-center px-4">
         <div className="glass p-8 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -44,7 +43,7 @@ export default function WorkerGuard({ children }: { children: React.ReactNode })
             This area is for workers only.
           </p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.replace("/dashboard")}
             className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
           >
             Go to Dashboard
@@ -54,14 +53,5 @@ export default function WorkerGuard({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!loading && isAuthenticated && userProfile) {
-    const activeRole = typeof window !== "undefined" ? localStorage.getItem("role") || userProfile.activeRole || userProfile.role : userProfile.activeRole || userProfile.role;
-    if (activeRole === "worker" || activeRole === "admin") return <>{children}</>;
-  }
-
-  return (
-    <div className="page-bg min-h-screen flex items-center justify-center">
-      <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  return <>{children}</>;
 }
