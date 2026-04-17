@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           })();
         `}} />
       </head>
-      <body className="min-h-screen font-sans antialiased bg-slate-50 dark:bg-slate-900 text-gray-900 dark:text-white transition-colors duration-300">
+      <body className="min-h-screen font-sans antialiased bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-gray-100 transition-colors duration-500">
         <ThemeProvider>
           <AuthProvider>
             {children}

@@ -14,7 +14,8 @@ export default function WorkerGuard({ children }: { children: React.ReactNode })
       router.replace("/login");
       return;
     }
-    if (userProfile && userProfile.role !== "worker" && userProfile.role !== "admin") {
+    const effectiveRole = userProfile?.activeRole || userProfile?.role;
+    if (userProfile && effectiveRole !== "worker" && effectiveRole !== "admin") {
       router.replace("/dashboard");
     }
   }, [loading, isAuthenticated, userProfile, router]);
@@ -29,7 +30,8 @@ export default function WorkerGuard({ children }: { children: React.ReactNode })
 
   if (!isAuthenticated || !userProfile) return null;
 
-  if (userProfile.role !== "worker" && userProfile.role !== "admin") {
+  const effectiveRole = userProfile?.activeRole || userProfile?.role;
+  if (effectiveRole !== "worker" && effectiveRole !== "admin") {
     return (
       <div className="page-bg min-h-screen flex items-center justify-center px-4">
         <div className="glass p-8 max-w-md w-full text-center">

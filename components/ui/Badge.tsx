@@ -17,15 +17,15 @@ interface BadgeProps {
 }
 
 const priorityStyles: Record<Priority, string> = {
-  High: "bg-red-500/20 text-red-400 border-red-500/30",
-  Medium: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  Low: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  High: "bg-red-500/10 text-red-500 border-red-500/20",
+  Medium: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  Low: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
 };
 
 const statusStyles: Record<IssueStatus, string> = {
-  Open: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  "In Progress": "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  Resolved: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  Open: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
+  "In Progress": "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  Resolved: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
 };
 
 export default function Badge({
@@ -47,8 +47,8 @@ export default function Badge({
     <span
       className={`
         inline-flex items-center
-        px-2.5 py-1 text-xs font-medium
-        rounded-lg border
+        px-3 py-1 text-[10px] font-black uppercase tracking-widest
+        rounded-full border shadow-sm
         ${colorClasses}
         ${className}
       `}

@@ -69,17 +69,6 @@ export default function IssueForm() {
     setEditingImageIndex(null);
   };
   
-  // Helper to convert base64 to File for upload
-  const dataURLtoFile = (dataurl: string, filename: string) => {
-    const arr = dataurl.split(",");
-    const mime = arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) u8arr[n] = bstr.charCodeAt(n);
-    return new File([u8arr], filename, { type: mime });
-  };
-
   // ── Step 1: AI analysis ─────────────────────────────────────
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,19 +94,12 @@ export default function IssueForm() {
     if (!userProfile || !aiResult) return;
     setIsSubmitting(true);
     setError("");
-    try {
-      let finalImageUrls: string[] = [];
+    console.log("Submitting issue...", { title, description, location, category: aiResult.category, priority: aiResult.priority });
 
-      // Intercept and upload to real storage if data strings exist
-      if (images.length > 0) {
-        const { uploadImage } = await import("@/services/storageService");
-        finalImageUrls = await Promise.all(
-          images.map((base64Data, idx) => {
-            const file = dataURLtoFile(base64Data, `issue-${idx}.jpg`);
-            return uploadImage(file, "issues");
-          })
-        );
-      }
+    try {
+      // Store base64 images directly — no Firebase Storage needed
+      // Compress large images to keep Firestore document size reasonable
+      const finalImageUrls: string[] = images.slice(0, 3); // max 3 images
 
       await createIssue(
         { title, description, location },
@@ -127,9 +109,12 @@ export default function IssueForm() {
         aiResult.priority,
         finalImageUrls
       );
+
+      console.log("✅ Issue submitted successfully!");
       router.push("/dashboard");
-    } catch {
-      setError("Failed to submit issue. Please try again.");
+    } catch (err) {
+      console.error("❌ Submit failed:", err);
+      setError("Failed to submit issue. Please check your connection and try again.");
       setIsSubmitting(false);
     }
   };

@@ -143,19 +143,22 @@ function DashboardContent() {
       ) : (
         <div className="animate-in fade-in duration-500">
           {/* Stat cards */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
             {[
-              { label: "Open", count: openCount, color: "text-blue-500", filter: "Open", ring: "ring-blue-500/40", bg: "bg-blue-500/5" },
-              { label: "In Progress", count: inProgressCount, color: "text-purple-500", filter: "In Progress", ring: "ring-purple-500/40", bg: "bg-purple-500/5" },
-              { label: "Resolved", count: resolvedCount, color: "text-emerald-500", filter: "Resolved", ring: "ring-emerald-500/40", bg: "bg-emerald-500/5" },
-            ].map(({ label, count, color, filter, ring, bg }) => (
+              { label: "Open Issues", count: openCount, color: "text-blue-500", filter: "Open", shadow: "shadow-blue-500/20", bg: "bg-blue-500/5", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/></svg> },
+              { label: "Researching", count: inProgressCount, color: "text-indigo-500", filter: "In Progress", shadow: "shadow-indigo-500/20", bg: "bg-indigo-500/5", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> },
+              { label: "Resolved", count: resolvedCount, color: "text-emerald-500", filter: "Resolved", shadow: "shadow-emerald-500/20", bg: "bg-emerald-500/5", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg> },
+            ].map(({ label, count, color, filter, shadow, bg, icon }) => (
               <button
                 key={label}
                 onClick={() => setStatusFilter(statusFilter === filter ? "all" : filter)}
-                className={`stat-card text-left transition-all duration-300 hover:scale-[1.02] ${bg} ${statusFilter === filter ? `ring-2 ${ring}` : ""}`}
+                className={`group relative p-8 rounded-[32px] bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl ${shadow} ${statusFilter === filter ? `ring-4 ring-indigo-500/20` : ""}`}
               >
-                <p className={`text-3xl font-bold ${color}`}>{count}</p>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">{label}</p>
+                <div className={`w-12 h-12 rounded-2xl ${bg} ${color} flex items-center justify-center mb-6 transition-transform group-hover:rotate-12`}>
+                  {icon}
+                </div>
+                <p className={`text-4xl font-black ${color} tracking-tighter`}>{count}</p>
+                <p className="text-[10px] font-black text-slate-400 dark:text-gray-500 mt-2 uppercase tracking-widest">{label}</p>
               </button>
             ))}
           </div>

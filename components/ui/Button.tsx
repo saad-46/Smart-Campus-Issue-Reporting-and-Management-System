@@ -15,15 +15,15 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<string, string> = {
   primary:
-    "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40",
+    "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-xl shadow-indigo-500/20",
   secondary:
-    "bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 hover:border-gray-600",
+    "bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 hover:border-white/20",
   danger:
-    "bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white shadow-lg shadow-red-500/25",
+    "bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-xl shadow-red-500/10",
   ghost:
-    "bg-transparent hover:bg-gray-800 text-gray-400 hover:text-gray-200",
+    "bg-transparent hover:bg-slate-800/50 text-slate-400 hover:text-slate-200",
   success:
-    "bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white shadow-lg shadow-green-500/25",
+    "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-xl shadow-emerald-500/20",
 };
 
 const sizeClasses: Record<string, string> = {
@@ -45,11 +45,11 @@ export default function Button({
     <button
       className={`
         inline-flex items-center justify-center gap-2
-        font-medium rounded-xl
-        transition-all duration-200 ease-out
-        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-950
+        font-black rounded-xl
+        transition-all duration-300 ease-out
+        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950
         disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
-        active:scale-[0.98]
+        hover:scale-105 active:scale-95
         ${variantClasses[variant]}
         ${sizeClasses[size]}
         ${className}

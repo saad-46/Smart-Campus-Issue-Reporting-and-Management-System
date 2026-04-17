@@ -29,10 +29,10 @@ export default function IssueCard({ issue, showActions = false, viewContext = "m
       <div className={`
         glass relative group overflow-hidden
         border-l-4 ${priorityBorder[issue.priority]}
-        border-t border-r border-b border-gray-800/60
-        rounded-2xl p-5 
-        hover:scale-105 hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10
-        transition-all duration-300 ease-out flex flex-col h-full
+        border shadow-xl
+        rounded-[32px] p-6 
+        hover:scale-[1.02] hover:border-indigo-500/30 hover:shadow-2xl hover:shadow-indigo-500/10
+        transition-all duration-500 ease-out flex flex-col h-full
       `}>
         {/* Header row */}
         <div className="flex items-start justify-between gap-3 mb-2">
@@ -63,22 +63,23 @@ export default function IssueCard({ issue, showActions = false, viewContext = "m
 
         {/* Images Preview */}
         {(issue.imageUrls?.length ? issue.imageUrls : issue.imageUrl ? [issue.imageUrl] : []).length > 0 && (
-          <div className="mb-3">
-            <div className={`grid gap-2 ${issue.imageUrls && issue.imageUrls.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+          <div className="mb-4">
+            <div className={`grid gap-3 ${issue.imageUrls && issue.imageUrls.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
               {(issue.imageUrls?.length ? issue.imageUrls : [issue.imageUrl as string]).slice(0, 2).map((url, i) => (
-                <img
-                  key={i}
-                  src={url}
-                  alt={issue.title}
-                  className="w-full h-44 object-cover rounded-xl border border-gray-200 dark:border-white/10 cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setShowImageModal(true)}
-                />
+                <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-slate-200 dark:border-white/10 shadow-lg group/img">
+                  <img
+                    src={url}
+                    alt={issue.title}
+                    className="w-full h-full object-cover cursor-pointer transition-transform duration-700 group-hover/img:scale-110"
+                    onClick={() => setShowImageModal(true)}
+                  />
+                </div>
               ))}
             </div>
             {issue.imageUrls && issue.imageUrls.length > 2 && (
-              <p className="text-xs text-gray-400 mt-2 text-center">+{issue.imageUrls.length - 2} more image(s)</p>
+              <p className="text-[10px] font-black text-slate-400 dark:text-gray-500 mt-2 text-center uppercase tracking-widest">+{issue.imageUrls.length - 2} more photos</p>
             )}
-            <p className="text-[10px] text-gray-500 mt-1 text-center">Click to enlarge</p>
+            <p className="text-[9px] font-black text-slate-300 dark:text-gray-600 mt-1 text-center uppercase tracking-tighter">Click to enlarge</p>
           </div>
         )}
 
@@ -154,10 +155,10 @@ export default function IssueCard({ issue, showActions = false, viewContext = "m
         )}
 
         {/* Global Details Forwarder */}
-        <div className="mt-4 pt-4 border-t border-gray-800/40">
-          <Link href={`/issues/${issue.id}`} className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500 text-white transition-all shadow-lg shadow-purple-500/20">
-            View Issue Details & Chat
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        <div className="mt-auto pt-6 border-t border-slate-100 dark:border-white/5">
+          <Link href={`/issues/${issue.id}`} className="flex items-center justify-center gap-3 w-full py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white transition-all shadow-xl shadow-indigo-600/20 active:scale-95 group/btn">
+            View Thread
+            <svg className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
           </Link>
         </div>
       </div>

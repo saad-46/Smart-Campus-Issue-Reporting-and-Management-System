@@ -19,6 +19,7 @@ function IssueDetailContent() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,48 +97,94 @@ function IssueDetailContent() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
         {/* Left Col: Details */}
         <div className="lg:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-6 custom-scrollbar">
-          <div className="glass rounded-2xl p-6 border border-gray-800/60 shadow-xl flex flex-col gap-4">
+          <div className="bg-white dark:bg-[#111827] rounded-2xl p-6 border border-gray-200 dark:border-white/10 shadow-lg transition-all duration-200 hover:shadow-xl flex flex-col gap-6">
+            <div className="border-b border-gray-100 dark:border-white/5 pb-4">
+              <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Issue Summary</h2>
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <PriorityBadge priority={issue.priority} />
               <StatusBadge status={issue.status} />
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700 font-mono">
+              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/5">
                 {issue.category}
               </span>
             </div>
 
-            {(issue.imageUrls?.length ? issue.imageUrls : issue.imageUrl ? [issue.imageUrl] : []).length > 0 && (
-              <div className={`grid gap-2 ${(issue.imageUrls || []).length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-                {(issue.imageUrls?.length ? issue.imageUrls : [issue.imageUrl as string]).map((url, i) => (
-                  <img key={i} src={url} alt={`Issue image ${i+1}`} className="w-full rounded-xl object-cover border border-gray-800 shadow-md max-h-64 cursor-pointer hover:opacity-90" />
-                ))}
+            <div className="space-y-6">
+              {/* Section: Title */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <label className="text-[10px] font-black uppercase tracking-widest">Title</label>
+                </div>
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{issue.title}</p>
               </div>
-            )}
 
-            <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Description</h3>
-              <p className="text-sm text-gray-300 leading-relaxed bg-gray-900/30 p-4 rounded-xl border border-gray-800/50">
-                {issue.description}
-              </p>
-            </div>
+              <div className="h-px bg-gray-100 dark:bg-white/5" />
 
-            <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                Location
-              </h3>
-              <p className="text-sm font-medium text-gray-200">{issue.location}</p>
+              {/* Section: Description */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7"/></svg>
+                  <label className="text-[10px] font-black uppercase tracking-widest">Description</label>
+                </div>
+                <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/5">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                    {issue.description}
+                  </p>
+                </div>
+              </div>
+
+              <div className="h-px bg-gray-100 dark:bg-white/5" />
+
+              {/* Section: Location */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  <label className="text-[10px] font-black uppercase tracking-widest">Location</label>
+                </div>
+                <p className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-tighter">{issue.location}</p>
+              </div>
+
+              {(issue.imageUrls?.length ? issue.imageUrls : issue.imageUrl ? [issue.imageUrl] : []).length > 0 && (
+                <>
+                  <div className="h-px bg-gray-100 dark:bg-white/5" />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                      <label className="text-[10px] font-black uppercase tracking-widest">Attached Images</label>
+                    </div>
+                    <div className="bg-gray-50 dark:bg-white/5 p-3 rounded-xl border border-gray-100 dark:border-white/5 grid grid-cols-2 gap-4">
+                      {(issue.imageUrls?.length ? issue.imageUrls : [issue.imageUrl as string]).map((url, i) => (
+                        <div 
+                          key={i} 
+                          onClick={() => setSelectedImageUrl(url)}
+                          className="group relative rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-md aspect-square cursor-zoom-in"
+                        >
+                          <img src={url} alt={`Issue preview ${i+1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
         {/* Right Col: Live Chat Area */}
-        <div className="lg:col-span-2 glass flex flex-col rounded-2xl border border-gray-800/60 shadow-xl overflow-hidden min-h-[500px] lg:min-h-0">
-          <div className="px-6 py-4 border-b border-gray-800/80 bg-gray-900/40 shrink-0">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Live Discussion Thread
-            </h2>
-            <p className="text-xs text-gray-500 mt-1">Communicate directly regarding this issue.</p>
+        <div className="lg:col-span-2 bg-slate-50/50 dark:bg-[#0F172A] flex flex-col rounded-[32px] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden min-h-[500px] lg:min-h-0">
+          <div className="px-8 py-5 border-b border-slate-200 dark:border-white/10 bg-white/80 dark:bg-white/[0.02] backdrop-blur-md shrink-0 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-glow shadow-emerald-500/50" />
+                Live Discussion
+              </h2>
+              <p className="text-[10px] font-bold text-slate-400 dark:text-gray-500 mt-1 uppercase tracking-tight">Real-time issue resolution thread</p>
+            </div>
           </div>
 
           {(() => {
@@ -146,13 +193,13 @@ function IssueDetailContent() {
             
             if (!canChat) {
               return (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-gray-500">
-                  <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                    <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-500">
+                  <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6 shadow-inner">
+                    <svg className="w-10 h-10 text-slate-400 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                   </div>
-                  <h3 className="text-white font-medium mb-2">Restricted Access</h3>
-                  <p className="text-sm max-w-sm">
-                    Chat is strictly limited to the original author and assigned workers / admins to protect privacy.
+                  <h3 className="text-slate-900 dark:text-white font-black uppercase tracking-tight mb-2">Private Thread</h3>
+                  <p className="text-sm font-medium max-w-sm mx-auto opacity-70">
+                    Communication is limited to the author and assigned experts.
                   </p>
                 </div>
               );
@@ -160,29 +207,31 @@ function IssueDetailContent() {
 
             return (
               <>
-                <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 custom-scrollbar bg-gray-950/20">
+                <div className="flex-1 overflow-y-auto px-8 py-8 space-y-6 custom-scrollbar bg-slate-50/30 dark:bg-transparent">
             {messages.length === 0 ? (
-              <div className="h-full flex items-center justify-center flex-col text-gray-500">
-                <svg className="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                <p className="text-sm">No messages yet. Start the conversation!</p>
+              <div className="h-full flex items-center justify-center flex-col text-slate-400">
+                <div className="w-24 h-24 bg-white dark:bg-white/[0.02] rounded-full flex items-center justify-center mb-6 shadow-xl border border-slate-100 dark:border-white/5">
+                  <svg className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                </div>
+                <p className="text-xs font-black uppercase tracking-widest opacity-40">No messages yet</p>
               </div>
             ) : (
               messages.map(msg => {
                 const isMe = msg.authorId === userProfile?.id;
                 return (
-                  <div key={msg.id} className={`flex flex-col max-w-[80%] ${isMe ? "ml-auto items-end" : "mr-auto items-start"}`}>
-                    <div className="flex items-center gap-2 mb-1 px-1">
-                      <span className="text-xs font-medium text-gray-300">{isMe ? "You" : msg.authorName}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase tracking-widest font-bold ${
-                        msg.authorRole === "worker" ? "bg-indigo-500/20 text-indigo-400" :
-                        msg.authorRole === "admin" ? "bg-rose-500/20 text-rose-400" :
-                        "bg-gray-800 text-gray-400"
+                  <div key={msg.id} className={`flex flex-col max-w-[85%] ${isMe ? "ml-auto items-end" : "mr-auto items-start"}`}>
+                    <div className="flex items-center gap-2 mb-2 px-1">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{isMe ? "You" : msg.authorName}</span>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full uppercase tracking-tighter font-black shadow-sm ${
+                        msg.authorRole === "worker" ? "bg-indigo-500 text-white" :
+                        msg.authorRole === "admin" ? "bg-rose-500 text-white" :
+                        "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-gray-300"
                       }`}>{msg.authorRole}</span>
                     </div>
-                    <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                    <div className={`px-5 py-3.5 rounded-2xl text-sm font-medium leading-relaxed shadow-xl break-words ${
                       isMe 
-                      ? "bg-indigo-600 text-white rounded-tr-sm" 
-                      : "bg-gray-800 border border-gray-700 text-gray-200 rounded-tl-sm"
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-none" 
+                      : "bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-white/5 text-slate-800 dark:text-gray-100 rounded-tl-none"
                     }`}>
                       {msg.text}
                     </div>
@@ -193,28 +242,49 @@ function IssueDetailContent() {
             <div ref={bottomRef} className="h-1" />
           </div>
 
-          <form onSubmit={handleSend} className="p-4 border-t border-gray-800/80 bg-gray-900/80 shrink-0 flex gap-3">
+          <form onSubmit={handleSend} className="p-6 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] backdrop-blur-xl shrink-0 flex gap-4">
             <input
               type="text"
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
               placeholder="Type your message..."
-              className="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+              className="flex-1 bg-slate-100 dark:bg-[#020617] border-2 border-slate-200 dark:border-white/10 rounded-2xl px-6 py-4 text-sm font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
             />
             <button 
               type="submit"
               disabled={!chatInput.trim()}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-black uppercase tracking-widest rounded-2xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:grayscale shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-3"
             >
-              Send
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                </button>
-              </form>
+              <span className="hidden sm:inline">Send</span>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            </button>
+          </form>
             </>
           );
         })()}
         </div>
       </div>
+      {/* Image Zoom Modal */}
+      {selectedImageUrl && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 md:p-10 transition-all duration-300 animate-in fade-in"
+          onClick={() => setSelectedImageUrl(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center bg-white/10 rounded-full text-white hover:bg-white/20 transition-all"
+            onClick={() => setSelectedImageUrl(null)}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+          <div className="relative max-w-5xl w-full h-full flex items-center justify-center">
+            <img 
+              src={selectedImageUrl} 
+              alt="Zoomed issue preview" 
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl animate-in zoom-in-95 duration-300"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
