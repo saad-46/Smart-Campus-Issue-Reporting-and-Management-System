@@ -66,7 +66,7 @@
 1. **Create Database**
    - In Firebase Console sidebar, click "Build" → "Firestore Database"
    - Click "Create database"
-   - Select "Start in **test mode**" (for development)
+   - Select "Start in **production mode**" (the project's own rules are deployed in the next step)
    - Click "Next"
    - Choose location (select closest to you)
    - Click "Enable"
@@ -75,20 +75,10 @@
 2. **Set Security Rules**
    - Go to "Rules" tab
    - Replace with this:
-   ```javascript
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /users/{userId} {
-         allow read: if request.auth != null;
-         allow write: if request.auth != null && request.auth.uid == userId;
-       }
-       match /issues/{issueId} {
-         allow read, write: if request.auth != null;
-       }
-     }
-   }
-   ```
+   > Use the rules in [`firestore.rules`](./firestore.rules) — do not paste hand-written rules.
+   > Deploy them with `npx firebase-tools deploy --only firestore:rules`, or copy the file's
+   > contents into Firebase Console → Firestore → Rules. See
+   > [FIRESTORE_RULES_FIX.md](./FIRESTORE_RULES_FIX.md) for the permission model and how to grant admin access.
    - Click "Publish"
 
 ---

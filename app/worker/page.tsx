@@ -1,404 +1,311 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, ChevronDown, Inbox, Lightbulb, Play, Wallet } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import IssueCard from "@/components/IssueCard";
+import IssueRow from "@/components/IssueCard";
 import BillSubmissionForm from "@/components/BillSubmissionForm";
-import { Issue, IssueStatus, Transaction } from "@/types";
-import { subscribeToAllIssues, updateIssueStatus, assignIssue, submitBill } from "@/lib/firestore";
+import PageHeader from "@/components/ui/PageHeader";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import { Tabs, tabId } from "@/components/ui/Tabs";
+import { payoutLabel } from "@/lib/claims";
+import { StatStrip, TableWrap, td, th, trHover } from "@/components/ui/Data";
+import { EmptyState, ErrorState, Notice, SkeletonRows } from "@/components/ui/States";
+import { useToast } from "@/components/ui/Toast";
+import { Issue, Transaction } from "@/types";
+import { subscribeToAssignedIssues, subscribeToOpenPool, updateIssueStatus, assignIssue, submitBill } from "@/lib/firestore";
 import { subscribeToTransactions } from "@/lib/finance";
 import { getSuggestedSolution } from "@/services/aiAssistService";
+import { useSlaConfig } from "@/hooks/useSlaConfig";
+import { useNow } from "@/hooks/useNow";
+import { computeSla } from "@/lib/intelligence/sla";
+import { formatDate, greeting } from "@/lib/dates";
+import { getFriendlyErrorMessage, logError } from "@/lib/errors";
 
-function WorkerIssueCard({ 
-  issue, 
-  workerId, 
-  onResolveClick 
-}: { 
-  issue: Issue, 
-  workerId: string, 
-  onResolveClick?: (issue: Issue) => void 
-}) {
-  const [suggestion, setSuggestion] = useState<string>("");
-  const [loadingSuggestion, setLoadingSuggestion] = useState<boolean>(false);
+const currency = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
+/** Keyword-based repair tip, collapsed by default so the list stays scannable. */
+function RepairTip({ issue }: { issue: Issue }) {
+  const [tip, setTip] = useState("");
+  const { description, category, location } = issue;
   useEffect(() => {
-    const fetchSuggestion = async () => {
-      setLoadingSuggestion(true);
-      try {
-        const text = await getSuggestedSolution(issue);
-        setSuggestion(text);
-      } catch (e) {
-        console.error("Failed to load AI suggestion");
-      }
-      setLoadingSuggestion(false);
+    let cancelled = false;
+    getSuggestedSolution({ description, category, location })
+      .then((text) => {
+        if (!cancelled) setTip(text);
+      })
+      .catch((e) => logError("getSuggestedSolution", e));
+    return () => {
+      cancelled = true;
     };
-
-    if (issue.assignedTo === workerId && issue.status !== "Resolved") {
-      fetchSuggestion();
-    }
-  }, [issue, workerId]);
-
-  const handleStatusChange = async (newStatus: IssueStatus) => {
-    if (newStatus === "Resolved" && onResolveClick) {
-      onResolveClick(issue);
-      return;
-    }
-    try {
-      await updateIssueStatus(issue.id, newStatus);
-    } catch (e) {
-      console.error("Failed to update status", e);
-    }
-  };
-
-  const handleTakeTask = async () => {
-    try {
-      await assignIssue(issue.id, workerId);
-    } catch (e) {
-      console.error("Failed to take task", e);
-    }
-  };
-
+  }, [description, category, location]);
+  if (!tip) return null;
   return (
-    <div className="relative bg-white dark:bg-slate-900 rounded-[24px] overflow-hidden border border-gray-200 dark:border-white/10 flex flex-col group transition-all duration-300 hover:shadow-xl hover:border-indigo-500/30">
-      <div className="p-1">
-        <IssueCard issue={issue} showActions={false} viewContext="my-issues" />
-      </div>
-
-      {issue.assignedTo === workerId && issue.status !== "Resolved" && (
-        <div className="mx-4 mb-4 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-500/5 border border-indigo-100 dark:border-indigo-500/10 relative overflow-hidden">
-          <p className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 flex items-center gap-2 mb-2 uppercase tracking-wider">
-            🪄 AI Insight
-          </p>
-          {loadingSuggestion ? (
-            <div className="space-y-1.5">
-              <div className="h-2 bg-gray-200 dark:bg-white/5 rounded-full w-full animate-pulse" />
-              <div className="h-2 bg-gray-200 dark:bg-white/5 rounded-full w-4/5 animate-pulse" />
-            </div>
-          ) : (
-            <p className="text-xs text-slate-700 dark:text-gray-300 leading-relaxed font-semibold">{suggestion}</p>
-          )}
-        </div>
-      )}
-
-      {/* Worker Action Buttons */}
-      <div className="mt-auto p-4 pt-0">
-        {!issue.assignedTo && (
-          <button
-            onClick={handleTakeTask}
-            className="w-full py-3 rounded-xl text-xs font-black bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 transition-all uppercase tracking-widest shadow-lg shadow-slate-950/20"
-          >
-            Claim Task →
-          </button>
-        )}
-
-        {issue.assignedTo === workerId && issue.status !== "Resolved" && (
-          <div className="flex items-center gap-2">
-            {issue.status === "Open" && (
-              <button
-                onClick={() => handleStatusChange("In Progress")}
-                className="flex-1 py-3 rounded-xl text-xs font-black bg-indigo-600 text-white hover:bg-indigo-700 transition-all uppercase tracking-widest"
-              >
-                Start
-              </button>
-            )}
-            {issue.status === "In Progress" && (
-              <button
-                onClick={() => handleStatusChange("Resolved")}
-                className="flex-1 py-3 rounded-xl text-xs font-black bg-emerald-600 text-white hover:bg-emerald-700 transition-all uppercase tracking-widest"
-              >
-                Resolve
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+    <details className="group/tip text-[13px]">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded text-fg-subtle hover:text-fg">
+        <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
+        Suggested checks
+        <span className="text-xs">(keyword-based tip)</span>
+        <ChevronDown className="h-3.5 w-3.5 transition-transform group-open/tip:rotate-180" aria-hidden="true" />
+      </summary>
+      <p className="mt-1.5 max-w-2xl rounded-md border border-border bg-surface-2/60 px-3 py-2 text-fg-muted">{tip}</p>
+    </details>
   );
 }
 
-type FilterTab = "work" | "submission";
-
-function WorkerContent() {
-  const { userProfile } = useAuthContext();
-  const [allIssues, setAllIssues] = useState<Issue[]>([]);
+export default function WorkerPage() {
+  const { userProfile, activeRole } = useAuthContext();
+  const toast = useToast();
+  const workerId = userProfile?.id ?? "";
+  // null = still loading
+  const [myIssues, setMyIssues] = useState<Issue[] | null>(null);
+  const [poolIssues, setPoolIssues] = useState<Issue[] | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<FilterTab>("work");
+  const [loadError, setLoadError] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
+  const [tab, setTab] = useState<"tasks" | "pool" | "payouts">("tasks");
   const [resolvingIssue, setResolvingIssue] = useState<Issue | null>(null);
+  const [busyId, setBusyId] = useState("");
+  const panelRef = useRef<HTMLDivElement>(null);
+  // A resolved task's row (and its Resolve button) disappears, so keep keyboard focus in the list.
+  const focusPanel = () => window.setTimeout(() => panelRef.current?.focus({ preventScroll: true }), 50);
 
+  // Scoped listeners: only this worker's tasks, the unassigned pool and
+  // this worker's payouts — not every issue on campus.
   useEffect(() => {
-    const unsubIssues = subscribeToAllIssues((data) => {
-      setAllIssues(data);
-      setLoading(false);
-    });
-    
-    let unsubTx: () => void;
-    if (userProfile?.id) {
-      unsubTx = subscribeToTransactions(userProfile.id, setTransactions);
-    }
-    
+    if (!workerId) return;
+    setLoadError("");
+    const onError = (operation: string) => (err: unknown) => {
+      logError(operation, err);
+      setLoadError(getFriendlyErrorMessage(err, "We couldn't load your tasks. Please check your connection and try again."));
+    };
+    const unsubMine = subscribeToAssignedIssues(workerId, setMyIssues, onError("subscribeToAssignedIssues"));
+    const unsubPool = subscribeToOpenPool(setPoolIssues, onError("subscribeToOpenPool"));
+    const unsubTx = subscribeToTransactions(workerId, setTransactions, onError("subscribeToTransactions"));
     return () => {
-      unsubIssues();
-      if (unsubTx) unsubTx();
+      unsubMine();
+      unsubPool();
+      unsubTx();
     };
-  }, [userProfile?.id]);
+  }, [workerId, retryKey]);
 
-  const stats = useMemo(() => {
-    const myIssues = allIssues.filter(i => i.assignedTo === userProfile?.id);
-    const resolvedCount = myIssues.filter(i => i.status === "Resolved").length;
-    
-    const pendingAmount = myIssues
-      .filter(i => i.status === "Resolved" && i.claimStatus === "pending")
-      .reduce((sum, i) => sum + (i.claimAmount || 0), 0);
-      
-    const availablePool = allIssues.filter(i => !i.assignedTo && i.status === "Open").length;
+  const loading = (myIssues === null || poolIssues === null) && !loadError;
+  const pool = useMemo(() => poolIssues ?? [], [poolIssues]);
+  const mine = useMemo(() => myIssues ?? [], [myIssues]);
 
-    return {
-      pendingAmount,
-      resolvedTotal: resolvedCount,
-      availablePool
-    };
-  }, [allIssues, userProfile?.id]);
+  // Most urgent first: escalated, then by time left before the SLA deadline.
+  const slaConfig = useSlaConfig();
+  const now = useNow();
+  const active = useMemo(
+    () =>
+      mine
+        .filter((i) => i.status !== "Resolved")
+        .map((i) => ({ issue: i, sla: computeSla(i, slaConfig, now) }))
+        .sort((a, b) => Number(!!b.issue.escalated) - Number(!!a.issue.escalated) || a.sla.remainingMs - b.sla.remainingMs),
+    [mine, slaConfig, now]
+  );
+  const overdue = active.filter((x) => x.sla.state === "breached").length;
+  const dueSoon = active.filter((x) => x.sla.state === "approaching").length;
+  const escalated = active.filter((x) => x.issue.escalated).length;
+  const attention = active.filter((x) => x.issue.escalated || x.sla.state === "approaching" || x.sla.state === "breached").length;
 
-  const poolIssues = useMemo(() => allIssues.filter(i => !i.assignedTo && i.status === "Open"), [allIssues]);
-  const myActiveIssues = useMemo(() => allIssues.filter(i => i.assignedTo === userProfile?.id && i.status !== "Resolved"), [allIssues, userProfile?.id]);
+  const pendingClaims = mine.filter((i) => i.status === "Resolved" && i.claimStatus === "pending");
+  const pendingAmount = pendingClaims.reduce((sum, i) => sum + (i.claimAmount || 0), 0);
+  const resolvedCount = mine.filter((i) => i.status === "Resolved").length;
+  const paidTotal = transactions.reduce((s, t) => s + t.amount, 0);
 
-  const handleResolveRequest = (issue: Issue) => {
-    setResolvingIssue(issue);
-    setActiveWorkspaceTab("submission");
+  const start = async (issue: Issue) => {
+    setBusyId(issue.id);
+    try {
+      await updateIssueStatus(issue.id, "In Progress", { id: workerId, role: activeRole });
+      toast.success("Work started", "The reporter has been notified.");
+    } catch (e) {
+      logError("updateIssueStatus", e);
+      toast.error("Couldn't start this task", getFriendlyErrorMessage(e, "Please try again."));
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const claim = async (issue: Issue) => {
+    setBusyId(issue.id);
+    try {
+      await assignIssue(issue.id, workerId, activeRole);
+      toast.success("Task claimed", "It's now in your tasks.");
+    } catch (e) {
+      logError("assignIssue", e);
+      toast.error("Couldn't claim this task", getFriendlyErrorMessage(e, "Please try again."));
+    } finally {
+      setBusyId("");
+    }
   };
 
   const handleBillSuccess = async (data: { amount: number; description: string; receiptUrl: string }) => {
     if (!resolvingIssue) return;
-    try {
-      await submitBill(resolvingIssue.id, data.amount, data.receiptUrl);
-      setResolvingIssue(null);
-      setActiveWorkspaceTab("work");
-    } catch (e) {
-      console.error("Failed to submit bill", e);
-      throw e;
-    }
+    // Errors propagate to the dialog, which shows them and stays open.
+    await submitBill(resolvingIssue.id, { id: workerId, role: activeRole }, data.amount, data.receiptUrl, data.description);
+    toast.success("Task resolved", `Your claim of ${currency(data.amount)} was sent for review.`);
+    setResolvingIssue(null);
+    focusPanel();
   };
 
   const handleSkipBill = async () => {
     if (!resolvingIssue) return;
-    try {
-      await updateIssueStatus(resolvingIssue.id, "Resolved");
-      setResolvingIssue(null);
-      setActiveWorkspaceTab("work");
-    } catch (e) {
-      console.error("Failed to resolve issue", e);
-    }
+    await updateIssueStatus(resolvingIssue.id, "Resolved", { id: workerId, role: activeRole });
+    toast.success("Task resolved", "The reporter will be asked to rate the fix.");
+    setResolvingIssue(null);
+    focusPanel();
   };
 
-  const kpis = [
-    { 
-      label: "Pending Payout", 
-      value: `₹${stats.pendingAmount.toLocaleString()}`, 
-      sub: `${myActiveIssues.length} tasks matching search`,
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/5",
-      shadow: "shadow-emerald-500/20",
-      icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    },
-    { 
-      label: "Issues Resolved", 
-      value: stats.resolvedTotal.toString(), 
-      sub: stats.resolvedTotal === 0 ? "No completed tasks yet" : "Lifetime assignments",
-      color: "text-indigo-500",
-      bg: "bg-indigo-500/5",
-      shadow: "shadow-indigo-500/20",
-      icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    },
-    { 
-      label: "Available Pool", 
-      value: stats.availablePool.toString(), 
-      sub: stats.availablePool === 0 ? "No open issues" : "In campus pool",
-      color: "text-blue-500",
-      bg: "bg-blue-500/5",
-      shadow: "shadow-blue-500/20",
-      icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-    },
-  ];
+  if (!workerId) return null;
+  const firstName = userProfile?.name?.split(" ")[0];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 bg-white dark:bg-transparent min-h-screen">
-      
-      {/* 1. KPI TOP ROW — 3 Columns */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        {kpis.map((k, i) => (
-          <div 
-            key={i} 
-            className={`group relative p-8 rounded-[32px] bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl ${k.shadow}`}
-          >
-            <div className={`w-12 h-12 rounded-2xl ${k.bg} ${k.color} flex items-center justify-center mb-6 transition-transform group-hover:rotate-12`}>
-              {k.icon}
-            </div>
-            <p className={`text-4xl font-black ${k.color} tracking-tighter`}>{k.value}</p>
-            <p className="text-[10px] font-black text-slate-400 dark:text-gray-500 mt-2 uppercase tracking-widest">{k.label}</p>
-            <p className="text-[10px] font-bold text-slate-300 dark:text-gray-500 mt-1 uppercase tracking-tighter opacity-60">{k.sub}</p>
-          </div>
-        ))}
-      </div>
+    <>
+      <PageHeader eyebrow={firstName ? `${greeting()}, ${firstName}` : undefined} title="My work" description="Your assigned tasks, most urgent first, and open issues you can claim." />
 
-      {/* 2. MAIN SPLIT CONTENT — 2 Columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        
-        {/* LEFT COLUMN: Workspace (Tasks / Form) */}
-        <div className="flex flex-col h-full max-h-[80vh]">
-          <div className="flex items-center justify-between mb-4 px-2">
-            <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
-              {activeWorkspaceTab === "work" ? "Active Workspace" : "Expense Submission"}
-            </h2>
-            <div className="flex bg-gray-200 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10 shrink-0">
-               <button 
-                 onClick={() => { 
-                   console.log("Switching to Tasks tab");
-                   setActiveWorkspaceTab("work"); 
-                 }}
-                 className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-300 transform ${activeWorkspaceTab === 'work' ? 'bg-white dark:bg-slate-800 text-indigo-600 shadow-xl scale-105' : 'text-gray-500 hover:text-slate-700 dark:hover:text-gray-300'}`}
-               >
-                 Tasks
-               </button>
-               <button 
-                 onClick={() => {
-                   console.log("Switching to Form tab");
-                   setActiveWorkspaceTab("submission");
-                 }}
-                 className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-300 transform ${activeWorkspaceTab === 'submission' ? 'bg-white dark:bg-slate-800 text-indigo-600 shadow-xl scale-105' : 'text-gray-500 hover:text-slate-700 dark:hover:text-gray-300'}`}
-               >
-                 Form
-               </button>
-            </div>
-          </div>
+      {loadError ? (
+        <Card>
+          <ErrorState title="Couldn't load your work" description={loadError} onRetry={() => setRetryKey((k) => k + 1)} />
+        </Card>
+      ) : (
+        <>
+          <StatStrip
+            className="mb-6 lg:grid-cols-4"
+            stats={[
+              { label: "Active tasks", value: active.length, loading, hint: active.length === 0 ? "Nothing assigned" : `${resolvedCount} resolved in total` },
+              {
+                label: "Needs attention",
+                value: attention,
+                loading,
+                tone: overdue ? "danger" : attention ? "warning" : "default",
+                hint: attention ? [overdue && `${overdue} overdue`, dueSoon && `${dueSoon} due soon`, escalated && `${escalated} escalated`].filter(Boolean).join(" · ") : "All on track",
+              },
+              { label: "Open pool", value: pool.length, loading, hint: "Unassigned issues" },
+              { label: "Pending payout", value: currency(pendingAmount), loading, hint: `${pendingClaims.length} claim${pendingClaims.length === 1 ? "" : "s"} awaiting review` },
+            ]}
+          />
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6 min-h-[400px] transition-all duration-500">
-            {activeWorkspaceTab === "work" ? (
-              <div className="space-y-8 pb-10">
-                {/* Section: My Active Tasks */}
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                    <h4 className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest">Your Assignments ({myActiveIssues.length})</h4>
-                  </div>
-                  {myActiveIssues.length === 0 ? (
-                    <div className="p-10 rounded-[32px] border-2 border-dashed border-gray-200 dark:border-white/5 text-center bg-gray-50/50 dark:bg-white/[0.02]">
-                       <p className="text-sm font-bold text-gray-400">No active tasks. Take one from the pool below!</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4">
-                      {myActiveIssues.map(i => (
-                        <WorkerIssueCard key={i.id} issue={i} workerId={userProfile!.id} onResolveClick={handleResolveRequest} />
+          {attention > 0 && !loading && (
+            <Notice tone={overdue ? "danger" : "warning"} title={`${attention} task${attention === 1 ? " needs" : "s need"} attention`} className="mb-6">
+              They&apos;re listed first in your tasks. Overdue means the target time for its priority has passed.
+            </Notice>
+          )}
+
+          <Card>
+            <div className="px-4 pt-2 sm:px-5">
+              <h2 className="sr-only">Work lists</h2>
+              <Tabs
+                label="Work lists"
+                value={tab}
+                onChange={setTab}
+                panelId="work-panel"
+                className="border-b-0"
+                options={[
+                  { value: "tasks", label: "My tasks", count: myIssues ? active.length : undefined },
+                  { value: "pool", label: "Open pool", count: poolIssues ? pool.length : undefined },
+                  { value: "payouts", label: "Payouts" },
+                ]}
+              />
+            </div>
+            <div ref={panelRef} tabIndex={-1} className="border-t border-border outline-none" id="work-panel" role="tabpanel" aria-labelledby={tabId("work-panel", tab)}>
+              {loading ? (
+                <SkeletonRows rows={4} label="Loading tasks" />
+              ) : tab === "tasks" ? (
+                active.length === 0 ? (
+                  <EmptyState
+                    icon={<CheckCircle2 />}
+                    title="No active tasks"
+                    description="You're all caught up. Claim an issue from the open pool to get started."
+                    action={pool.length > 0 ? <Button variant="secondary" size="sm" onClick={() => setTab("pool")}>View open pool ({pool.length})</Button> : undefined}
+                  />
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {active.map(({ issue }) => (
+                      <li key={issue.id}>
+                        <IssueRow
+                          issue={issue}
+                          showSla
+                          footer={<RepairTip issue={issue} />}
+                          actions={
+                            issue.status === "Open" ? (
+                              <Button size="sm" icon={<Play className="h-3.5 w-3.5" aria-hidden="true" />} onClick={() => start(issue)} isLoading={busyId === issue.id} disabled={busyId !== "" && busyId !== issue.id} aria-label={`Start work on “${issue.title}”`}>
+                                Start work
+                              </Button>
+                            ) : (
+                              <Button size="sm" icon={<CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />} onClick={() => setResolvingIssue(issue)} aria-label={`Resolve “${issue.title}”`}>
+                                Resolve
+                              </Button>
+                            )
+                          }
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : tab === "pool" ? (
+                pool.length === 0 ? (
+                  <EmptyState icon={<Inbox />} title="The open pool is empty" description="Every reported issue has been picked up. New ones will appear here." />
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {pool.map((issue) => (
+                      <li key={issue.id}>
+                        <IssueRow
+                          issue={issue}
+                          showSla
+                          actions={
+                            <Button size="sm" variant="secondary" onClick={() => claim(issue)} isLoading={busyId === issue.id} disabled={busyId !== "" && busyId !== issue.id} aria-label={`Claim “${issue.title}”`}>
+                              Claim task
+                            </Button>
+                          }
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : transactions.length === 0 ? (
+                <EmptyState icon={<Wallet />} title="No payouts yet" description="Approved expense claims will be listed here." />
+              ) : (
+                <>
+                  <TableWrap label="Payouts">
+                    <thead>
+                      <tr>
+                        <th className={th}>Date</th>
+                        <th className={th}>Description</th>
+                        <th className={`${th} text-right`}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.map((tx) => (
+                        <tr key={tx.id} className={trHover}>
+                          <td className={`${td} whitespace-nowrap text-fg-muted`}>{formatDate(tx.createdAt)}</td>
+                          <td className={`${td} max-w-[22rem] truncate`}>{payoutLabel(tx.note, "Task payout")}</td>
+                          <td className={`${td} tabular whitespace-nowrap text-right font-medium`}>{currency(tx.amount)}</td>
+                        </tr>
                       ))}
-                    </div>
-                  )}
-                </div>
+                    </tbody>
+                  </TableWrap>
+                  <p className="flex justify-between px-4 py-3 text-sm sm:px-5">
+                    <span className="text-fg-subtle">Total paid</span>
+                    <span className="tabular font-semibold text-fg">{currency(paidTotal)}</span>
+                  </p>
+                </>
+              )}
+            </div>
+          </Card>
+        </>
+      )}
 
-                {/* Section: Open Pool */}
-                <div className="pt-4 border-t border-gray-100 dark:border-white/5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <h4 className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest">Available in Pool ({poolIssues.length})</h4>
-                  </div>
-                  {poolIssues.length === 0 ? (
-                    <div className="p-10 rounded-[32px] border-2 border-dashed border-gray-200 dark:border-white/5 text-center bg-gray-50/50 dark:bg-white/[0.02]">
-                       <p className="text-sm font-bold text-gray-400">All campus issues are currently assigned. Great job! No available issues</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4">
-                       {poolIssues.map(i => (
-                         <WorkerIssueCard key={i.id} issue={i} workerId={userProfile!.id} />
-                       ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : resolvingIssue ? (
-              <div className="pb-10">
-                 <BillSubmissionForm 
-                   issueId={resolvingIssue.id}
-                   issueTitle={resolvingIssue.title}
-                   onSuccess={handleBillSuccess}
-                   onCancel={() => { setResolvingIssue(null); setActiveWorkspaceTab("work"); }}
-                   onSkip={handleSkipBill}
-                 />
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center p-12 text-center glass rounded-[40px] border-2 border-dashed border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02]">
-                <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-500/10 rounded-full flex items-center justify-center mb-6">
-                  <svg className="w-10 h-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                </div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">No active resolution</h3>
-                <p className="text-sm font-bold text-gray-500 max-w-xs mx-auto">Please go to the Tasks tab and click "Resolve" on an active task to start a submission.</p>
-                <button 
-                  onClick={() => setActiveWorkspaceTab("work")}
-                  className="mt-6 px-6 py-2.5 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"
-                >
-                  Go to Tasks →
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: Payment History */}
-        <div className="flex flex-col h-full sticky top-8">
-           <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-4 px-2">Approved Payouts</h2>
-           <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-gray-200 dark:border-white/10 shadow-lg overflow-hidden flex flex-col h-[70vh]">
-              <div className="p-6 bg-slate-50 dark:bg-white/[0.02] border-b border-gray-100 dark:border-white/5 flex items-center justify-between shrink-0">
-                  <div>
-                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Verified History</p>
-                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-tighter mt-0.5">Approved Transactions</h4>
-                  </div>
-                  <div className="p-3 bg-white dark:bg-white/5 rounded-2xl shadow-sm border border-gray-100 dark:border-white/10">
-                     <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  </div>
-              </div>
-              <div className="p-6 overflow-y-auto custom-scrollbar space-y-4">
-                 {transactions.length === 0 ? (
-                   <div className="h-full flex flex-col items-center justify-center text-center opacity-40 py-20">
-                      <div className="w-16 h-16 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                      </div>
-                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest">No payment history yet</p>
-                   </div>
-                 ) : (
-                   transactions.map(tx => (
-                     <div key={tx.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 hover:border-indigo-500/30 transition-all group">
-                       <div className="flex items-center justify-between mb-3">
-                         <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-white dark:bg-white/10 text-slate-500 dark:text-gray-400 uppercase border border-gray-100 dark:border-white/5 tracking-tighter">
-                           {tx.type === 'receipt' ? 'Repair Claim' : 'Bonus'}
-                         </span>
-                         <span className="text-[10px] font-bold text-gray-400">{tx.createdAt.toLocaleDateString()}</span>
-                       </div>
-                       <p className="text-sm font-bold text-slate-900 dark:text-gray-100 mb-3 truncate group-hover:block transition-all">{tx.note || "Task Resolution Payout"}</p>
-                       <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-white/5">
-                          <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Paid Out</span>
-                          <span className="text-xl font-black text-slate-900 dark:text-white">₹{tx.amount.toLocaleString()}</span>
-                       </div>
-                     </div>
-                   ))
-                 )}
-              </div>
-              <div className="p-6 mt-auto bg-slate-50 dark:bg-white/[0.02] border-t border-gray-100 dark:border-white/5">
-                 <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Lifetime Payout</p>
-                    <p className="text-lg font-black text-indigo-600 dark:text-indigo-400">₹{transactions.reduce((s,t)=>s+t.amount,0).toLocaleString()}</p>
-                 </div>
-              </div>
-           </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-export default function WorkerDashboardPage() {
-  return (
-    <ProtectedRoute>
-      <WorkerContent />
-    </ProtectedRoute>
+      <BillSubmissionForm
+        key={resolvingIssue?.id ?? "none"}
+        open={!!resolvingIssue}
+        issueId={resolvingIssue?.id ?? ""}
+        issueTitle={resolvingIssue?.title ?? ""}
+        onSuccess={handleBillSuccess}
+        onSkip={handleSkipBill}
+        onCancel={() => setResolvingIssue(null)}
+      />
+    </>
   );
 }

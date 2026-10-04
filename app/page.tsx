@@ -2,206 +2,295 @@
 
 import React, { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  ArrowRight,
+  BarChart3,
+  BellRing,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock,
+  Eye,
+  Lock,
+  MapPin,
+  QrCode,
+  ShieldCheck,
+  Tags,
+  Users,
+} from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuthContext } from "@/components/AuthProvider";
-import { useRouter } from "next/navigation";
+import Logo from "@/components/shell/Logo";
+import { buttonClasses } from "@/components/ui/Button";
+import Badge, { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
+import { dashboardPathForRole } from "@/lib/roles";
 
-function getRoleRedirect(role: string) {
-  if (role === "admin") return "/admin";
-  if (role === "worker") return "/worker";
-  return "/dashboard";
+const STEPS = [
+  { icon: QrCode, title: "Report", body: "Scan the QR code at the location or describe the problem. A category and priority are suggested — you confirm." },
+  { icon: Users, title: "Assign", body: "Administrators see similar reports grouped together and assign an approved worker, with a ranked suggestion." },
+  { icon: ClipboardCheck, title: "Resolve", body: "Workers update progress; every step is recorded on the issue timeline against a clear deadline." },
+  { icon: BarChart3, title: "Learn", body: "Reporters rate the fix. Trends, hotspots and recurring faults surface from the recorded history." },
+];
+
+const CAPABILITIES = [
+  {
+    icon: Tags,
+    title: "Campus intelligence",
+    points: ["Suggested category and priority, with the reason shown", "Similar open reports flagged before submitting", "Recurring faults highlighted per building"],
+  },
+  {
+    icon: BellRing,
+    title: "Real-time operations",
+    points: ["Live status for reporters, workers and administrators", "Deadlines per priority with early warnings", "In-app notifications for every status change"],
+  },
+  {
+    icon: CheckCircle2,
+    title: "Transparent resolution",
+    points: ["A timeline of what happened, and when", "Expense claims reviewed and paid exactly once", "Feedback from the people who reported the issue"],
+  },
+];
+
+const SECURITY = [
+  { icon: ShieldCheck, text: "Every permission is enforced by the database rules, not only the interface." },
+  { icon: Users, text: "Administrator and worker access is granted by people, never self-assigned." },
+  { icon: Lock, text: "Receipts are visible only to the worker who filed them and administrators." },
+  { icon: Clock, text: "Rate limits and validation protect the system from spam and malformed data." },
+];
+
+/** Static illustration of the product (sample content, not live data). */
+function ProductPreview() {
+  return (
+    <figure className="relative">
+      <div aria-hidden="true" className="overflow-hidden rounded-lg border border-border bg-surface shadow-md">
+        <div className="flex items-center gap-1.5 border-b border-border bg-surface-2 px-3 py-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
+          <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
+          <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
+        </div>
+        <div className="grid gap-0 sm:grid-cols-[1fr_11rem]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatusBadge status="In Progress" />
+              <PriorityBadge priority="High" />
+              <Badge>Electrical</Badge>
+            </div>
+            <p className="mt-3 text-base font-semibold text-fg">Power sockets not working in Lab 204</p>
+            <p className="mt-1 flex items-center gap-1 text-[13px] text-fg-subtle">
+              <MapPin className="h-3.5 w-3.5" /> Laboratory Complex · Floor 2 · Room 204
+            </p>
+            <div className="mt-5 space-y-3 border-l border-border pl-4">
+              {[
+                ["Reported", "10:32"],
+                ["Suggested: Electrical · High", "10:32"],
+                ["Assigned to a worker", "10:40"],
+                ["Work started", "11:15"],
+              ].map(([label, time], i) => (
+                <div key={label} className="relative">
+                  <span className={`absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 ${i === 3 ? "border-brand bg-surface" : "border-brand bg-brand"}`} />
+                  <p className="text-[13px] text-fg">{label}</p>
+                  <p className="text-xs text-fg-subtle">Today · {time}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-border bg-surface-2/50 p-5 sm:border-l sm:border-t-0">
+            <p className="text-xs text-fg-subtle">Deadline</p>
+            <p className="mt-0.5 text-sm font-medium text-fg">2h 14m left</p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border">
+              <div className="h-full w-[62%] rounded-full bg-brand" />
+            </div>
+            <p className="mt-5 text-xs text-fg-subtle">Similar reports</p>
+            <p className="mt-0.5 text-sm text-fg">2 linked</p>
+            <p className="mt-5 text-xs text-fg-subtle">Suggested team</p>
+            <p className="mt-0.5 text-sm text-fg">Electrical Maintenance</p>
+          </div>
+        </div>
+      </div>
+      <figcaption className="mt-3 text-center text-xs text-fg-subtle">Illustration with sample content</figcaption>
+    </figure>
+  );
 }
 
 export default function LandingPage() {
-  const { isAuthenticated, userProfile, loading } = useAuthContext();
+  const { isAuthenticated, userProfile, loading, activeRole } = useAuthContext();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && isAuthenticated && userProfile) {
-      const activeRole = localStorage.getItem("role") || userProfile.activeRole || userProfile.role;
-      router.replace(getRoleRedirect(activeRole));
-    }
-  }, [isAuthenticated, userProfile, loading, router]);
-
-  const stats = [
-    { value: "500+", label: "Issues Resolved" },
-    { value: "98%", label: "Satisfaction Rate" },
-    { value: "< 2hr", label: "Avg Response Time" },
-    { value: "24/7", label: "Availability" },
-  ];
-
-  const features = [
-    { icon: "🤖", title: "AI-Powered Analysis", desc: "Automatically categorizes issues and assigns priority levels for faster resolution." },
-    { icon: "⚡", title: "Real-Time Updates", desc: "Track reported issues live. Get instant updates when status changes." },
-    { icon: "🛡️", title: "Smart Management", desc: "Admins and workers can efficiently assign, track, and resolve issues." },
-  ];
+    if (!loading && isAuthenticated && userProfile) router.replace(dashboardPathForRole(activeRole));
+  }, [isAuthenticated, userProfile, loading, activeRole, router]);
 
   return (
-    /* ── Outer wrapper — theme-aware background ── */
-    <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-purple-950 dark:to-slate-900 transition-colors duration-300">
-
-      {/* Subtle grid overlay */}
-      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(99,102,241,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
-
-      {/* ── Navbar ── */}
-      <nav className="relative z-10 border-b border-gray-200 dark:border-white/10 bg-white/70 dark:bg-black/20 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
-              </svg>
-            </div>
-            <span className="text-lg font-bold bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
-              UniFix
-            </span>
-          </div>
-
-          {/* Right — only theme toggle + Get Started */}
-          <div className="flex items-center gap-3">
+    <div className="min-h-dvh bg-canvas">
+      <header className="sticky top-0 z-40 border-b border-border bg-surface">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
+          <Logo />
+          <nav aria-label="Sections" className="hidden items-center gap-1 md:flex">
+            {[
+              ["How it works", "#how-it-works"],
+              ["Capabilities", "#capabilities"],
+              ["Security", "#security"],
+            ].map(([label, href]) => (
+              <a key={href} href={href} className="rounded-md px-2.5 py-1.5 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
+                {label}
+              </a>
+            ))}
+            <Link href="/viewer" className="rounded-md px-2.5 py-1.5 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
+              Explore as Viewer
+            </Link>
+          </nav>
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <ThemeToggle />
-            <Link
-              href="/register"
-              className="px-4 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:opacity-90 transition-all duration-200"
-            >
-              Get Started
+            <Link href="/login" className={buttonClasses("ghost", "md", "max-sm:hidden")}>
+              Sign in
+            </Link>
+            <Link href="/register" className={buttonClasses("primary")}>
+              Create account
             </Link>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* ── Hero ── */}
-      <section className="relative z-10 pt-24 pb-20 px-4">
-        <div className="max-w-5xl mx-auto text-center">
-
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-full text-sm text-purple-600 dark:text-purple-400 mb-8">
-            <span className="w-2 h-2 bg-purple-500 dark:bg-purple-400 rounded-full animate-pulse" />
-            AI-Powered Campus Management
-          </div>
-
-          {/* Heading */}
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight mb-6 text-gray-900 dark:text-white">
-            Fix Campus Issues,{" "}
-            <span className="bg-gradient-to-r from-purple-600 to-indigo-500 dark:from-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
-              Smarter
-            </span>
-          </h1>
-
-          <p className="text-lg sm:text-xl text-gray-500 dark:text-gray-400 max-w-2xl mx-auto mb-12 leading-relaxed">
-            UniFix uses AI to automatically categorize, prioritize, and route campus issues —
-            making your campus safer and better maintained.
-          </p>
-
-          {/* ── 3 Role Entry Points — all go to /login ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-16">
-
-            {/* Report Issue → /login */}
-            <Link href="/login?role=user" className="group">
-              <div className="p-6 rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-white dark:bg-blue-500/10 shadow-sm dark:shadow-none hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-500/20 hover:scale-[1.03] transition-all duration-300">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/20 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-200 dark:group-hover:bg-blue-500/30 transition-colors">
-                  <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Report Issue</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">As a Student / Staff</p>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 group-hover:gap-2 transition-all">
-                  Sign In →
-                </span>
+      <main>
+        {/* Hero */}
+        <section className="border-b border-border bg-surface">
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:py-24">
+            <div>
+              <p className="text-sm font-medium text-brand-fg">Campus maintenance and facilities</p>
+              <h1 className="mt-3 text-4xl font-semibold tracking-tight text-fg sm:text-5xl sm:leading-[1.08]">
+                Smart campus operations, without the operational chaos.
+              </h1>
+              <p className="mt-5 max-w-xl text-lg leading-relaxed text-fg-muted">
+                UniFix gives students, maintenance staff and administrators one place to report, assign, resolve and learn from every
+                campus issue — with a clear record of who did what, and when.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <Link href="/login" className={buttonClasses("primary", "lg")}>
+                  Sign in
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link href="/register" className={buttonClasses("secondary", "lg")}>
+                  Create account
+                </Link>
+                <Link href="/viewer" className={buttonClasses("tertiary", "lg")}>
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                  Explore as Viewer
+                </Link>
               </div>
-            </Link>
-
-            {/* Worker Login → /login */}
-            <Link href="/login?role=worker" className="group">
-              <div className="p-6 rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-white dark:bg-emerald-500/10 shadow-sm dark:shadow-none hover:shadow-md hover:border-emerald-400 dark:hover:border-emerald-500/50 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 hover:scale-[1.03] transition-all duration-300">
-                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-500/30 transition-colors">
-                  <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Worker Login</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Resolve assigned tasks</p>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 group-hover:gap-2 transition-all">
-                  Sign In →
-                </span>
-              </div>
-            </Link>
-
-            {/* Admin Login → /login */}
-            <Link href="/login?role=admin" className="group">
-              <div className="p-6 rounded-2xl border border-purple-200 dark:border-purple-500/30 bg-white dark:bg-purple-500/10 shadow-sm dark:shadow-none hover:shadow-md hover:border-purple-400 dark:hover:border-purple-500/50 hover:bg-purple-50 dark:hover:bg-purple-500/20 hover:scale-[1.03] transition-all duration-300">
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-500/20 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/30 transition-colors">
-                  <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Admin Login</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Manage the system</p>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600 dark:text-purple-400 group-hover:gap-2 transition-all">
-                  Sign In →
-                </span>
-              </div>
-            </Link>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
-            {stats.map((stat) => (
-              <div key={stat.label} className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4 shadow-sm dark:shadow-none">
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
-                <p className="text-xs text-gray-500 mt-1">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features ── */}
-      <section className="relative z-10 py-20 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">How It Works</h2>
-            <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
-              Three simple steps to report and resolve campus issues efficiently
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {features.map((f, i) => (
-              <div
-                key={f.title}
-                className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-8 shadow-sm dark:shadow-none hover:shadow-md dark:hover:border-purple-500/30 hover:scale-[1.02] transition-all duration-300"
-              >
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-500/10 rounded-xl flex items-center justify-center text-2xl">
-                    {f.icon}
-                  </div>
-                  <span className="text-xs text-gray-400 font-mono">0{i + 1}</span>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">{f.title}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-gray-200 dark:border-white/10 py-8 px-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
-              </svg>
+              <p className="mt-4 text-[13px] text-fg-subtle">
+                Explore the campus operations experience without signing in — Viewer Mode is read-only sample data.
+              </p>
             </div>
-            <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">UniFix</span>
+            <ProductPreview />
           </div>
-          <p className="text-xs text-gray-400 dark:text-gray-600">
-            &copy; {new Date().getFullYear()} UniFix. Built for DEV ARENA Hackathon.
-          </p>
+        </section>
+
+        {/* How it works */}
+        <section id="how-it-works" className="scroll-mt-16 border-b border-border">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+            <h2 className="text-2xl font-semibold tracking-tight text-fg">How it works</h2>
+            <p className="mt-2 max-w-2xl text-fg-muted">One flow from the moment something breaks to the moment it&apos;s confirmed fixed.</p>
+            <ol className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="relative">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-brand-fg">
+                      <step.icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                    </span>
+                    <span className="tabular text-xs font-medium text-fg-subtle">Step {i + 1}</span>
+                    {i < STEPS.length - 1 && <span aria-hidden="true" className="hidden h-px flex-1 bg-border lg:block" />}
+                  </div>
+                  <h3 className="mt-4 font-semibold text-fg">{step.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* Capabilities */}
+        <section id="capabilities" className="scroll-mt-16 border-b border-border bg-surface">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+            <h2 className="text-2xl font-semibold tracking-tight text-fg">Built for the people who keep a campus running</h2>
+            <div className="mt-10 grid gap-10 md:grid-cols-3">
+              {CAPABILITIES.map((c) => (
+                <div key={c.title}>
+                  <c.icon className="h-5 w-5 text-brand-fg" aria-hidden="true" />
+                  <h3 className="mt-3 font-semibold text-fg">{c.title}</h3>
+                  <ul className="mt-3 space-y-2">
+                    {c.points.map((p) => (
+                      <li key={p} className="flex gap-2 text-sm text-fg-muted">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
+                        {p}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-14 grid items-center gap-8 rounded-lg border border-border bg-canvas p-6 sm:p-8 lg:grid-cols-[1fr_1.2fr]">
+              <div>
+                <h3 className="text-lg font-semibold text-fg">See where problems cluster</h3>
+                <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+                  A campus map shows open issues by building, and a maintenance indicator points to places where the same fault keeps
+                  coming back — so repairs can be planned instead of repeated.
+                </p>
+              </div>
+              <figure>
+                <div aria-hidden="true" className="grid grid-cols-5 gap-1.5">
+                  {[1, 2, 0, 1, 3, 2, 4, 1, 0, 2, 0, 1, 5, 2, 1].map((level, i) => (
+                    <div key={i} className="h-10 rounded-sm border border-border" style={{ background: `var(--heat-${level})` }} />
+                  ))}
+                </div>
+                <figcaption className="mt-2 text-xs text-fg-subtle">Illustration of the campus heatmap</figcaption>
+              </figure>
+            </div>
+          </div>
+        </section>
+
+        {/* Security */}
+        <section id="security" className="scroll-mt-16 border-b border-border">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+            <div className="grid gap-10 lg:grid-cols-[1fr_1.4fr]">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-fg">Secure by design</h2>
+                <p className="mt-2 text-fg-muted">Access is decided by who you are, checked on every request.</p>
+              </div>
+              <ul className="grid gap-5 sm:grid-cols-2">
+                {SECURITY.map((s) => (
+                  <li key={s.text} className="flex gap-3">
+                    <s.icon className="mt-0.5 h-5 w-5 shrink-0 text-fg-subtle" aria-hidden="true" />
+                    <p className="text-sm leading-relaxed text-fg-muted">{s.text}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* Final call to action */}
+        <section className="bg-surface">
+          <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-14 sm:px-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-fg">Seen something that needs fixing?</h2>
+              <p className="mt-1 text-fg-muted">It takes under a minute to report, and you can follow it until it&apos;s resolved.</p>
+            </div>
+            <div className="flex gap-3">
+              <Link href="/login" className={buttonClasses("secondary", "lg")}>
+                Sign in
+              </Link>
+              <Link href="/register" className={buttonClasses("primary", "lg")}>
+                Create account
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-fg-subtle sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <Logo />
+          <p>Built for the DEV ARENA Hackathon by GDG, UCE-OU.</p>
         </div>
       </footer>
     </div>

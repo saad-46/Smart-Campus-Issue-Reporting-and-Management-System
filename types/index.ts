@@ -21,6 +21,16 @@ export interface User {
   activeRole?: UserRole;
   createdAt: Date;
   earnings?: number; // Total money earned by the worker
+  /** Set when the account asked for worker access; only an admin can resolve it. */
+  workerRequest?: WorkerRequestStatus;
+}
+
+export type WorkerRequestStatus = "pending" | "approved" | "rejected";
+
+/** A photo attached to a new issue: the full image plus a small preview. */
+export interface IssueImage {
+  full: string;
+  thumb: string;
 }
 
 /** Campus issue report */
@@ -36,7 +46,14 @@ export interface Issue {
   createdByName: string;   // Display name for convenience
   assignedTo: string;      // Admin User ID (empty if unassigned)
   imageUrl?: string;       // legacy base64 or URL
-  imageUrls?: string[];    // NEW: Array of images
+  imageUrls?: string[];    // legacy: full images stored inside the issue document
+  /** Small previews stored in the issue document (for legacy issues: the full images). */
+  thumbnails: string[];
+  imageCount: number;
+  /** True when full-size photos live in the issues/{id}/images subcollection. */
+  hasImageDocs: boolean;
+  /** True when a receipt photo exists (issues/{id}/receipts/receipt, or legacy receiptUrl). */
+  hasReceipt: boolean;
   createdAt: Date;
   updatedAt: Date;
   startedAt?: Date;
@@ -44,9 +61,132 @@ export interface Issue {
   upvotes: number;
   upvotedBy: string[]; // user IDs who upvoted
   escalated?: boolean; // true if escalated by engine
-  receiptUrl?: string; // Uploaded expense receipt
+  receiptUrl?: string; // legacy: receipt stored inside the issue document
   claimAmount?: number; // Cost of repair claimed by worker
+  claimDescription?: string; // What the claim was spent on ("" for claims filed before this field existed)
   claimStatus?: "pending" | "approved" | "rejected"; // Status of the receipt
+  /** Extractive summary from the analysis layer ("" when the report was short). */
+  aiSummary: string;
+  /** Heuristic confidence 0–1 of the automatic category, or null for older issues. */
+  aiConfidence: number | null;
+  /** Suggested handling team. */
+  aiDepartment: string;
+  /** campusLocations/{id} when the issue was reported through a location QR code. */
+  locationId: string;
+  /** Master issue of the incident this report belongs to ("" when standalone). */
+  duplicateOf: string;
+}
+
+/**
+ * Lightweight projection of an issue (no description, photos or votes),
+ * used by analytics, the map, search and duplicate detection.
+ */
+export interface IssueSummary {
+  id: string;
+  title: string;
+  category: string;
+  priority: Priority;
+  status: IssueStatus;
+  location: string;
+  locationId: string;
+  assignedTo: string;
+  duplicateOf: string;
+  createdAt: Date;
+  startedAt?: Date;
+  resolvedAt?: Date;
+  /** Flagged for attention by an administrator. */
+  escalated?: boolean;
+}
+
+export type SlaState = "on-track" | "approaching" | "breached" | "met" | "missed";
+
+export interface SlaConfig {
+  /** Target hours from report to resolution, per priority. */
+  hours: Record<Priority, number>;
+  /** True when these are the built-in defaults (no admin override saved). */
+  isDefault: boolean;
+}
+
+export interface SlaStatus {
+  state: SlaState;
+  deadline: Date;
+  /** Milliseconds left (negative once breached); 0 for resolved issues. */
+  remainingMs: number;
+  /** Share of the window used, 0–1+ (capped at 1 for display). */
+  elapsedFraction: number;
+}
+
+/** Event recorded on an issue's timeline (issues/{id}/events). */
+export type IssueEventType =
+  | "reported"
+  | "claimed"
+  | "assigned"
+  | "started"
+  | "resolved"
+  | "claim_approved"
+  | "claim_rejected"
+  | "linked"
+  | "feedback";
+
+export interface IssueEvent {
+  id: string;
+  type: IssueEventType;
+  actorRole: UserRole;
+  createdAt: Date;
+  /** Category/priority at report time, or the linked master issue, etc. */
+  category?: string;
+  priority?: Priority;
+  confidence?: number | null;
+  duplicateOf?: string;
+  rating?: number;
+}
+
+export type NotificationType =
+  | "issue_assigned"
+  | "status_changed"
+  | "worker_access"
+  | "claim_decision";
+
+/**
+ * A notification addressed to one user. It carries no free text: the
+ * message is rendered from the type and the validated fields, so a sender
+ * can't put arbitrary words in front of the recipient.
+ */
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  recipientId: string;
+  issueId: string;
+  issueTitle: string;
+  /** status_changed: the new status. */
+  status?: IssueStatus;
+  /** worker_access / claim_decision: the outcome. */
+  decision?: "approved" | "rejected";
+  /** claim_decision: the amount paid. */
+  amount?: number;
+  createdAt: Date;
+  readAt: Date | null;
+}
+
+/** Student rating of a resolved issue (feedback/{issueId}). */
+export interface Feedback {
+  issueId: string;
+  rating: number;
+  comment: string;
+  createdBy: string;
+  assignedTo: string;
+  category: string;
+  createdAt: Date;
+}
+
+/** An admin-managed reportable place (campusLocations/{id}), used for QR codes. */
+export interface CampusLocation {
+  id: string;
+  name: string;
+  buildingId: string;
+  floor: string;
+  room: string;
+  createdAt: Date;
 }
 
 /** Result returned from AI analysis service */

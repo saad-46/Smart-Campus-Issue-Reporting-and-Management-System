@@ -3,9 +3,23 @@
 // ============================================
 // Handles messaging inside issue sub-collections
 
-import { collection, addDoc, onSnapshot, query, orderBy, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  runTransaction,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+  FirestoreError,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ChatMessage } from "@/types";
+import { ChatMessage, UserRole } from "@/types";
+import { LIMITS } from "@/lib/constants";
+import { assertOnline } from "@/lib/errors";
+import { track } from "@/lib/listeners";
+import { normalizeChatMessage } from "@/lib/models";
+import { validateChatMessage } from "@/lib/validation";
 
 const ISSUES_COLLECTION = "issues";
 const CHAT_SUBCOLLECTION = "messages";
@@ -14,26 +28,27 @@ const CHAT_SUBCOLLECTION = "messages";
  * Subscribes to the chat messages sub-collection of a specific issue.
  * Ordered by createdAt ascending.
  */
-export function subscribeToIssueChat(issueId: string, callback: (messages: ChatMessage[]) => void) {
+export function subscribeToIssueChat(
+  issueId: string,
+  callback: (messages: ChatMessage[]) => void,
+  onError?: (error: FirestoreError) => void
+) {
   const q = query(
     collection(db, ISSUES_COLLECTION, issueId, CHAT_SUBCOLLECTION),
     orderBy("createdAt", "asc")
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const messages = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        text: data.text,
-        authorId: data.authorId,
-        authorName: data.authorName,
-        authorRole: data.authorRole,
-        createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
-      } as ChatMessage;
-    });
-    callback(messages);
-  });
+  return track(
+    onSnapshot(
+      q,
+      (snapshot) => {
+        callback(
+          snapshot.docs.map((d) => normalizeChatMessage(d.id, d.data({ serverTimestamps: "estimate" })))
+        );
+      },
+      (error) => onError?.(error)
+    )
+  );
 }
 
 /**
@@ -44,15 +59,23 @@ export async function sendChatMessage(
   text: string,
   authorId: string,
   authorName: string,
-  authorRole: string
+  authorRole: UserRole
 ): Promise<void> {
+  assertOnline();
   const messagesRef = collection(db, ISSUES_COLLECTION, issueId, CHAT_SUBCOLLECTION);
-  
-  await addDoc(messagesRef, {
-    text,
+
+  const message = {
+    text: validateChatMessage(text),
     authorId,
-    authorName,
+    authorName: authorName.trim().slice(0, LIMITS.name) || "Unknown",
     authorRole,
-    createdAt: Timestamp.now(),
+    createdAt: serverTimestamp(),
+  };
+
+  // Sent in a transaction so it is never queued while offline: it either
+  // reaches the server or fails, and the UI only clears the box on success.
+  const messageRef = doc(messagesRef);
+  await runTransaction(db, async (transaction) => {
+    transaction.set(messageRef, message);
   });
 }

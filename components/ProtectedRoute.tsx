@@ -3,34 +3,24 @@
 import { useAuthContext } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import ProfileUnavailable from "./ProfileUnavailable";
+import { ShellSkeleton } from "./shell/StatusScreen";
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-}
-
-// Simple auth-only guard — just checks if logged in, no role restriction.
-// Role-specific guards (AdminGuard, WorkerGuard) handle role checks.
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, loading } = useAuthContext();
+// Auth-only guard (no role restriction); AdminGuard / WorkerGuard handle roles.
+export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, userProfile, loading } = useAuthContext();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.replace("/login");
+      // Come back here after signing in (e.g. a scanned QR report link).
+      const here = `${window.location.pathname}${window.location.search}`;
+      router.replace(here === "/" ? "/login" : `/login?next=${encodeURIComponent(here)}`);
     }
   }, [isAuthenticated, loading, router]);
 
-  if (loading) {
-    return (
-      <div className="page-bg min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Loading…</p>
-        </div>
-      </div>
-    );
-  }
-
+  if (loading) return <ShellSkeleton />;
   if (!isAuthenticated) return null;
+  if (!userProfile) return <ProfileUnavailable />;
   return <>{children}</>;
 }

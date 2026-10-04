@@ -1,74 +1,113 @@
 "use client";
 
-import React, { useState } from "react";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import React, { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import IssueForm from "@/components/IssueForm";
 import ChatReporter from "@/components/ChatReporter";
-import Link from "next/link";
 import { useAuthContext } from "@/components/AuthProvider";
+import PageHeader from "@/components/ui/PageHeader";
+import { Segmented } from "@/components/ui/Tabs";
+import { Notice, Skeleton } from "@/components/ui/States";
+import { dashboardPathForRole } from "@/lib/roles";
+import { getCampusLocation } from "@/lib/locations";
+import { logError } from "@/lib/errors";
+import { CampusLocation } from "@/types";
+
+const LOCATION_ID = /^[a-z0-9-]{1,60}$/;
+
+function FormSkeleton() {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-5" role="status" aria-label="Loading">
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="mt-4 h-9 w-full" />
+      <Skeleton className="mt-4 h-28 w-full" />
+      <Skeleton className="mt-4 h-9 w-2/3" />
+    </div>
+  );
+}
 
 function ReportContent() {
-  const { userProfile } = useAuthContext();
-  const [tab, setTab] = useState<"chat" | "manual">("chat");
+  const { activeRole } = useAuthContext();
+  const searchParams = useSearchParams();
+  const locationParam = searchParams.get("location") ?? "";
+  const [mode, setMode] = useState<"form" | "quick">("form");
+  // undefined = still loading; null = none / not recognised.
+  const [preset, setPreset] = useState<CampusLocation | null | undefined>(locationParam ? undefined : null);
+  const [presetMissing, setPresetMissing] = useState(false);
 
-  // Back link goes to the correct dashboard for this user's role
-  const backHref =
-    userProfile?.role === "admin" ? "/admin" :
-    userProfile?.role === "worker" ? "/worker" :
-    "/dashboard";
+  useEffect(() => {
+    if (!locationParam) return;
+    if (!LOCATION_ID.test(locationParam)) {
+      setPreset(null);
+      setPresetMissing(true);
+      return;
+    }
+    let cancelled = false;
+    getCampusLocation(locationParam)
+      .then((loc) => {
+        if (cancelled) return;
+        setPreset(loc);
+        setPresetMissing(!loc);
+      })
+      .catch((err) => {
+        logError("getCampusLocation", err);
+        if (!cancelled) {
+          setPreset(null);
+          setPresetMissing(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [locationParam]);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-6">
-        <Link href={backHref} className="hover:text-purple-500 transition-colors">
-          Dashboard
-        </Link>
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <span className="text-gray-700 dark:text-gray-300">Report Issue</span>
-      </div>
+    <>
+      <PageHeader
+        eyebrow={
+          <Link href={dashboardPathForRole(activeRole)} className="inline-flex items-center gap-1 rounded hover:text-fg">
+            <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            Back to dashboard
+          </Link>
+        }
+        title="Report an issue"
+        description="Tell us what's wrong and where. A category and priority are suggested automatically — you can review everything before submitting."
+        actions={
+          <Segmented
+            label="Report mode"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "form", label: "Full form" },
+              { value: "quick", label: "Quick report" },
+            ]}
+          />
+        }
+      />
 
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Report a Campus Issue
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Describe the issue and our AI will automatically categorize and prioritize it.
-        </p>
-      </div>
+      {presetMissing && (
+        <Notice tone="warning" title="QR location not recognised" className="mb-6">
+          It may have been removed. Please type the location instead.
+        </Notice>
+      )}
 
-      {/* Mode tabs */}
-      <div className="flex gap-1 p-1 bg-gray-100 dark:bg-white/5 rounded-xl mb-6 w-fit">
-        {(["chat", "manual"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-              tab === t
-                ? "bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
-          >
-            {t === "chat" ? "🤖 AI Chat" : "📝 Manual Form"}
-          </button>
-        ))}
-      </div>
-
-      {/* Form card */}
-      <div className="glass p-6 sm:p-8">
-        {tab === "chat" ? <ChatReporter /> : <IssueForm />}
-      </div>
-    </div>
+      {preset === undefined ? (
+        <FormSkeleton />
+      ) : mode === "quick" ? (
+        <ChatReporter key={preset?.id ?? "none"} locationPreset={preset} />
+      ) : (
+        <IssueForm key={preset?.id ?? "none"} locationPreset={preset} />
+      )}
+    </>
   );
 }
 
 export default function ReportIssuePage() {
   return (
-    <ProtectedRoute>
+    <Suspense fallback={<FormSkeleton />}>
       <ReportContent />
-    </ProtectedRoute>
+    </Suspense>
   );
 }

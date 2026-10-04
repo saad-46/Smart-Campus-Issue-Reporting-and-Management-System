@@ -107,7 +107,7 @@ npm run dev
 ============================================================
 
 ⚠️  Using placeholder values for:
-   - apiKey: AIzaSyDemoKey123456789-REPLACE_WITH_YOUR_KEY
+   - apiKey: AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXR_KEY
    - authDomain: campus-iq-demo.firebaseapp.com
    - projectId: campus-iq-demo
 

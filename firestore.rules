@@ -1,13 +1,777 @@
 rules_version = '2';
 
+// ============================================================
+// UniFix — Firestore Security Rules
+// ============================================================
+// These rules are the application's backend. Nothing in the web
+// client is trusted: every permission is decided here.
+//
+// Trust model
+//   admin  — a document exists at /admins/{uid}. No client can write
+//            that collection; grant admin from the Firebase console
+//            (or the Admin SDK) by creating /admins/{uid}.
+//   worker — /users/{uid}.role == 'worker'. Only an admin can set it.
+//            Registration may record a request (workerRequest: 'pending')
+//            which an admin approves or rejects.
+//   user   — any signed-in account.
+//
+// Enums and size limits mirror lib/constants.ts.
+// Anything not explicitly allowed below is denied.
+// ============================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow all authenticated users to read and write for the hackathon
-    // WARNING: This is highly insecure and should be restricted before production deployment.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    // ---------- identity ----------
+
+    function signedIn() {
+      return request.auth != null;
     }
-    
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isWorker() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'worker';
+    }
+
+    // Workers and admins may both carry out maintenance work.
+    function isStaff() {
+      return isWorker() || isAdmin();
+    }
+
+    // ---------- shared validation ----------
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function validCategory(c) {
+      return c in ['Electrical', 'Plumbing', 'Infrastructure', 'Cleanliness',
+                   'Safety', 'IT', 'Furniture', 'Landscaping', 'General'];
+    }
+
+    function validPriority(p) {
+      return p in ['Low', 'Medium', 'High'];
+    }
+
+    // Mirrors CATEGORY_DEPARTMENTS in lib/constants.ts.
+    function validDepartment(d) {
+      return d in ['Electrical Maintenance', 'Plumbing & Water', 'Civil & Estates', 'Housekeeping',
+                   'Campus Security', 'IT Services', 'Facilities & Furniture', 'Grounds & Gardens',
+                   'Facilities Helpdesk'];
+    }
+
+    // Images are inline base64 only — never an arbitrary URL.
+    function validImage(s, maxChars) {
+      return s is string
+        && s.size() <= maxChars
+        && s.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+');
+    }
+
+    // ============================================================
+    // admins — the admin allow-list
+    // ============================================================
+    match /admins/{adminId} {
+      allow get: if signedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // ============================================================
+    // users — profiles
+    // ============================================================
+    match /users/{userId} {
+
+      function validNewProfile() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['id', 'name', 'email', 'role', 'roles', 'activeRole',
+                                 'createdAt', 'workerRequest'])
+          && d.keys().hasAll(['id', 'name', 'email', 'role', 'activeRole', 'createdAt'])
+          && d.id == userId
+          && d.name is string && d.name.size() >= 1 && d.name.size() <= 80
+          && d.email is string && d.email == request.auth.token.email
+          // Every account starts as a plain user. Worker access can only
+          // be *requested* here; an admin grants it.
+          && d.role == 'user'
+          && d.activeRole == 'user'
+          && (!('roles' in d) || d.roles == ['user'])
+          && (!('workerRequest' in d) || d.workerRequest == 'pending')
+          && d.createdAt is string && d.createdAt.size() <= 40;
+      }
+
+      // The owner may only switch which of their granted roles is active.
+      function ownerUpdate() {
+        let role = request.resource.data.activeRole;
+        return changedKeys().hasOnly(['activeRole'])
+          && (role == 'user'
+              || (role == 'worker' && (resource.data.role == 'worker' || isAdmin()))
+              || (role == 'admin' && isAdmin()));
+      }
+
+      function adminUpdate() {
+        let d = request.resource.data;
+        return changedKeys().hasOnly(['name', 'role', 'roles', 'activeRole', 'earnings', 'workerRequest'])
+          && d.role in ['user', 'worker', 'admin']
+          && d.get('workerRequest', 'approved') in ['pending', 'approved', 'rejected']
+          && d.name is string && d.name.size() >= 1 && d.name.size() <= 80
+          && d.get('earnings', 0) is number && d.get('earnings', 0) >= 0;
+      }
+
+      allow get: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() && request.auth.uid == userId && validNewProfile();
+      allow update: if signedIn()
+        && ((request.auth.uid == userId && ownerUpdate()) || (isAdmin() && adminUpdate()));
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // issues
+    // ============================================================
+    // Issues are visible to every signed-in member of the campus: the
+    // "Explore" community feed and the worker task pool depend on it.
+    match /issues/{issueId} {
+
+      // The issue document only carries small thumbnails; full-size
+      // photos live in /issues/{id}/images so list queries stay light.
+      // imageUrl / imageUrls are legacy fields and must stay empty.
+      function validImages(d) {
+        return d.thumbnails is list
+          && d.thumbnails.size() <= 3
+          && (d.thumbnails.size() < 1 || validImage(d.thumbnails[0], 24000))
+          && (d.thumbnails.size() < 2 || validImage(d.thumbnails[1], 24000))
+          && (d.thumbnails.size() < 3 || validImage(d.thumbnails[2], 24000))
+          && d.imageCount == d.thumbnails.size()
+          && d.imageUrls is list && d.imageUrls.size() == 0
+          && d.imageUrl == '';
+      }
+
+      // Server-side rate limit: an issue can only be created in the same
+      // commit that stamps /rateLimits/{uid}, and that stamp can only move
+      // once per cooldown window (see the rateLimits block below).
+      function withinRateLimit() {
+        return getAfter(/databases/$(database)/documents/rateLimits/$(request.auth.uid))
+                 .data.lastIssueAt == request.time;
+      }
+
+      // Optional data written when an issue is reported. The analysis
+      // fields are suggestions from the client-side classifier, so they
+      // are only shape-checked: nothing in the app grants access based on them.
+      function validOptionalReportFields(d) {
+        return (!('aiSummary' in d) || (d.aiSummary is string && d.aiSummary.size() <= 300))
+          && (!('aiConfidence' in d) || (d.aiConfidence is number && d.aiConfidence >= 0 && d.aiConfidence <= 1))
+          && (!('aiDepartment' in d) || validDepartment(d.aiDepartment))
+          // A QR location must be one an admin created.
+          && (!('locationId' in d)
+              || (d.locationId is string && d.locationId.size() >= 1 && d.locationId.size() <= 60
+                  && exists(/databases/$(database)/documents/campusLocations/$(d.locationId))))
+          // "Same problem as #X": must point at another existing issue.
+          && (!('duplicateOf' in d)
+              || (d.duplicateOf is string && d.duplicateOf.size() >= 1 && d.duplicateOf.size() <= 64
+                  && d.duplicateOf != issueId
+                  && exists(/databases/$(database)/documents/issues/$(d.duplicateOf))));
+      }
+
+      function validNewIssue() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['title', 'description', 'location', 'category', 'priority',
+                                 'status', 'createdBy', 'createdByName', 'assignedTo',
+                                 'createdAt', 'updatedAt', 'upvotes', 'upvotedBy',
+                                 'escalated', 'imageUrl', 'imageUrls', 'thumbnails', 'imageCount',
+                                 'aiSummary', 'aiConfidence', 'aiDepartment', 'locationId', 'duplicateOf'])
+          && d.keys().hasAll(['title', 'description', 'location', 'category', 'priority',
+                              'status', 'createdBy', 'createdByName', 'assignedTo',
+                              'createdAt', 'updatedAt', 'upvotes', 'upvotedBy',
+                              'escalated', 'imageUrl', 'imageUrls', 'thumbnails', 'imageCount'])
+          && d.createdBy == request.auth.uid
+          && d.createdByName is string && d.createdByName.size() >= 1 && d.createdByName.size() <= 80
+          && d.title is string && d.title.size() >= 1 && d.title.size() <= 150
+          && d.description is string && d.description.size() >= 1 && d.description.size() <= 5000
+          && d.location is string && d.location.size() >= 1 && d.location.size() <= 200
+          && validCategory(d.category)
+          && validPriority(d.priority)
+          // System-managed fields start from a fixed state.
+          && d.status == 'Open'
+          && d.assignedTo == ''
+          && d.upvotes == 0
+          && d.upvotedBy is list && d.upvotedBy.size() == 0
+          && d.escalated == false
+          && d.createdAt == request.time
+          && d.updatedAt == request.time
+          && validImages(d)
+          && validOptionalReportFields(d)
+          && withinRateLimit();
+      }
+
+      // Any signed-in user may add or remove exactly their own upvote.
+      function upvoteUpdate() {
+        let before = resource.data.get('upvotedBy', []).toSet();
+        let after = request.resource.data.get('upvotedBy', []).toSet();
+        let me = [request.auth.uid].toSet();
+        return changedKeys().hasOnly(['upvotes', 'upvotedBy', 'priority'])
+          && request.resource.data.get('upvotedBy', []) is list
+          // No duplicate voters.
+          && request.resource.data.get('upvotedBy', []).size() == after.size()
+          && ((after.difference(before) == me && before.difference(after).size() == 0)
+              || (before.difference(after) == me && after.difference(before).size() == 0))
+          && request.resource.data.upvotes == after.size()
+          // Priority may only be auto-promoted once the threshold is reached.
+          && (request.resource.data.priority == resource.data.priority
+              || (request.resource.data.priority == 'High' && after.size() >= 5));
+      }
+
+      // A worker takes an unassigned, open issue from the pool.
+      function staffClaim() {
+        return resource.data.get('assignedTo', '') == ''
+          && resource.data.status == 'Open'
+          && request.resource.data.assignedTo == request.auth.uid
+          && changedKeys().hasOnly(['assignedTo', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && isStaff();
+      }
+
+      // Open -> In Progress, by the assignee.
+      function staffStart() {
+        return resource.data.get('assignedTo', '') == request.auth.uid
+          && resource.data.status == 'Open'
+          && request.resource.data.status == 'In Progress'
+          && changedKeys().hasOnly(['status', 'updatedAt', 'startedAt'])
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.startedAt == request.time
+          && isStaff();
+      }
+
+      function validClaim() {
+        let d = request.resource.data;
+        return (!changedKeys().hasAny(['claimAmount', 'claimStatus', 'hasReceipt'])
+                || (d.claimAmount is number && d.claimAmount > 0 && d.claimAmount <= 1000000
+                    && d.claimStatus == 'pending'
+                    && d.get('hasReceipt', false) is bool))
+          // What the claim was spent on: optional, and only together with a new claim.
+          && (!changedKeys().hasAny(['claimDescription'])
+              || (changedKeys().hasAll(['claimAmount', 'claimStatus'])
+                  && d.claimDescription is string
+                  && d.claimDescription.size() >= 1 && d.claimDescription.size() <= 500));
+      }
+
+      // In Progress -> Resolved, by the assignee, optionally with an expense claim.
+      function staffResolve() {
+        return resource.data.get('assignedTo', '') == request.auth.uid
+          && resource.data.status == 'In Progress'
+          && request.resource.data.status == 'Resolved'
+          && changedKeys().hasOnly(['status', 'updatedAt', 'resolvedAt',
+                                    'claimAmount', 'claimStatus', 'hasReceipt', 'claimDescription'])
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.resolvedAt == request.time
+          && validClaim()
+          && isStaff();
+      }
+
+      function forwardOrSame(from, to) {
+        return to == from
+          || (from == 'Open' && to == 'In Progress')
+          || (from == 'In Progress' && to == 'Resolved');
+      }
+
+      // Admins manage workflow fields. They cannot rewrite the report
+      // itself (title, description, author, creation time, images).
+      // An admin can only hand an issue to an approved worker (or an admin),
+      // and can't reassign a resolved one.
+      function validAssignment(d) {
+        return d.assignedTo is string
+          && (d.assignedTo == resource.data.get('assignedTo', '')
+              || (resource.data.status != 'Resolved'
+                  && (d.assignedTo == ''
+                      || exists(/databases/$(database)/documents/admins/$(d.assignedTo))
+                      || (exists(/databases/$(database)/documents/users/$(d.assignedTo))
+                          && get(/databases/$(database)/documents/users/$(d.assignedTo)).data.role == 'worker'))));
+      }
+
+      // Linking a report into an incident (or unlinking it).
+      function validIncidentLink(d) {
+        return d.get('duplicateOf', '') == resource.data.get('duplicateOf', '')
+          || d.get('duplicateOf', '') == ''
+          || (d.duplicateOf is string && d.duplicateOf != issueId
+              && exists(/databases/$(database)/documents/issues/$(d.duplicateOf)));
+      }
+
+      function adminUpdate() {
+        let d = request.resource.data;
+        return changedKeys().hasOnly(['status', 'assignedTo', 'priority', 'category', 'escalated',
+                                      'claimStatus', 'updatedAt', 'startedAt', 'resolvedAt', 'duplicateOf'])
+          && forwardOrSame(resource.data.status, d.status)
+          && validPriority(d.priority)
+          && (d.category == resource.data.category || validCategory(d.category))
+          && validAssignment(d)
+          && validIncidentLink(d)
+          && d.get('escalated', false) is bool
+          && (d.get('claimStatus', null) == resource.data.get('claimStatus', null)
+              || (resource.data.get('claimStatus', null) == 'pending'
+                  && d.claimStatus in ['approved', 'rejected']));
+      }
+
+      allow read: if signedIn();
+      allow create: if signedIn() && validNewIssue();
+      allow update: if signedIn()
+        && (upvoteUpdate() || staffClaim() || staffStart() || staffResolve()
+            || (isAdmin() && adminUpdate()));
+      // Authors may withdraw a report nobody has picked up yet.
+      allow delete: if signedIn()
+        && ((resource.data.createdBy == request.auth.uid
+             && resource.data.status == 'Open'
+             && resource.data.get('assignedTo', '') == '')
+            || isAdmin());
+
+      // ---------- full-size photos ----------
+      // Written once, in the same commit that creates the issue, by its author.
+      match /images/{imageId} {
+
+        function parentAfter() {
+          return getAfter(/databases/$(database)/documents/issues/$(issueId)).data;
+        }
+
+        function parentNow() {
+          return get(/databases/$(database)/documents/issues/$(issueId)).data;
+        }
+
+        function validIssueImage() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['data', 'index', 'createdBy', 'createdAt'])
+            && d.keys().hasAll(['data', 'index', 'createdBy', 'createdAt'])
+            && validImage(d.data, 220000)
+            && d.index is int && d.index >= 0 && d.index <= 2
+            && d.createdBy == request.auth.uid
+            && d.createdAt == request.time;
+        }
+
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && imageId in ['0', '1', '2']
+          && parentAfter().createdBy == request.auth.uid
+          // Only while the issue itself is being created.
+          && parentAfter().createdAt == request.time
+          && validIssueImage();
+        allow update: if false;
+        // Removed together with the issue (same conditions as deleting it).
+        allow delete: if signedIn()
+          && (isAdmin()
+              || (parentNow().createdBy == request.auth.uid
+                  && parentNow().status == 'Open'
+                  && parentNow().get('assignedTo', '') == ''));
+      }
+
+      // ---------- expense-claim receipt ----------
+      // Visible only to the worker who filed it and to admins.
+      match /receipts/{receiptId} {
+
+        function parentAfter() {
+          return getAfter(/databases/$(database)/documents/issues/$(issueId)).data;
+        }
+
+        function validReceipt() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['data', 'createdBy', 'createdAt'])
+            && d.keys().hasAll(['data', 'createdBy', 'createdAt'])
+            && validImage(d.data, 250000)
+            && d.createdBy == request.auth.uid
+            && d.createdAt == request.time;
+        }
+
+        allow get: if signedIn()
+          && (get(/databases/$(database)/documents/issues/$(issueId)).data.get('assignedTo', '') == request.auth.uid
+              || isAdmin());
+        allow list: if false;
+        // Only in the commit that resolves the issue with a pending claim.
+        allow create: if signedIn()
+          && receiptId == 'receipt'
+          && parentAfter().get('assignedTo', '') == request.auth.uid
+          && parentAfter().get('claimStatus', '') == 'pending'
+          && parentAfter().get('resolvedAt', null) == request.time
+          && validReceipt();
+        allow update: if false;
+        allow delete: if isAdmin();
+      }
+
+      // ---------- timeline events ----------
+      // Readable by everyone who can read the issue. Each event can only be
+      // written in the same commit as the change it records (compared with
+      // get() = before and getAfter() = after the commit), so the timeline
+      // can't be forged, backdated or padded. Events are immutable.
+      // Single-occurrence events use their type as the document id, so they
+      // can't be written twice; repeatable ones use "<type>-<millis>".
+      match /events/{eventId} {
+
+        function before() {
+          return get(/databases/$(database)/documents/issues/$(issueId)).data;
+        }
+
+        function after() {
+          return getAfter(/databases/$(database)/documents/issues/$(issueId)).data;
+        }
+
+        function eventShape(extra) {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['type', 'actorRole', 'createdAt'].concat(extra))
+            && d.keys().hasAll(['type', 'actorRole', 'createdAt'])
+            && d.createdAt == request.time
+            && (d.actorRole == 'user'
+                || (d.actorRole == 'worker' && isStaff())
+                || (d.actorRole == 'admin' && isAdmin()));
+        }
+
+        function reported() {
+          let d = request.resource.data;
+          return eventId == 'reported' && d.type == 'reported'
+            && eventShape(['category', 'priority', 'confidence'])
+            && after().createdBy == request.auth.uid
+            && after().createdAt == request.time
+            && d.category == after().category
+            && d.priority == after().priority
+            && d.get('confidence', null) == after().get('aiConfidence', null);
+        }
+
+        function claimed() {
+          return eventId.matches('claimed-[0-9]{10,16}') && request.resource.data.type == 'claimed'
+            && eventShape([])
+            && before().get('assignedTo', '') == ''
+            && after().get('assignedTo', '') == request.auth.uid;
+        }
+
+        function assigned() {
+          return eventId.matches('assigned-[0-9]{10,16}') && request.resource.data.type == 'assigned'
+            && eventShape([]) && isAdmin()
+            && after().get('assignedTo', '') != ''
+            && after().get('assignedTo', '') != before().get('assignedTo', '');
+        }
+
+        function statusEvent(type, from, to) {
+          return eventId == type && request.resource.data.type == type
+            && eventShape([])
+            && before().status == from
+            && after().status == to;
+        }
+
+        function claimDecision(type, outcome) {
+          return eventId == 'claim' && request.resource.data.type == type
+            && eventShape([]) && isAdmin()
+            && before().get('claimStatus', '') == 'pending'
+            && after().get('claimStatus', '') == outcome;
+        }
+
+        function linked() {
+          let d = request.resource.data;
+          return eventId.matches('linked-[0-9]{10,16}') && d.type == 'linked'
+            && eventShape(['duplicateOf']) && isAdmin()
+            && after().get('duplicateOf', '') != before().get('duplicateOf', '')
+            && d.duplicateOf == after().get('duplicateOf', '');
+        }
+
+        function feedbackGiven() {
+          let d = request.resource.data;
+          let fb = getAfter(/databases/$(database)/documents/feedback/$(issueId));
+          return eventId == 'feedback' && d.type == 'feedback'
+            && eventShape(['rating'])
+            && fb != null
+            && fb.data.createdBy == request.auth.uid
+            && fb.data.createdAt == request.time
+            && d.rating == fb.data.rating;
+        }
+
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && (reported() || claimed() || assigned()
+              || statusEvent('started', 'Open', 'In Progress')
+              || statusEvent('resolved', 'In Progress', 'Resolved')
+              || claimDecision('claim_approved', 'approved')
+              || claimDecision('claim_rejected', 'rejected')
+              || linked() || feedbackGiven());
+        allow update, delete: if false;
+      }
+
+      // ---------- issue discussion thread ----------
+      // Private to the issue's author and staff.
+      match /messages/{messageId} {
+
+        function canChat() {
+          return get(/databases/$(database)/documents/issues/$(issueId)).data.createdBy == request.auth.uid
+            || isStaff();
+        }
+
+        function validMessage() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['text', 'authorId', 'authorName', 'authorRole', 'createdAt'])
+            && d.keys().hasAll(['text', 'authorId', 'authorName', 'authorRole', 'createdAt'])
+            && d.text is string && d.text.size() >= 1 && d.text.size() <= 2000
+            && d.authorId == request.auth.uid
+            && d.authorName is string && d.authorName.size() >= 1 && d.authorName.size() <= 80
+            && d.createdAt == request.time
+            // The role badge shown next to a message can't be faked.
+            && (d.authorRole == 'user'
+                || (d.authorRole == 'worker' && isStaff())
+                || (d.authorRole == 'admin' && isAdmin()));
+        }
+
+        allow read: if signedIn() && canChat();
+        allow create: if signedIn() && canChat() && validMessage();
+        allow update, delete: if false;
+      }
+    }
+
+    // ============================================================
+    // finance — the global maintenance budget (admin only)
+    // ============================================================
+    match /finance/{docId} {
+
+      function validBudget() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['totalAvailable', 'totalSpent', 'updatedAt'])
+          && d.totalAvailable is number && d.totalAvailable >= 0
+          && d.get('totalSpent', 0) is number && d.get('totalSpent', 0) >= 0;
+      }
+
+      allow read: if isAdmin();
+      allow create: if isAdmin() && docId == 'budget' && validBudget()
+        && request.resource.data.get('totalSpent', 0) <= request.resource.data.totalAvailable;
+      // Spending can never be pushed past the available budget.
+      allow update: if isAdmin() && docId == 'budget' && validBudget()
+        && (request.resource.data.get('totalSpent', 0) <= request.resource.data.totalAvailable
+            || request.resource.data.get('totalSpent', 0) <= resource.data.get('totalSpent', 0));
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // transactions — immutable payment ledger
+    // ============================================================
+    match /transactions/{txId} {
+
+      function validTransaction() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['workerId', 'workerName', 'amount', 'type', 'note',
+                                 'issueId', 'receiptUrl', 'status', 'createdAt'])
+          && d.workerId is string && d.workerId.size() >= 1
+          && d.workerName is string && d.workerName.size() <= 80
+          && d.amount is number && d.amount > 0 && d.amount <= 1000000
+          && d.type == 'receipt'
+          && d.get('note', '') is string && d.get('note', '').size() <= 500
+          && d.issueId is string && d.issueId.size() >= 1 && d.issueId.size() <= 200
+          && d.get('receiptUrl', '') == ''
+          && d.status == 'approved'
+          && d.createdAt == request.time
+          && settlesPendingClaim(d);
+      }
+
+      // A ledger entry is only valid in the commit that moves its issue's
+      // claim from pending to approved, for exactly the claimed amount and
+      // payee. This makes paying the same claim twice impossible even for
+      // a buggy or malicious admin client.
+      function settlesPendingClaim(d) {
+        let before = get(/databases/$(database)/documents/issues/$(d.issueId)).data;
+        let after = getAfter(/databases/$(database)/documents/issues/$(d.issueId)).data;
+        return before.get('claimStatus', '') == 'pending'
+          && after.get('claimStatus', '') == 'approved'
+          && d.amount == before.claimAmount
+          && d.workerId == before.get('assignedTo', '');
+      }
+
+      // Workers see their own payouts; admins see the whole ledger.
+      allow read: if signedIn() && (resource.data.workerId == request.auth.uid || isAdmin());
+      allow create: if isAdmin() && validTransaction();
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // notifications — one document per recipient
+    // ============================================================
+    // A notification carries no free text: the app renders the message
+    // from `type` and fields the rules check against the real data, so a
+    // sender can't put arbitrary words in front of someone. Each type can
+    // only be created in the same commit as the change it announces, by
+    // the person entitled to make that change.
+    match /notifications/{notificationId} {
+
+      function shape(extra) {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['type', 'recipientId', 'senderId', 'createdAt', 'readAt'].concat(extra))
+          && d.keys().hasAll(['type', 'recipientId', 'senderId', 'createdAt', 'readAt'].concat(extra))
+          && d.senderId == request.auth.uid
+          && d.recipientId is string && d.recipientId.size() >= 1
+          && d.createdAt == request.time
+          && d.readAt == null;
+      }
+
+      function issueBefore(id) {
+        return get(/databases/$(database)/documents/issues/$(id)).data;
+      }
+
+      function issueAfter(id) {
+        return getAfter(/databases/$(database)/documents/issues/$(id)).data;
+      }
+
+      // Admin assigned the issue to the recipient (a worker) in this commit.
+      function assignedNotice() {
+        let d = request.resource.data;
+        return d.type == 'issue_assigned'
+          && shape(['issueId', 'issueTitle']) && isAdmin()
+          && issueAfter(d.issueId).get('assignedTo', '') == d.recipientId
+          && issueBefore(d.issueId).get('assignedTo', '') != d.recipientId
+          && d.issueTitle == issueAfter(d.issueId).title;
+      }
+
+      // The assignee (or an admin) changed the status of the recipient's issue in this commit.
+      function statusNotice() {
+        let d = request.resource.data;
+        return d.type == 'status_changed'
+          && shape(['issueId', 'issueTitle', 'status'])
+          && issueAfter(d.issueId).createdBy == d.recipientId
+          && issueAfter(d.issueId).status != issueBefore(d.issueId).status
+          && d.status == issueAfter(d.issueId).status
+          && d.issueTitle == issueAfter(d.issueId).title
+          && (issueAfter(d.issueId).get('assignedTo', '') == request.auth.uid || isAdmin());
+      }
+
+      // An admin decided the recipient's expense claim in this commit.
+      function claimNotice() {
+        let d = request.resource.data;
+        return d.type == 'claim_decision'
+          && shape(['issueId', 'issueTitle', 'decision', 'amount']) && isAdmin()
+          && issueBefore(d.issueId).get('claimStatus', '') == 'pending'
+          && issueAfter(d.issueId).get('claimStatus', '') == d.decision
+          && issueAfter(d.issueId).get('assignedTo', '') == d.recipientId
+          && d.issueTitle == issueAfter(d.issueId).title
+          && d.amount == issueBefore(d.issueId).claimAmount;
+      }
+
+      // An admin approved, rejected or removed the recipient's worker access in this commit.
+      function workerAccessNotice() {
+        let d = request.resource.data;
+        let before = get(/databases/$(database)/documents/users/$(d.recipientId)).data;
+        let after = getAfter(/databases/$(database)/documents/users/$(d.recipientId)).data;
+        return d.type == 'worker_access'
+          && shape(['decision']) && isAdmin()
+          && d.decision in ['approved', 'rejected']
+          && after.get('workerRequest', '') == d.decision
+          && (before.get('workerRequest', '') != d.decision || before.role != after.role);
+      }
+
+      allow get, list: if signedIn() && resource.data.recipientId == request.auth.uid;
+      allow create: if signedIn()
+        && (assignedNotice() || statusNotice() || claimNotice() || workerAccessNotice());
+      // The recipient can only mark it read (once) or delete it.
+      allow update: if signedIn()
+        && resource.data.recipientId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+        && resource.data.readAt == null
+        && request.resource.data.readAt == request.time;
+      allow delete: if signedIn() && resource.data.recipientId == request.auth.uid;
+    }
+
+    // ============================================================
+    // feedback — one rating per resolved issue, by its reporter
+    // ============================================================
+    // The document id is the issue id and documents are create-only, so
+    // each issue can be rated exactly once. Readable by its author and admins.
+    match /feedback/{issueId} {
+
+      function ratedIssue() {
+        return get(/databases/$(database)/documents/issues/$(issueId)).data;
+      }
+
+      function validFeedback() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['issueId', 'rating', 'comment', 'createdBy', 'assignedTo', 'category', 'createdAt'])
+          && d.keys().hasAll(['issueId', 'rating', 'comment', 'createdBy', 'assignedTo', 'category', 'createdAt'])
+          && d.issueId == issueId
+          && d.createdBy == request.auth.uid
+          && d.rating is int && d.rating >= 1 && d.rating <= 5
+          && d.comment is string && d.comment.size() <= 500
+          && d.createdAt == request.time
+          && ratedIssue().createdBy == request.auth.uid
+          && ratedIssue().status == 'Resolved'
+          // Copied from the issue so ratings can be aggregated per worker/category.
+          && d.assignedTo == ratedIssue().get('assignedTo', '')
+          && d.category == ratedIssue().category;
+      }
+
+      // The reporter may also check whether their own issue has been rated yet
+      // (reading the not-yet-existing document).
+      allow get: if signedIn()
+        && (isAdmin()
+            || (resource == null && ratedIssue().createdBy == request.auth.uid)
+            || (resource != null && resource.data.createdBy == request.auth.uid));
+      allow list: if signedIn() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow create: if signedIn() && validFeedback();
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // campusLocations — admin-managed places for QR reporting
+    // ============================================================
+    match /campusLocations/{locationId} {
+
+      function validLocation() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['name', 'buildingId', 'floor', 'room', 'createdAt'])
+          && d.keys().hasAll(['name', 'buildingId', 'floor', 'room', 'createdAt'])
+          && locationId.matches('[a-z0-9-]{1,60}')
+          && d.name is string && d.name.size() >= 1 && d.name.size() <= 80
+          && d.buildingId is string && d.buildingId.size() <= 40
+          && d.floor is string && d.floor.size() <= 10
+          && d.room is string && d.room.size() <= 20
+          && d.createdAt == request.time;
+      }
+
+      // Anyone signed in can read a location (the QR report page shows it).
+      allow read: if signedIn();
+      allow create: if isAdmin() && validLocation();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // config — admin-tunable settings
+    // ============================================================
+    match /config/{docId} {
+
+      function validHours(h) {
+        return h is int && h >= 1 && h <= 2160;
+      }
+
+      // SLA targets in hours per priority.
+      function validSla() {
+        let d = request.resource.data;
+        return docId == 'sla'
+          && d.keys().hasOnly(['High', 'Medium', 'Low', 'updatedAt'])
+          && d.keys().hasAll(['High', 'Medium', 'Low', 'updatedAt'])
+          && validHours(d.High) && validHours(d.Medium) && validHours(d.Low)
+          && d.updatedAt == request.time;
+      }
+
+      allow read: if signedIn() && docId == 'sla';
+      allow write: if isAdmin() && validSla();
+    }
+
+    // ============================================================
+    // rateLimits — per-account write throttle (see withinRateLimit)
+    // ============================================================
+    match /rateLimits/{userId} {
+
+      function validStamp() {
+        return request.resource.data.keys().hasOnly(['lastIssueAt'])
+          && request.resource.data.lastIssueAt == request.time;
+      }
+
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow list: if false;
+      allow create: if signedIn() && request.auth.uid == userId && validStamp();
+      // One issue per 30 seconds per account.
+      allow update: if signedIn() && request.auth.uid == userId && validStamp()
+        && request.time >= resource.data.lastIssueAt + duration.value(30, 's');
+      allow delete: if false;
+    }
   }
 }

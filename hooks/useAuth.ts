@@ -1,49 +1,93 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 import {
   signIn as authSignIn,
   signUp as authSignUp,
   signOut as authSignOut,
   getUserProfile,
+  hasAdminGrant,
+  createMissingProfile,
+  setActiveRole,
 } from "@/lib/auth";
+import { ValidationError, logError } from "@/lib/errors";
+import { getAvailableRoles, resolveActiveRole } from "@/lib/roles";
 import { User, UserRole } from "@/types";
+
+/** How long to wait for Firebase Auth's first state before telling the user. */
+const AUTH_INIT_TIMEOUT_MS = 12000;
 
 export function useAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [adminGrant, setAdminGrant] = useState(false);
+  const [profileError, setProfileError] = useState(false);
   // loading stays TRUE until both Firebase auth state AND Firestore profile are resolved
   const [loading, setLoading] = useState(true);
+  // True if Firebase Auth never reported an initial state (e.g. the
+  // browser's storage is blocked), so the UI can say so instead of spinning.
+  const [initStalled, setInitStalled] = useState(false);
+
+  // True while signUp() is writing the new profile, so the auth listener
+  // doesn't race it and create a default profile first.
+  const signingUp = useRef(false);
+  // Bumped on every auth change so a slow profile fetch for a previous
+  // user can't overwrite the state of the current one.
+  const authGeneration = useRef(0);
+
+  const loadProfile = useCallback(async (user: FirebaseUser, generation: number) => {
+    try {
+      const [existingProfile, isAdminGranted] = await Promise.all([
+        getUserProfile(user.uid),
+        hasAdminGrant(user.uid),
+      ]);
+      const profile =
+        existingProfile ?? (signingUp.current ? null : await createMissingProfile(user));
+      if (generation !== authGeneration.current) return;
+      setUserProfile(profile);
+      setAdminGrant(isAdminGranted);
+      setProfileError(false);
+    } catch (err) {
+      if (generation !== authGeneration.current) return;
+      logError("loadProfile", err);
+      setUserProfile(null);
+      setAdminGrant(false);
+      setProfileError(true);
+    }
+  }, []);
 
   useEffect(() => {
+    const watchdog = setTimeout(() => setInitStalled(true), AUTH_INIT_TIMEOUT_MS);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      clearTimeout(watchdog);
+      setInitStalled(false);
+      const generation = ++authGeneration.current;
       setFirebaseUser(user);
 
       if (user) {
-        try {
-          const profile = await getUserProfile(user.uid);
-          console.log("✅ Role loaded from Firestore:", profile?.activeRole || profile?.role, "| uid:", user.uid);
-          setUserProfile(profile);
-          if (profile) {
-            localStorage.setItem("role", profile.activeRole || profile.role);
-          }
-        } catch (err) {
-          console.error("❌ Failed to load user profile:", err);
-          setUserProfile(null);
+        // signUp() sets the profile itself once the document is written.
+        if (!signingUp.current) {
+          setLoading(true);
+          await loadProfile(user, generation);
         }
       } else {
         setUserProfile(null);
+        setAdminGrant(false);
+        setProfileError(false);
       }
 
       // CRITICAL: only set loading=false AFTER profile fetch completes
-      setLoading(false);
+      if (generation === authGeneration.current && !signingUp.current) setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      clearTimeout(watchdog);
+      unsubscribe();
+    };
+  }, [loadProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     // Don't touch loading here — onAuthStateChanged handles it
@@ -52,9 +96,16 @@ export function useAuth() {
 
   const signUp = useCallback(
     async (email: string, password: string, name: string, role: UserRole) => {
-      const profile = await authSignUp(email, password, name, role);
-      setUserProfile(profile);
-      console.log("✅ Signup complete, role:", profile.role);
+      signingUp.current = true;
+      try {
+        const profile = await authSignUp(email, password, name, role);
+        setUserProfile(profile);
+        setAdminGrant(false);
+        setProfileError(false);
+      } finally {
+        signingUp.current = false;
+        setLoading(false);
+      }
     },
     []
   );
@@ -62,30 +113,54 @@ export function useAuth() {
   const signOut = useCallback(async () => {
     await authSignOut();
     setUserProfile(null);
-    localStorage.removeItem("role");
+    setAdminGrant(false);
   }, []);
 
-  const switchRole = useCallback(async (role: UserRole) => {
+  /** Retry loading the profile after a failure (e.g. the network dropped). */
+  const reloadProfile = useCallback(async () => {
     if (!firebaseUser) return;
-    try {
-      await updateDoc(doc(db, "users", firebaseUser.uid), { activeRole: role });
-      localStorage.setItem("role", role);
-      setUserProfile((prev) => prev ? { ...prev, activeRole: role } as User : null);
-    } catch (e) {
-      console.error("Failed to switch role", e);
-    }
-  }, [firebaseUser]);
+    setLoading(true);
+    await loadProfile(firebaseUser, authGeneration.current);
+    setLoading(false);
+  }, [firebaseUser, loadProfile]);
+
+  const availableRoles = useMemo(
+    () => getAvailableRoles(userProfile, adminGrant),
+    [userProfile, adminGrant]
+  );
+  const activeRole = useMemo(
+    () => resolveActiveRole(userProfile, adminGrant),
+    [userProfile, adminGrant]
+  );
+
+  /** Switch between the roles this account has been granted. Throws on failure. */
+  const switchRole = useCallback(
+    async (role: UserRole) => {
+      if (!firebaseUser) throw new ValidationError("Your session has expired. Please sign in again.");
+      if (!availableRoles.includes(role)) {
+        throw new ValidationError("Your account doesn't have access to that role.");
+      }
+      await setActiveRole(firebaseUser.uid, role);
+      setUserProfile((prev) => (prev ? { ...prev, activeRole: role } : null));
+    },
+    [firebaseUser, availableRoles]
+  );
 
   return {
     user: firebaseUser,
     userProfile,
     loading,
+    profileError,
+    initStalled,
+    reloadProfile,
     signIn,
     signUp,
     signOut,
     switchRole,
-    isAdmin: (userProfile?.activeRole || userProfile?.role) === "admin",
-    isWorker: (userProfile?.activeRole || userProfile?.role) === "worker",
+    activeRole,
+    availableRoles,
+    isAdmin: !!userProfile && activeRole === "admin",
+    isWorker: !!userProfile && activeRole === "worker",
     isAuthenticated: !!firebaseUser,
   };
 }

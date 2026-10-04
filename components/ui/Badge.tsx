@@ -1,80 +1,89 @@
 // ============================================
-// Badge — Priority & Status Badge Component
+// Badges — semantic, compact, consistent
 // ============================================
-// Color-coded badges for displaying priority and status.
+// Colour carries meaning only: neutral (default), info (brand),
+// success, warning, danger. Status and priority map onto these tones.
 
 "use client";
 
 import React from "react";
-import { Priority, IssueStatus } from "@/types";
+import { IssueStatus, Priority } from "@/types";
+import { cn } from "@/lib/cn";
+
+export type BadgeTone = "neutral" | "info" | "success" | "warning" | "danger";
+
+const tones: Record<BadgeTone, string> = {
+  neutral: "bg-surface-2 text-fg-muted border-border",
+  info: "bg-brand-subtle text-brand-fg border-brand-subtle-border",
+  success: "bg-success-subtle text-success border-success-border",
+  warning: "bg-warning-subtle text-warning border-warning-border",
+  danger: "bg-danger-subtle text-danger border-danger-border",
+};
+
+const dots: Record<BadgeTone, string> = {
+  neutral: "bg-fg-subtle",
+  info: "bg-brand-fg",
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
+};
 
 interface BadgeProps {
+  tone?: BadgeTone;
+  /** Small leading dot — used for live states (status, SLA). */
+  dot?: boolean;
+  icon?: React.ReactNode;
   children: React.ReactNode;
-  variant?: "default" | "priority" | "status";
-  priority?: Priority;
-  status?: IssueStatus;
   className?: string;
+  title?: string;
 }
 
-const priorityStyles: Record<Priority, string> = {
-  High: "bg-red-500/10 text-red-500 border-red-500/20",
-  Medium: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-  Low: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-};
-
-const statusStyles: Record<IssueStatus, string> = {
-  Open: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
-  "In Progress": "bg-purple-500/10 text-purple-500 border-purple-500/20",
-  Resolved: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-};
-
-export default function Badge({
-  children,
-  variant = "default",
-  priority,
-  status,
-  className = "",
-}: BadgeProps) {
-  let colorClasses = "bg-gray-700/50 text-gray-300 border-gray-600/50";
-
-  if (variant === "priority" && priority) {
-    colorClasses = priorityStyles[priority];
-  } else if (variant === "status" && status) {
-    colorClasses = statusStyles[status];
-  }
-
+export default function Badge({ tone = "neutral", dot, icon, children, className, title }: BadgeProps) {
   return (
     <span
-      className={`
-        inline-flex items-center
-        px-3 py-1 text-[10px] font-black uppercase tracking-widest
-        rounded-full border shadow-sm
-        ${colorClasses}
-        ${className}
-      `}
+      title={title}
+      className={cn(
+        "inline-flex h-[22px] items-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-xs font-medium",
+        "[&>svg]:h-3 [&>svg]:w-3",
+        tones[tone],
+        className
+      )}
     >
+      {dot && <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", dots[tone])} />}
+      {icon}
       {children}
     </span>
   );
 }
 
-/** Convenience component for priority badges */
-export function PriorityBadge({ priority }: { priority: Priority }) {
+const STATUS_TONE: Record<IssueStatus, BadgeTone> = {
+  Open: "info",
+  "In Progress": "warning",
+  Resolved: "success",
+};
+
+export function StatusBadge({ status, className }: { status: IssueStatus; className?: string }) {
   return (
-    <Badge variant="priority" priority={priority}>
-      {priority === "High" && "🔴 "}
-      {priority === "Medium" && "🟡 "}
-      {priority === "Low" && "🟢 "}
-      {priority}
+    <Badge tone={STATUS_TONE[status]} dot className={className}>
+      {status}
     </Badge>
   );
 }
 
-/** Convenience component for status badges */
-export function StatusBadge({ status }: { status: IssueStatus }) {
+const PRIORITY_TONE: Record<Priority, BadgeTone> = { High: "danger", Medium: "warning", Low: "neutral" };
+
+/** Priority as a quiet signal-bar indicator rather than a loud pill. */
+export function PriorityBadge({ priority, className }: { priority: Priority; className?: string }) {
+  const bars = priority === "High" ? 3 : priority === "Medium" ? 2 : 1;
   return (
-    <Badge variant="status" status={status}>
-      {status}
+    <Badge tone={PRIORITY_TONE[priority]} className={className} title={`${priority} priority`}>
+      <span aria-hidden="true" className="flex items-end gap-[2px]">
+        {[1, 2, 3].map((n) => (
+          <span key={n} className={cn("w-[3px] rounded-[1px] bg-current", n <= bars ? "opacity-100" : "opacity-25")} style={{ height: 3 + n * 2 }} />
+        ))}
+      </span>
+      {priority}
+      <span className="sr-only"> priority</span>
     </Badge>
   );
 }

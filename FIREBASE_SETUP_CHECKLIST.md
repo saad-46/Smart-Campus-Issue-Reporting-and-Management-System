@@ -43,26 +43,10 @@
 1. In Firestore Database, go to **"Rules"** tab
 2. Replace the default rules with:
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Allow authenticated users to read/write their own user document
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Allow authenticated users to create and read issues
-    match /issues/{issueId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
-    }
-  }
-}
-```
+> Use the rules in [`firestore.rules`](./firestore.rules) — do not paste hand-written rules.
+> Deploy them with `npx firebase-tools deploy --only firestore:rules`, or copy the file's
+> contents into Firebase Console → Firestore → Rules. See
+> [FIRESTORE_RULES_FIX.md](./FIRESTORE_RULES_FIX.md) for the permission model and how to grant admin access.
 
 3. Click **"Publish"**
 

@@ -1,303 +1,338 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ChevronLeft, Lock, MapPin, MessageSquare, SendHorizontal, Siren } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import Sidebar from "@/components/Sidebar";
-import { subscribeToSingleIssue } from "@/lib/firestore";
+import AdminIssueControls from "@/components/issue/AdminIssueControls";
+import AnalysisPanel from "@/components/issue/AnalysisPanel";
+import FeedbackPanel from "@/components/issue/FeedbackPanel";
+import IncidentPanel from "@/components/issue/IncidentPanel";
+import IssueTimeline from "@/components/issue/IssueTimeline";
+import Panel from "@/components/issue/Panel";
+import { SlaMeter } from "@/components/issue/SlaBadge";
+import ImageModal from "@/components/ImageModal";
+import Badge, { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
+import Button, { IconButton } from "@/components/ui/Button";
+import { DescriptionList } from "@/components/ui/Data";
+import { ErrorState, EmptyState, Skeleton, SkeletonLines } from "@/components/ui/States";
+import { Actor, getIssueImages, subscribeToSingleIssue } from "@/lib/firestore";
 import { subscribeToIssueChat, sendChatMessage } from "@/services/chatService";
 import { Issue, ChatMessage } from "@/types";
-import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
+import { LIMITS } from "@/lib/constants";
+import { formatDate, formatRelative, formatTime } from "@/lib/dates";
+import { getFriendlyErrorMessage, logError } from "@/lib/errors";
+import { dashboardPathForRole } from "@/lib/roles";
+import { cn } from "@/lib/cn";
 
-function IssueDetailContent() {
-  const { id } = useParams() as { id: string };
-  const { userProfile } = useAuthContext();
-  const router = useRouter();
+const ROLE_NAMES = { user: "Reporter", worker: "Worker", admin: "Admin" } as const;
 
-  const [issue, setIssue] = useState<Issue | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!id) return;
-    const unsubIssue = subscribeToSingleIssue(id, (fetched) => {
-      setIssue(fetched);
-      setLoading(false);
-    });
-    
-    const unsubChat = subscribeToIssueChat(id, (fetchedMsgs) => {
-      setMessages(fetchedMsgs);
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-    });
-
-    return () => {
-      unsubIssue();
-      unsubChat();
-    };
-  }, [id]);
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !userProfile || !issue) return;
-    
-    const text = chatInput.trim();
-    setChatInput("");
-    
-    try {
-      await sendChatMessage(id, text, userProfile.id, userProfile.name, userProfile.role);
-    } catch {
-      console.error("Failed to send message");
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center min-h-screen">
-        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!issue) {
-    return (
-      <div className="flex-1 p-8 text-center text-gray-400">
-        <h2 className="text-xl font-bold text-white mb-2">Issue Not Found</h2>
-        <p>The issue you are looking for does not exist or was deleted.</p>
-        <button onClick={() => router.back()} className="mt-4 text-indigo-400 hover:text-indigo-300">
-          ← Go Back
-        </button>
-      </div>
-    );
-  }
-
+function IssueSkeleton() {
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto h-[100dvh] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6 shrink-0">
-        <button onClick={() => router.back()} className="w-10 h-10 flex items-center justify-center glass rounded-xl hover:bg-gray-800/50 transition border border-gray-800">
-          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">{issue.title}</h1>
-          <p className="text-sm text-gray-400 flex items-center gap-2 mt-1">
-            <span>Reported by {issue.createdByName}</span>
-            <span>•</span>
-            <span>{issue.createdAt.toLocaleDateString()}</span>
-          </p>
+    <div role="status" aria-label="Loading issue">
+      <Skeleton className="h-4 w-28" />
+      <div className="mt-4 flex gap-2">
+        <Skeleton className="h-5 w-16 rounded-full" />
+        <Skeleton className="h-5 w-16 rounded-full" />
+      </div>
+      <Skeleton className="mt-3 h-7 w-2/3" />
+      <Skeleton className="mt-2 h-4 w-1/3" />
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="space-y-6">
+          <div className="rounded-lg border border-border bg-surface p-5">
+            <SkeletonLines lines={4} />
+          </div>
+          <div className="rounded-lg border border-border bg-surface p-5">
+            <SkeletonLines lines={3} />
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-surface p-5">
+          <SkeletonLines lines={5} />
         </div>
       </div>
-
-      {/* Main Grid */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
-        {/* Left Col: Details */}
-        <div className="lg:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-6 custom-scrollbar">
-          <div className="bg-white dark:bg-[#111827] rounded-2xl p-6 border border-gray-200 dark:border-white/10 shadow-lg transition-all duration-200 hover:shadow-xl flex flex-col gap-6">
-            <div className="border-b border-gray-100 dark:border-white/5 pb-4">
-              <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Issue Summary</h2>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <PriorityBadge priority={issue.priority} />
-              <StatusBadge status={issue.status} />
-              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/5">
-                {issue.category}
-              </span>
-            </div>
-
-            <div className="space-y-6">
-              {/* Section: Title */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <label className="text-[10px] font-black uppercase tracking-widest">Title</label>
-                </div>
-                <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{issue.title}</p>
-              </div>
-
-              <div className="h-px bg-gray-100 dark:bg-white/5" />
-
-              {/* Section: Description */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7"/></svg>
-                  <label className="text-[10px] font-black uppercase tracking-widest">Description</label>
-                </div>
-                <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/5">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
-                    {issue.description}
-                  </p>
-                </div>
-              </div>
-
-              <div className="h-px bg-gray-100 dark:bg-white/5" />
-
-              {/* Section: Location */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                  <label className="text-[10px] font-black uppercase tracking-widest">Location</label>
-                </div>
-                <p className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-tighter">{issue.location}</p>
-              </div>
-
-              {(issue.imageUrls?.length ? issue.imageUrls : issue.imageUrl ? [issue.imageUrl] : []).length > 0 && (
-                <>
-                  <div className="h-px bg-gray-100 dark:bg-white/5" />
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                      <label className="text-[10px] font-black uppercase tracking-widest">Attached Images</label>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-white/5 p-3 rounded-xl border border-gray-100 dark:border-white/5 grid grid-cols-2 gap-4">
-                      {(issue.imageUrls?.length ? issue.imageUrls : [issue.imageUrl as string]).map((url, i) => (
-                        <div 
-                          key={i} 
-                          onClick={() => setSelectedImageUrl(url)}
-                          className="group relative rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-md aspect-square cursor-zoom-in"
-                        >
-                          <img src={url} alt={`Issue preview ${i+1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Col: Live Chat Area */}
-        <div className="lg:col-span-2 bg-slate-50/50 dark:bg-[#0F172A] flex flex-col rounded-[32px] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden min-h-[500px] lg:min-h-0">
-          <div className="px-8 py-5 border-b border-slate-200 dark:border-white/10 bg-white/80 dark:bg-white/[0.02] backdrop-blur-md shrink-0 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-glow shadow-emerald-500/50" />
-                Live Discussion
-              </h2>
-              <p className="text-[10px] font-bold text-slate-400 dark:text-gray-500 mt-1 uppercase tracking-tight">Real-time issue resolution thread</p>
-            </div>
-          </div>
-
-          {(() => {
-            const activeRole = localStorage.getItem("role") || userProfile?.activeRole || userProfile?.role;
-            const canChat = userProfile?.id === issue.createdBy || activeRole === "worker" || activeRole === "admin";
-            
-            if (!canChat) {
-              return (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-500">
-                  <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                    <svg className="w-10 h-10 text-slate-400 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                  </div>
-                  <h3 className="text-slate-900 dark:text-white font-black uppercase tracking-tight mb-2">Private Thread</h3>
-                  <p className="text-sm font-medium max-w-sm mx-auto opacity-70">
-                    Communication is limited to the author and assigned experts.
-                  </p>
-                </div>
-              );
-            }
-
-            return (
-              <>
-                <div className="flex-1 overflow-y-auto px-8 py-8 space-y-6 custom-scrollbar bg-slate-50/30 dark:bg-transparent">
-            {messages.length === 0 ? (
-              <div className="h-full flex items-center justify-center flex-col text-slate-400">
-                <div className="w-24 h-24 bg-white dark:bg-white/[0.02] rounded-full flex items-center justify-center mb-6 shadow-xl border border-slate-100 dark:border-white/5">
-                  <svg className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                </div>
-                <p className="text-xs font-black uppercase tracking-widest opacity-40">No messages yet</p>
-              </div>
-            ) : (
-              messages.map(msg => {
-                const isMe = msg.authorId === userProfile?.id;
-                return (
-                  <div key={msg.id} className={`flex flex-col max-w-[85%] ${isMe ? "ml-auto items-end" : "mr-auto items-start"}`}>
-                    <div className="flex items-center gap-2 mb-2 px-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{isMe ? "You" : msg.authorName}</span>
-                      <span className={`text-[9px] px-2 py-0.5 rounded-full uppercase tracking-tighter font-black shadow-sm ${
-                        msg.authorRole === "worker" ? "bg-indigo-500 text-white" :
-                        msg.authorRole === "admin" ? "bg-rose-500 text-white" :
-                        "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-gray-300"
-                      }`}>{msg.authorRole}</span>
-                    </div>
-                    <div className={`px-5 py-3.5 rounded-2xl text-sm font-medium leading-relaxed shadow-xl break-words ${
-                      isMe 
-                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-none" 
-                      : "bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-white/5 text-slate-800 dark:text-gray-100 rounded-tl-none"
-                    }`}>
-                      {msg.text}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            <div ref={bottomRef} className="h-1" />
-          </div>
-
-          <form onSubmit={handleSend} className="p-6 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] backdrop-blur-xl shrink-0 flex gap-4">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 bg-slate-100 dark:bg-[#020617] border-2 border-slate-200 dark:border-white/10 rounded-2xl px-6 py-4 text-sm font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
-            />
-            <button 
-              type="submit"
-              disabled={!chatInput.trim()}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-black uppercase tracking-widest rounded-2xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:grayscale shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-3"
-            >
-              <span className="hidden sm:inline">Send</span>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-            </button>
-          </form>
-            </>
-          );
-        })()}
-        </div>
-      </div>
-      {/* Image Zoom Modal */}
-      {selectedImageUrl && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 md:p-10 transition-all duration-300 animate-in fade-in"
-          onClick={() => setSelectedImageUrl(null)}
-        >
-          <button 
-            className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center bg-white/10 rounded-full text-white hover:bg-white/20 transition-all"
-            onClick={() => setSelectedImageUrl(null)}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-          <div className="relative max-w-5xl w-full h-full flex items-center justify-center">
-            <img 
-              src={selectedImageUrl} 
-              alt="Zoomed issue preview" 
-              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl animate-in zoom-in-95 duration-300"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 export default function IssueDetailPage() {
-  return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-950 flex">
-        <Sidebar />
-        <main className="flex-1 md:ml-64 transition-all duration-300">
-          <IssueDetailContent />
-        </main>
+  const { id } = useParams() as { id: string };
+  const { userProfile, activeRole, isAdmin } = useAuthContext();
+  const router = useRouter();
+  const isStaff = activeRole === "admin" || activeRole === "worker";
+  const adminId = isAdmin ? userProfile?.id ?? "" : "";
+  // Memoised so child effects don't restart on every render.
+  const adminActor = useMemo<Actor | null>(() => (adminId ? { id: adminId, role: "admin" } : null), [adminId]);
+
+  const [issue, setIssue] = useState<Issue | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [chatError, setChatError] = useState("");
+  const [sending, setSending] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    setLoadError("");
+    return subscribeToSingleIssue(
+      id,
+      (fetched) => {
+        setIssue(fetched);
+        setLoading(false);
+      },
+      (err) => {
+        logError("subscribeToSingleIssue", err);
+        setLoadError(getFriendlyErrorMessage(err, "We couldn't load this issue. Please try again."));
+        setLoading(false);
+      }
+    );
+  }, [id, retryKey]);
+
+  // Full-size photos are separate documents, loaded once per issue (not per
+  // snapshot); the thumbnails on the issue are shown until they arrive.
+  const latestIssue = useRef(issue);
+  useEffect(() => {
+    latestIssue.current = issue;
+  });
+  const [fullImages, setFullImages] = useState<string[]>([]);
+  const imageCount = issue?.imageCount ?? 0;
+  const issueId = issue?.id;
+  useEffect(() => {
+    setFullImages([]);
+    const current = latestIssue.current;
+    if (!current || imageCount === 0) return;
+    let cancelled = false;
+    getIssueImages(current)
+      .then((loaded) => {
+        if (!cancelled) setFullImages(loaded);
+      })
+      .catch((err) => logError("getIssueImages", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [issueId, imageCount]);
+  const displayImages = (issue?.thumbnails ?? []).map((thumb, i) => fullImages[i] ?? thumb);
+
+  // The thread is private to the issue's author and staff (the security
+  // rules enforce this; the check here just avoids a doomed subscription).
+  const issueAuthor = issue?.createdBy;
+  const canChat = !!userProfile && !!issueAuthor && (userProfile.id === issueAuthor || activeRole === "worker" || activeRole === "admin");
+
+  useEffect(() => {
+    if (!id || !canChat) return;
+    setChatError("");
+    return subscribeToIssueChat(id, setMessages, (err) => {
+      logError("subscribeToIssueChat", err);
+      setChatError(getFriendlyErrorMessage(err, "We couldn't load the discussion."));
+    });
+  }, [id, canChat]);
+
+  // Keep the newest message in view inside the thread (not the page).
+  useEffect(() => {
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length]);
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = chatInput.trim();
+    if (!text || !userProfile || !issue || sending) return;
+    setSending(true);
+    setChatError("");
+    try {
+      await sendChatMessage(id, text, userProfile.id, userProfile.name, activeRole);
+      setChatInput(""); // only cleared once the message is actually saved
+    } catch (err) {
+      logError("sendChatMessage", err);
+      setChatError(getFriendlyErrorMessage(err, "Your message couldn't be sent. Please try again."));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const back = (
+    <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push(dashboardPathForRole(activeRole)))} className="inline-flex items-center gap-1 rounded text-[13px] text-fg-subtle transition-colors hover:text-fg">
+      <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+      Back
+    </button>
+  );
+
+  if (loading) return <IssueSkeleton />;
+
+  if (!issue) {
+    return (
+      <div>
+        {back}
+        <div className="mt-6 rounded-lg border border-border bg-surface">
+          {loadError ? (
+            <ErrorState title="Couldn't load this issue" description={loadError} onRetry={() => setRetryKey((k) => k + 1)} />
+          ) : (
+            <EmptyState title="Issue not found" description="It may have been withdrawn by the reporter or removed by an administrator." />
+          )}
+        </div>
       </div>
-    </ProtectedRoute>
+    );
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-6">
+        {back}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <StatusBadge status={issue.status} />
+          <PriorityBadge priority={issue.priority} />
+          <Badge>{issue.category}</Badge>
+          {issue.escalated && issue.status !== "Resolved" && (
+            <Badge tone="danger" icon={<Siren aria-hidden="true" />}>
+              Escalated
+            </Badge>
+          )}
+        </div>
+        <h1 className="mt-2.5 break-words text-xl font-semibold tracking-tight text-fg sm:text-2xl">{issue.title}</h1>
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-subtle">
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+            {issue.location}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>
+            Reported by {issue.createdByName} {formatRelative(issue.createdAt)}
+          </span>
+        </p>
+      </div>
+
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr]">
+        {/* Primary details: first on phones, top of the right rail on desktop */}
+        <div className="space-y-4 lg:col-start-2 lg:row-start-1">
+          <Panel title="Details">
+            <div className="space-y-4">
+              <div>
+                <p className="mb-1.5 text-xs text-fg-subtle">Deadline</p>
+                <SlaMeter issue={issue} />
+              </div>
+              <DescriptionList
+                items={[
+                  { label: "Status", value: <StatusBadge status={issue.status} /> },
+                  { label: "Reported", value: `${formatDate(issue.createdAt)} · ${formatTime(issue.createdAt)}` },
+                  ...(issue.resolvedAt ? [{ label: "Resolved", value: `${formatDate(issue.resolvedAt)} · ${formatTime(issue.resolvedAt)}` }] : []),
+                  { label: "Reference", value: <span className="tabular font-mono text-xs">#{issue.id.slice(0, 8)}</span> },
+                ]}
+              />
+            </div>
+          </Panel>
+          {adminActor && <AdminIssueControls issue={issue} admin={adminActor} />}
+          {userProfile && <FeedbackPanel issue={issue} userId={userProfile.id} isAdmin={isAdmin} />}
+        </div>
+
+        {/* Main content */}
+        <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+          <Panel title="Description">
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-fg">{issue.description}</p>
+            {displayImages.length > 0 && (
+              <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {displayImages.map((url, i) => (
+                  <li key={i}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImageUrl(url)}
+                      aria-label={`Enlarge photo ${i + 1}`}
+                      className="group block aspect-[4/3] w-full overflow-hidden rounded-md border border-border bg-surface-2"
+                    >
+                      <img src={url} alt="" className="h-full w-full cursor-zoom-in object-cover transition-opacity duration-150 group-hover:opacity-90" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <IssueTimeline issue={issue} />
+
+          <Panel
+            title="Discussion"
+            description={canChat ? "Visible to the reporter, workers and administrators." : undefined}
+            flush
+          >
+            {!canChat ? (
+              <div className="flex items-start gap-3 border-t border-border px-4 py-5 text-[13px] text-fg-subtle">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                The discussion is private to the person who reported this issue and campus staff.
+              </div>
+            ) : (
+              <>
+                <div ref={logRef} role="log" aria-live="polite" aria-label="Messages" className="max-h-[26rem] min-h-[8rem] space-y-4 overflow-y-auto border-t border-border px-4 py-4">
+                  {messages.length === 0 ? (
+                    <div className="flex flex-col items-center py-6 text-center">
+                      <MessageSquare className="h-5 w-5 text-fg-subtle" aria-hidden="true" />
+                      <p className="mt-2 text-[13px] text-fg-subtle">No messages yet. Ask a question or add details here.</p>
+                    </div>
+                  ) : (
+                    messages.map((msg) => {
+                      const isMe = msg.authorId === userProfile?.id;
+                      return (
+                        <div key={msg.id} className={cn("flex max-w-[85%] flex-col", isMe ? "ml-auto items-end" : "items-start")}>
+                          <p className="mb-1 flex items-center gap-1.5 px-0.5 text-xs text-fg-subtle">
+                            <span className="font-medium text-fg-muted">{isMe ? "You" : msg.authorName}</span>
+                            {!isMe && msg.authorRole !== "user" && <Badge tone="info">{ROLE_NAMES[msg.authorRole]}</Badge>}
+                            <time dateTime={msg.createdAt.toISOString()}>{formatTime(msg.createdAt)}</time>
+                          </p>
+                          <div
+                            className={cn(
+                              "max-w-full whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm",
+                              isMe ? "bg-brand text-on-brand" : "border border-border bg-surface-2 text-fg"
+                            )}
+                          >
+                            {msg.text}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                {chatError && (
+                  <p role="alert" className="border-t border-danger-border bg-danger-subtle px-4 py-2 text-[13px] text-danger">
+                    {chatError}
+                  </p>
+                )}
+                <form onSubmit={handleSend} className="flex gap-2 border-t border-border p-3">
+                  <label htmlFor="chat-input" className="sr-only">
+                    Message
+                  </label>
+                  <input
+                    id="chat-input"
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Write a message…"
+                    maxLength={LIMITS.chatMessage}
+                    autoComplete="off"
+                    className="h-9 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-fg placeholder:text-fg-subtle transition-[border-color,box-shadow] hover:border-border-strong focus:border-brand focus:outline-none focus:ring-3 focus:ring-brand/15"
+                  />
+                  <Button type="submit" disabled={!chatInput.trim()} isLoading={sending} className="max-sm:hidden">
+                    Send
+                  </Button>
+                  <IconButton type="submit" label="Send message" variant="primary" disabled={!chatInput.trim() || sending} className="sm:hidden">
+                    <SendHorizontal className="h-4 w-4" aria-hidden="true" />
+                  </IconButton>
+                </form>
+              </>
+            )}
+          </Panel>
+        </div>
+
+        {/* Secondary context */}
+        <div className="space-y-4 lg:col-start-2 lg:row-start-2">
+          <AnalysisPanel issue={issue} showConfidence={isStaff} />
+          <IncidentPanel issue={issue} admin={adminActor} />
+        </div>
+      </div>
+
+      {selectedImageUrl && <ImageModal imageUrl={selectedImageUrl} alt={`Photo attached to ${issue.title}`} onClose={() => setSelectedImageUrl(null)} />}
+    </div>
   );
 }

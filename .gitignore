@@ -10,6 +10,7 @@
 
 # testing
 /coverage
+/.vitest
 
 # next.js
 /.next/
@@ -28,8 +29,22 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env*.local
+# env files — never commit real configuration or credentials
+.env
+.env.*
+!.env.local.example
+!.env.example
+
+# credentials
+*serviceAccount*.json
+*service-account*.json
+*-firebase-adminsdk-*.json
+
+# firebase
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
 
 # vercel
 .vercel

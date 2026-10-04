@@ -1,10 +1,10 @@
-// ============================================
-// ImageModal — Full-screen image viewer
-// ============================================
-
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useRef } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
+import { useOverlay } from "@/hooks/useOverlay";
+import { usePortalReady } from "@/components/ui/Dialog";
 
 interface ImageModalProps {
   imageUrl: string;
@@ -12,48 +12,35 @@ interface ImageModalProps {
   onClose: () => void;
 }
 
+/** Full-screen photo viewer. Escape, the close button or a click outside closes it. */
 export default function ImageModal({ imageUrl, alt, onClose }: ImageModalProps) {
-  // Close on Escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
+  const ref = useRef<HTMLDivElement>(null);
+  const ready = usePortalReady();
+  useOverlay(true, ref, onClose);
+  if (!ready) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
-      onClick={onClose}
+      ref={ref}
+      role="dialog"
+      aria-modal="true"
+      aria-label={alt}
+      tabIndex={-1}
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-4 outline-none animate-fade-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      {/* Close button */}
       <button
+        type="button"
         onClick={onClose}
-        className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-gray-800/80 hover:bg-gray-700 rounded-full transition-colors"
-        aria-label="Close"
+        aria-label="Close photo"
+        className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-md bg-white/10 text-white transition-colors hover:bg-white/20"
       >
-        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
+        <X className="h-5 w-5" aria-hidden="true" />
       </button>
-
-      {/* Image */}
-      <div
-        className="relative max-w-5xl max-h-[90vh] w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <img
-          src={imageUrl}
-          alt={alt}
-          className="w-full h-full object-contain rounded-lg"
-        />
-      </div>
-
-      {/* Instructions */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-gray-400">
-        Press <kbd className="px-2 py-1 bg-gray-800 rounded">ESC</kbd> or click outside to close
-      </div>
-    </div>
+      <img src={imageUrl} alt={alt} className="max-h-[88dvh] max-w-full rounded-md object-contain animate-dialog-in" />
+    </div>,
+    document.body
   );
 }

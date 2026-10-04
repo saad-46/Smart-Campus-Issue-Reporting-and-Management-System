@@ -1,171 +1,96 @@
 "use client";
 
-import React, { useState } from "react";
-import { Issue } from "@/types";
-import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import UpvoteButton from "@/components/ui/UpvoteButton";
-import ImageModal from "./ImageModal";
+import React from "react";
 import Link from "next/link";
+import { ArrowUpRight, Flame, MapPin, Siren } from "lucide-react";
+import { Issue } from "@/types";
+import Badge, { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
+import UpvoteButton from "@/components/ui/UpvoteButton";
+import SlaBadge from "@/components/issue/SlaBadge";
+import { formatDate } from "@/lib/dates";
+import { cn } from "@/lib/cn";
 
-interface IssueCardProps {
+interface IssueRowProps {
   issue: Issue;
-  showActions?: boolean;
+  /** "explore" shows the reporter and an upvote control. */
   viewContext?: "my-issues" | "explore";
-  onStatusChange?: (issueId: string, status: Issue["status"]) => void;
-  onAssign?: (issueId: string) => void;
+  /** Show the live SLA state (worker and reporter views). */
+  showSla?: boolean;
+  /** Extra controls on the right (worker actions). Rendered above the row link. */
+  actions?: React.ReactNode;
+  /** Additional content under the meta line (e.g. a tip). */
+  footer?: React.ReactNode;
+  className?: string;
 }
 
-const priorityBorder: Record<string, string> = {
-  High: "border-l-red-500",
-  Medium: "border-l-amber-500",
-  Low: "border-l-emerald-500",
-};
-
-export default function IssueCard({ issue, showActions = false, viewContext = "my-issues", onStatusChange, onAssign }: IssueCardProps) {
-  const [showImageModal, setShowImageModal] = useState(false);
+/**
+ * One issue as a compact, scannable row: title first, then where and when,
+ * with status signals on the right. The whole row opens the issue; controls
+ * inside it stay independently clickable.
+ */
+export default function IssueRow({ issue, viewContext = "my-issues", showSla = false, actions, footer, className }: IssueRowProps) {
+  const thumb = issue.thumbnails[0];
+  const explore = viewContext === "explore";
 
   return (
-    <>
-      <div className={`
-        glass relative group overflow-hidden
-        border-l-4 ${priorityBorder[issue.priority]}
-        border shadow-xl
-        rounded-[32px] p-6 
-        hover:scale-[1.02] hover:border-indigo-500/30 hover:shadow-2xl hover:shadow-indigo-500/10
-        transition-all duration-500 ease-out flex flex-col h-full
-      `}>
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white leading-tight flex-1">
-            {issue.title}
+    <article className={cn("group relative flex gap-3 px-4 py-3.5 transition-colors hover:bg-surface-hover sm:px-5", className)}>
+      {thumb ? (
+        <img src={thumb} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-md border border-border object-cover" />
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <h3 className="min-w-0 text-sm font-medium text-fg">
+            <Link href={`/issues/${issue.id}`} className="break-words outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:underline">
+              {issue.title}
+            </Link>
           </h3>
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            {issue.escalated && issue.status !== "Resolved" && (
+              <Badge tone="danger" icon={<Siren aria-hidden="true" />}>
+                Escalated
+              </Badge>
+            )}
+            {showSla && issue.status !== "Resolved" && <SlaBadge issue={issue} compact />}
             <PriorityBadge priority={issue.priority} />
             <StatusBadge status={issue.status} />
-            {issue.escalated && (
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 rounded-full animate-pulse">
-                🔺 Escalated
+          </div>
+        </div>
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] text-fg-subtle">
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="truncate">{issue.location}</span>
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>{issue.category}</span>
+          <span aria-hidden="true">·</span>
+          <time dateTime={issue.createdAt.toISOString()}>{formatDate(issue.createdAt)}</time>
+          {explore && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="truncate">by {issue.createdByName}</span>
+            </>
+          )}
+          {issue.imageCount > 1 && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>{issue.imageCount} photos</span>
+            </>
+          )}
+        </p>
+        {footer && <div className="relative z-10 mt-2">{footer}</div>}
+        {(explore || actions) && (
+          <div className="relative z-10 mt-2.5 flex flex-wrap items-center gap-2">
+            {explore && <UpvoteButton issueId={issue.id} upvotes={issue.upvotes ?? 0} upvotedBy={issue.upvotedBy ?? []} issueTitle={`${issue.title}, ${issue.location}`} />}
+            {explore && (issue.upvotes ?? 0) >= 5 && (
+              <span className="inline-flex items-center gap-1 text-xs text-warning">
+                <Flame className="h-3.5 w-3.5" aria-hidden="true" /> Many people affected
               </span>
             )}
-          </div>
-        </div>
-
-        {/* Upvote + trending */}
-        {viewContext === "explore" && (
-          <div className="mb-3 flex items-center justify-between">
-            <UpvoteButton
-              issueId={issue.id}
-              upvotes={issue.upvotes ?? 0}
-              upvotedBy={issue.upvotedBy ?? []}
-            />
+            {actions}
           </div>
         )}
-
-        {/* Images Preview */}
-        {(issue.imageUrls?.length ? issue.imageUrls : issue.imageUrl ? [issue.imageUrl] : []).length > 0 && (
-          <div className="mb-4">
-            <div className={`grid gap-3 ${issue.imageUrls && issue.imageUrls.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-              {(issue.imageUrls?.length ? issue.imageUrls : [issue.imageUrl as string]).slice(0, 2).map((url, i) => (
-                <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-slate-200 dark:border-white/10 shadow-lg group/img">
-                  <img
-                    src={url}
-                    alt={issue.title}
-                    className="w-full h-full object-cover cursor-pointer transition-transform duration-700 group-hover/img:scale-110"
-                    onClick={() => setShowImageModal(true)}
-                  />
-                </div>
-              ))}
-            </div>
-            {issue.imageUrls && issue.imageUrls.length > 2 && (
-              <p className="text-[10px] font-black text-slate-400 dark:text-gray-500 mt-2 text-center uppercase tracking-widest">+{issue.imageUrls.length - 2} more photos</p>
-            )}
-            <p className="text-[9px] font-black text-slate-300 dark:text-gray-600 mt-1 text-center uppercase tracking-tighter">Click to enlarge</p>
-          </div>
-        )}
-
-        {/* Description */}
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">
-          {issue.description}
-        </p>
-
-        {/* Meta */}
-        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 dark:text-gray-500 mb-4">
-          <span className="flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            {issue.location}
-          </span>
-          <span className="flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-            {issue.category}
-          </span>
-          <span className="flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            {issue.createdByName}
-          </span>
-          <span className="flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {issue.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-          </span>
-        </div>
-
-        {/* Admin actions */}
-        {showActions && (
-          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 dark:border-white/10">
-            {issue.status !== "Resolved" && (
-              <>
-                {onAssign && issue.status === "Open" && !issue.assignedTo && (
-                  <button
-                    onClick={() => onAssign(issue.id)}
-                    className="px-3 py-1.5 text-xs font-medium bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/30 transition-colors"
-                  >
-                    Assign to Me
-                  </button>
-                )}
-                {onStatusChange && issue.status === "Open" && (
-                  <button
-                    onClick={() => onStatusChange(issue.id, "In Progress")}
-                    className="px-3 py-1.5 text-xs font-medium bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-500/30 transition-colors"
-                  >
-                    Mark In Progress
-                  </button>
-                )}
-                {onStatusChange && issue.status === "In Progress" && (
-                  <button
-                    onClick={() => onStatusChange(issue.id, "Resolved")}
-                    className="px-3 py-1.5 text-xs font-medium bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/30 transition-colors"
-                  >
-                    Mark Resolved
-                  </button>
-                )}
-              </>
-            )}
-            {issue.assignedTo && (
-              <span className="text-xs text-gray-400 ml-auto">Assigned ✓</span>
-            )}
-          </div>
-        )}
-
-        {/* Global Details Forwarder */}
-        <div className="mt-auto pt-6 border-t border-slate-100 dark:border-white/5">
-          <Link href={`/issues/${issue.id}`} className="flex items-center justify-center gap-3 w-full py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white transition-all shadow-xl shadow-indigo-600/20 active:scale-95 group/btn">
-            View Thread
-            <svg className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-          </Link>
-        </div>
       </div>
-
-      {showImageModal && issue.imageUrl && (
-        <ImageModal imageUrl={issue.imageUrl} alt={issue.title} onClose={() => setShowImageModal(false)} />
-      )}
-    </>
+      <ArrowUpRight className="mt-0.5 hidden h-4 w-4 shrink-0 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100 sm:block" aria-hidden="true" />
+    </article>
   );
 }

@@ -1,14 +1,36 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ToastProvider } from "@/components/ui/Toast";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
+const description = "Report, track and resolve campus maintenance issues in real time.";
+
 export const metadata: Metadata = {
-  title: "UniFix — Smart Campus Issue Reporting",
-  description: "AI-powered campus issue reporting and management system.",
+  title: {
+    default: "UniFix — Smart Campus Issue Reporting",
+    template: "%s · UniFix",
+  },
+  description,
+  applicationName: "UniFix",
+  openGraph: {
+    title: "UniFix — Smart Campus Issue Reporting",
+    description,
+    type: "website",
+    siteName: "UniFix",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#131720" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -29,11 +51,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           })();
         `}} />
       </head>
-      <body className="min-h-screen font-sans antialiased bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-gray-100 transition-colors duration-500">
+      <body className="min-h-dvh bg-canvas font-sans text-fg antialiased">
         <ThemeProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <ToastProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

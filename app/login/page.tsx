@@ -1,176 +1,213 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, MailCheck } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
-import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
-
-// Routing constants handled inside useEffect
+import AuthLayout from "@/components/shell/AuthLayout";
+import { Input } from "@/components/ui/Field";
+import Button, { buttonClasses } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/States";
+import { ROLE_LABELS } from "@/components/shell/nav";
+import { getFriendlyErrorMessage, logError } from "@/lib/errors";
+import { dashboardPathForRole } from "@/lib/roles";
+import { safeRedirectPath } from "@/lib/navigation";
+import { isValidEmail } from "@/lib/validation";
+import { sendPasswordReset } from "@/lib/auth";
 
 export default function LoginPage() {
-  const { signIn, userProfile, loading } = useAuthContext();
+  const { signIn, userProfile, loading, activeRole, isAuthenticated, profileError, reloadProfile } = useAuthContext();
   const router = useRouter();
 
+  const [mode, setMode] = useState<"signin" | "reset">("signin");
+  // Switching between sign-in and reset replaces the form: move focus to its first field.
+  const emailRef = useRef<HTMLInputElement>(null);
+  const modeChanged = useRef(false);
+  useEffect(() => {
+    if (!modeChanged.current) {
+      modeChanged.current = true;
+      return;
+    }
+    emailRef.current?.focus();
+  }, [mode]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [touched, setTouched] = useState({ email: false, password: false });
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  // Track whether this is a fresh login (not a page load while already signed in)
+  const [resetSent, setResetSent] = useState(false);
+  // Only redirect after a sign-in made on this page — not on page load.
   const [justSignedIn, setJustSignedIn] = useState(false);
-
-  // Only auto-redirect if the user JUST signed in — not on page load
+  // Where to go after signing in (only same-site paths are accepted).
+  const [next, setNext] = useState<string | null>(null);
   useEffect(() => {
-    if (loading) return;
-    if (!justSignedIn) return;   // ← key: don't redirect on initial load
-    if (!userProfile) return;
+    setNext(safeRedirectPath(new URLSearchParams(window.location.search).get("next")));
+  }, []);
 
-    // Persist role into localStorage right away to sync the layout fast
-    const newRole = userProfile.activeRole || userProfile.role || "user";
-    localStorage.setItem("role", newRole);
-
-    const role = localStorage.getItem("role");
-    console.log(`✅ activeRole="${role}" → Redirecting`);
-
-    if (role === "admin") {
-      router.push("/admin");
-    } else if (role === "worker") {
-      router.push("/worker");
-    } else {
-      router.push("/dashboard"); // USER
+  useEffect(() => {
+    if (loading || !justSignedIn) return;
+    if (!userProfile) {
+      // Signed in, but the profile couldn't be loaded: don't spin forever.
+      if (isAuthenticated && profileError) {
+        setError("Signed in, but we couldn't load your account. Please check your connection and try again.");
+        setIsLoading(false);
+      }
+      return;
     }
-  }, [loading, userProfile, justSignedIn, router]);
+    router.push(next ?? dashboardPathForRole(activeRole));
+  }, [loading, userProfile, justSignedIn, activeRole, isAuthenticated, profileError, router, next]);
+
+  const show = (field: "email" | "password") => touched[field] || submitted;
+  const emailError = !email.trim() ? "Enter your email address." : !isValidEmail(email.trim().toLowerCase()) ? "That email address doesn't look right." : "";
+  const passwordError = !password ? "Enter your password." : "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+    setSubmitted(true);
     setError("");
+    if (emailError || passwordError) return;
     setIsLoading(true);
     try {
-      await signIn(email, password);
-      setJustSignedIn(true); // allow redirect now
-    } catch (err: unknown) {
-      const fe = err as { code?: string };
-      if (
-        fe.code === "auth/user-not-found" ||
-        fe.code === "auth/wrong-password" ||
-        fe.code === "auth/invalid-credential"
-      ) {
-        setError("Invalid email or password.");
-      } else if (fe.code === "auth/too-many-requests") {
-        setError("Too many attempts. Please try again later.");
+      if (isAuthenticated) {
+        // Already signed in from a previous attempt whose profile failed to load.
+        setJustSignedIn(true);
+        await reloadProfile();
       } else {
-        setError("Failed to sign in. Please try again.");
+        await signIn(email, password);
+        setJustSignedIn(true);
       }
+    } catch (err: unknown) {
+      setError(getFriendlyErrorMessage(err, "Failed to sign in. Please try again."));
       setIsLoading(false);
     }
   };
 
-  // Already logged in — show options instead of form
-  if (!loading && userProfile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center px-4">
-        <div className="w-full max-w-sm text-center">
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-xl">
-            <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <p className="text-white font-bold text-lg mb-1">Already signed in</p>
-            <p className="text-gray-400 text-sm mb-1">{userProfile.email}</p>
-            <span className="inline-block px-3 py-1 bg-white/10 rounded-full text-xs text-gray-300 capitalize mb-6">
-              Role: <strong className="text-white">{userProfile.role}</strong>
-            </span>
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitted(true);
+    setError("");
+    if (emailError) return;
+    setIsLoading(true);
+    try {
+      await sendPasswordReset(email);
+      setResetSent(true);
+    } catch (err) {
+      logError("sendPasswordReset", err);
+      // Don't reveal whether an account exists; only surface real failures (network, rate limit).
+      const message = getFriendlyErrorMessage(err, "");
+      if (message && !/password|email/i.test(message)) setError(message);
+      else setResetSent(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-            <div className="space-y-3">
-              <button
-                onClick={() => router.replace(getRedirectPath(userProfile.role))}
-                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white text-sm font-bold rounded-xl transition-all"
-              >
-                Go to My Dashboard →
-              </button>
-              <Link
-                href="/switch-role"
-                className="block w-full py-3 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold rounded-xl transition-all border border-white/10"
-              >
-                🎭 Switch Role (Demo)
-              </Link>
-            </div>
-          </div>
+  // Already signed in — offer to continue instead of showing the form.
+  if (!loading && userProfile && !justSignedIn) {
+    return (
+      <AuthLayout title="You're signed in" description={`${userProfile.email} · ${ROLE_LABELS[activeRole]}`}>
+        <div className="space-y-2">
+          <Button className="w-full" size="lg" onClick={() => router.replace(next ?? dashboardPathForRole(activeRole))}>
+            {next ? "Continue" : "Go to my dashboard"}
+          </Button>
+          <Link href="/switch-role" className={buttonClasses("secondary", "lg", "w-full")}>
+            Switch view
+          </Link>
         </div>
-      </div>
+      </AuthLayout>
+    );
+  }
+
+  if (mode === "reset") {
+    return (
+      <AuthLayout
+        title="Reset your password"
+        description="Enter the email you signed up with and we'll send you a reset link."
+        footer={
+          <button type="button" onClick={() => { setMode("signin"); setResetSent(false); setSubmitted(false); setError(""); }} className="inline-flex items-center gap-1.5 font-medium text-brand-fg hover:underline">
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> Back to sign in
+          </button>
+        }
+      >
+        {resetSent ? (
+          <div className="text-center" role="status">
+            <MailCheck className="mx-auto h-8 w-8 text-success" aria-hidden="true" />
+            <p className="mt-3 text-sm font-medium text-fg">Check your inbox</p>
+            <p className="mt-1 text-[13px] text-fg-muted">
+              If an account exists for {email.trim()}, a reset link is on its way. It may take a minute to arrive.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleReset} className="space-y-4" noValidate>
+            <Input
+              label="Email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+              error={show("email") ? emailError : undefined}
+              ref={emailRef}
+              required
+            />
+            {error && <Notice tone="danger">{error}</Notice>}
+            <Button type="submit" isLoading={isLoading} className="w-full" size="lg">
+              Send reset link
+            </Button>
+          </form>
+        )}
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
-              </svg>
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
-              UniFix
-            </span>
+    <AuthLayout
+      title="Welcome back"
+      description="Sign in to report and track campus issues."
+      footer={
+        <>
+          Don&apos;t have an account?{" "}
+          <Link href="/register" className="font-medium text-brand-fg hover:underline">
+            Create one
           </Link>
-          <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
-          <p className="text-sm text-gray-400">Sign in to continue</p>
-        </div>
-
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-xl">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <Input
-              label="Email Address"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              icon={
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              }
-            />
-            <Input
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              icon={
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              }
-            />
-
-            {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-sm text-red-400">
-                {error}
-              </div>
-            )}
-
-            <Button type="submit" isLoading={isLoading} className="w-full" size="lg">
-              Sign In
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500">
-              Don&apos;t have an account?{" "}
-              <Link href="/register" className="text-purple-400 hover:text-purple-300 font-medium transition-colors">
-                Create one
-              </Link>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <Input
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+          error={show("email") ? emailError : undefined}
+          ref={emailRef}
+          required
+        />
+        <Input
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+          error={show("password") ? passwordError : undefined}
+          required
+          aside={
+            <button type="button" onClick={() => { setMode("reset"); setSubmitted(false); setError(""); }} className="font-medium text-brand-fg hover:underline">
+              Forgot password?
+            </button>
+          }
+        />
+        {error && <Notice tone="danger">{error}</Notice>}
+        <Button type="submit" isLoading={isLoading} className="w-full" size="lg">
+          Sign in
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

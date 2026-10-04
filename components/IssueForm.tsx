@@ -1,322 +1,320 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Camera, ImagePlus, MapPin, Pencil, QrCode, X } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
 import { createIssue } from "@/lib/firestore";
-import { analyzeIssue } from "@/services/aiService";
-import { AIAnalysisResult } from "@/types";
-import Input from "@/components/ui/Input";
-import Textarea from "@/components/ui/Textarea";
+import { analyzeIssueDetails, IssueIntelligence } from "@/services/aiService";
+import { CampusLocation } from "@/types";
+import { DEFAULT_CATEGORY, DEFAULT_PRIORITY, LIMITS, departmentFor } from "@/lib/constants";
+import { describeLocation } from "@/lib/campus";
+import { getFriendlyErrorMessage, logError } from "@/lib/errors";
+import { compressDataUrl, fileToCompressedDataUrl, makeThumbnail } from "@/lib/image";
+import { cleanText } from "@/lib/validation";
+import { Input, Textarea } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
-import { PriorityBadge } from "@/components/ui/Badge";
+import { Notice } from "@/components/ui/States";
+import { useToast } from "@/components/ui/Toast";
+import AnalysisSummary from "@/components/report/AnalysisSummary";
+import DuplicateCheck from "@/components/report/DuplicateCheck";
 import ImageEditor from "@/components/ImageEditor";
+import { useSlowNotice } from "@/hooks/useSlowNotice";
+import { cn } from "@/lib/cn";
 
-const MAX_SIZE_MB = 5;
-const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+interface IssueFormProps {
+  /** Called after the issue is saved. Defaults to opening the new issue. */
+  onIssueCreated?: (issueId: string) => void;
+  /** Place scanned from a location QR code. */
+  locationPreset?: CampusLocation | null;
+}
 
-export default function IssueForm() {
+const FALLBACK: IssueIntelligence = {
+  category: DEFAULT_CATEGORY,
+  priority: DEFAULT_PRIORITY,
+  confidence: 0,
+  explanation: "",
+  summary: "",
+  department: departmentFor(DEFAULT_CATEGORY),
+};
+
+function Section({ step, title, description, children }: { step: number; title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-4 border-b border-border px-4 py-5 last:border-b-0 sm:px-5 md:grid-cols-[11rem_1fr] md:gap-6">
+      <div>
+        <p className="tabular text-xs font-medium text-fg-subtle">Step {step}</p>
+        <h2 className="mt-0.5 text-sm font-semibold text-fg">{title}</h2>
+        {description && <p className="mt-1 text-[13px] text-fg-subtle">{description}</p>}
+      </div>
+      <div className="min-w-0 space-y-4">{children}</div>
+    </section>
+  );
+}
+
+export default function IssueForm({ onIssueCreated, locationPreset = null }: IssueFormProps) {
   const { userProfile } = useAuthContext();
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState(locationPreset ? describeLocation(locationPreset) : "");
+  const [locationId, setLocationId] = useState(locationPreset?.id ?? "");
+  const [duplicateOf, setDuplicateOf] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
   const [imageError, setImageError] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
+  const [touched, setTouched] = useState({ title: false, description: false, location: false });
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<"form" | "review">("form");
 
-  // ── Image handling ──────────────────────────────────────────
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const canAddImage = images.length < LIMITS.maxImages;
+  const submitIsSlow = useSlowNotice(isSubmitting);
+
+  // ── Live suggestion (deterministic and cheap; deferred while typing) ──
+  const deferredText = useDeferredValue(`${title}\u0000${description}\u0000${location}`);
+  const { analysis, unavailable } = useMemo(() => {
+    const [t, d, l] = deferredText.split("\u0000");
+    if (cleanText(`${t} ${d}`).length < 6) return { analysis: null, unavailable: false };
+    try {
+      return { analysis: analyzeIssueDetails({ title: t, description: d, location: l }), unavailable: false };
+    } catch (err) {
+      // Categorisation is a convenience — never let it block a report.
+      logError("analyzeIssueDetails", err);
+      return { analysis: FALLBACK, unavailable: true };
+    }
+  }, [deferredText]);
+
+  // ── Validation (shown after a field is left, or on submit) ──
+  const errors = {
+    title: !cleanText(title) ? "Give the issue a short title." : "",
+    description: !cleanText(description, true) ? "Describe what's wrong." : "",
+    location: !cleanText(location) ? "Say where the problem is." : "",
+  };
+  const show = (field: keyof typeof errors) => (touched[field] || submitted ? errors[field] || undefined : undefined);
+  const blur = (field: keyof typeof touched) => () => setTouched((t) => ({ ...t, [field]: true }));
+
+  // ── Photos ──
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setImageError("");
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
+    input.value = ""; // allow picking the same file again
     if (!file) return;
-
-    if (!ALLOWED.includes(file.type)) {
-      setImageError("Only JPG, PNG or WebP images are allowed.");
+    if (!canAddImage) {
+      setImageError(`You can attach at most ${LIMITS.maxImages} photos.`);
       return;
     }
-    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      setImageError(`Image must be smaller than ${MAX_SIZE_MB}MB.`);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => setImages((prev) => [...prev, reader.result as string]);
-    reader.readAsDataURL(file);
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleEditorSave = (editedImage: string) => {
-    if (editingImageIndex !== null) {
-      setImages((prev) => {
-        const copy = [...prev];
-        copy[editingImageIndex] = editedImage;
-        return copy;
-      });
-    }
-    setEditingImageIndex(null);
-  };
-  
-  // ── Step 1: AI analysis ─────────────────────────────────────
-  const handleAnalyze = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (!title.trim() || !description.trim() || !location.trim()) {
-      setError("Please fill in all required fields.");
-      return;
-    }
-    setIsAnalyzing(true);
+    setIsProcessingImage(true);
     try {
-      const result = await analyzeIssue(description);
-      setAiResult(result);
-      setStep("review");
-    } catch {
-      setError("AI analysis failed. Please try again.");
+      const dataUrl = await fileToCompressedDataUrl(file, LIMITS.imageChars);
+      setImages((prev) => (prev.length < LIMITS.maxImages ? [...prev, dataUrl] : prev));
+    } catch (err) {
+      setImageError(getFriendlyErrorMessage(err, "Couldn't add that photo. Please try another."));
     } finally {
-      setIsAnalyzing(false);
+      setIsProcessingImage(false);
     }
   };
 
-  // ── Step 2: Submit ──────────────────────────────────────────
-  const handleSubmit = async () => {
-    if (!userProfile || !aiResult) return;
-    setIsSubmitting(true);
-    setError("");
-    console.log("Submitting issue...", { title, description, location, category: aiResult.category, priority: aiResult.priority });
-
+  const handleEditorSave = async (editedImage: string) => {
+    const index = editingImageIndex;
+    setEditingImageIndex(null);
+    if (index === null) return;
     try {
-      // Store base64 images directly — no Firebase Storage needed
-      // Compress large images to keep Firestore document size reasonable
-      const finalImageUrls: string[] = images.slice(0, 3); // max 3 images
+      // The editor exports a fresh canvas — re-compress to stay within budget.
+      const compressed = await compressDataUrl(editedImage, LIMITS.imageChars);
+      setImages((prev) => prev.map((img, i) => (i === index ? compressed : img)));
+    } catch (err) {
+      setImageError(getFriendlyErrorMessage(err, "Couldn't save your edits to that photo."));
+    }
+  };
 
-      await createIssue(
+  // ── Submit ──
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userProfile || isSubmitting) return;
+    setSubmitted(true);
+    setError("");
+    if (errors.title || errors.description || errors.location) return;
+
+    const result = analysis ?? FALLBACK;
+    setIsSubmitting(true);
+    try {
+      // Lists only load a small preview; the full photo is fetched on demand.
+      const issueImages = await Promise.all(images.map(async (full) => ({ full, thumb: await makeThumbnail(full) })));
+      const issueId = await createIssue(
         { title, description, location },
         userProfile.id,
         userProfile.name,
-        aiResult.category,
-        aiResult.priority,
-        finalImageUrls
+        result.category,
+        result.priority,
+        issueImages,
+        {
+          analysis: analysis && !unavailable ? { summary: analysis.summary, confidence: analysis.confidence, department: analysis.department } : undefined,
+          locationId,
+          duplicateOf,
+        }
       );
-
-      console.log("✅ Issue submitted successfully!");
-      router.push("/dashboard");
+      // Only reached once the write has actually succeeded.
+      toast.success(duplicateOf ? "Issue submitted and linked" : "Issue submitted", "You'll be notified when its status changes.");
+      if (onIssueCreated) onIssueCreated(issueId);
+      else router.push(`/issues/${issueId}`);
     } catch (err) {
-      console.error("❌ Submit failed:", err);
-      setError("Failed to submit issue. Please check your connection and try again.");
+      logError("createIssue", err);
+      setError(getFriendlyErrorMessage(err, "Unable to submit your issue right now. Please try again."));
       setIsSubmitting(false);
     }
   };
 
-  // ── Review step ─────────────────────────────────────────────
-  if (step === "review" && aiResult) {
-    return (
-      <div className="space-y-6">
-        <Card className="border-purple-500/30 bg-purple-500/5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
-              <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-purple-400">AI Analysis Complete</h3>
-              <p className="text-xs text-gray-500">Your issue has been categorized</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-4">
-              <p className="text-xs text-gray-500 mb-1">Category</p>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">{aiResult.category}</p>
-            </div>
-            <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-4">
-              <p className="text-xs text-gray-500 mb-1">Priority</p>
-              <PriorityBadge priority={aiResult.priority} />
-            </div>
-          </div>
-        </Card>
+  return (
+    <form onSubmit={handleSubmit} noValidate className="grid items-start gap-6 lg:grid-cols-[1fr_20rem]">
+      <div className="min-w-0 space-y-6">
+        <div className="rounded-lg border border-border bg-surface">
+          <Section step={1} title="What happened?" description="A short title and a few details help staff fix it faster.">
+            <Input
+              label="Title"
+              placeholder="e.g. Broken AC in Lab 204"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={blur("title")}
+              error={show("title")}
+              maxLength={LIMITS.title}
+              required
+            />
+            <Textarea
+              label="Describe the problem"
+              placeholder="What's wrong, since when, and anything that would help someone find and fix it."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onBlur={blur("description")}
+              error={show("description")}
+              maxLength={LIMITS.description}
+              aside={description.length > LIMITS.description * 0.8 ? `${description.length}/${LIMITS.description}` : undefined}
+              rows={5}
+              required
+            />
+          </Section>
 
-        <Card>
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Issue Summary</h3>
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs text-gray-400">Title</p>
-              <p className="text-sm text-gray-900 dark:text-white">{title}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Description</p>
-              <p className="text-sm text-gray-600 dark:text-gray-300">{description}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Location</p>
-              <p className="text-sm text-gray-900 dark:text-white">{location}</p>
-            </div>
-            {images.length > 0 && (
-              <div>
-                <p className="text-xs text-gray-400 mb-2">Attached Images ({images.length})</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {images.map((img, i) => (
-                    <img
-                      key={i}
-                      src={img}
-                      alt={`Preview ${i + 1}`}
-                      className="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-700"
-                    />
-                  ))}
+          <Section step={2} title="Where?" description="Building, floor and room if you know them.">
+            {locationId ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-brand-subtle-border bg-brand-subtle px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <QrCode className="h-4 w-4 shrink-0 text-brand-fg" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-fg">{locationPreset ? describeLocation(locationPreset) : location}</p>
+                    <p className="text-xs text-fg-subtle">From the QR code you scanned</p>
+                  </div>
                 </div>
+                <Button variant="ghost" size="sm" onClick={() => setLocationId("")}>
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <Input
+                label="Location"
+                placeholder="e.g. Block B, 2nd floor, Lab 204"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                onBlur={blur("location")}
+                error={show("location")}
+                maxLength={LIMITS.location}
+                icon={<MapPin aria-hidden="true" />}
+                required
+              />
+            )}
+          </Section>
+
+          <Section step={3} title="Photos" description={`Optional, up to ${LIMITS.maxImages}. You can draw on a photo to point out the problem.`}>
+            {images.length > 0 && (
+              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {images.map((img, idx) => (
+                  <li key={idx} className="relative aspect-square overflow-hidden rounded-md border border-border bg-surface-2">
+                    <img src={img} alt={`Photo ${idx + 1}`} className="h-full w-full object-cover" />
+                    <div className="absolute right-1 top-1 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditingImageIndex(idx)}
+                        aria-label={`Draw on photo ${idx + 1}`}
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-surface/90 text-fg shadow-xs transition-colors hover:bg-surface"
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImages((prev) => prev.filter((_, i) => i !== idx));
+                          setImageError("");
+                        }}
+                        aria-label={`Remove photo ${idx + 1}`}
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-surface/90 text-fg shadow-xs transition-colors hover:bg-surface hover:text-danger"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {canAddImage && (
+              <div className="flex flex-wrap gap-2">
+                <label
+                  className={cn(
+                    "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface px-3.5 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand-subtle focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand",
+                    isProcessingImage && "pointer-events-none opacity-60"
+                  )}
+                >
+                  <ImagePlus className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
+                  {isProcessingImage ? "Processing…" : "Add photo"}
+                  <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleImageChange} disabled={isProcessingImage} className="sr-only" />
+                </label>
+                <label
+                  className={cn(
+                    "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface px-3.5 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand-subtle focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand sm:hidden",
+                    isProcessingImage && "pointer-events-none opacity-60"
+                  )}
+                >
+                  <Camera className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
+                  Take photo
+                  <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} disabled={isProcessingImage} className="sr-only" />
+                </label>
               </div>
             )}
-          </div>
-        </Card>
+            {imageError && (
+              <p role="alert" className="text-[13px] text-danger">
+                {imageError}
+              </p>
+            )}
+          </Section>
+        </div>
 
-        {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-sm text-red-400">{error}</div>
+        <DuplicateCheck candidate={{ title, category: analysis?.category ?? DEFAULT_CATEGORY, location, locationId }} value={duplicateOf} onChange={setDuplicateOf} />
+
+        {/* Suggestion appears inline on smaller screens. */}
+        <AnalysisSummary analysis={analysis} unavailable={unavailable} empty={!analysis} className="lg:hidden" />
+
+        {error && <Notice tone="danger" title="Couldn't submit">{error}</Notice>}
+        {submitIsSlow && (
+          <Notice tone="warning" title="Still trying to reach the server">
+            Your issue hasn&apos;t been saved yet — keep this page open and it will be submitted as soon as the connection returns.
+          </Notice>
         )}
 
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={() => setStep("form")} className="flex-1">
-            ← Edit Details
-          </Button>
-          <Button variant="primary" onClick={handleSubmit} isLoading={isSubmitting} className="flex-1">
-            Submit Issue
+        <div className="sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-border bg-canvas px-4 py-3 shadow-[0_-4px_12px_hsl(var(--shadow-color)/0.06)] sm:static sm:mx-0 sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+          <p className="hidden text-[13px] text-fg-subtle sm:block">You&apos;ll get a notification at every status change.</p>
+          <Button type="submit" size="lg" isLoading={isSubmitting} disabled={isProcessingImage} className="w-full sm:w-auto">
+            {duplicateOf ? "Submit and link report" : "Submit issue"}
           </Button>
         </div>
       </div>
-    );
-  }
 
-  // ── Form step ───────────────────────────────────────────────
-  return (
-    <form onSubmit={handleAnalyze} className="space-y-5">
-      <Input
-        label="Issue Title"
-        placeholder="e.g., Broken light in corridor"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        required
-      />
+      <aside className="sticky top-20 hidden lg:block">
+        <AnalysisSummary analysis={analysis} unavailable={unavailable} empty={!analysis} />
+      </aside>
 
-      <Textarea
-        label="Description"
-        placeholder="Describe the issue in detail — the more context, the better our AI can categorize it."
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        required
-        rows={4}
-      />
-
-      <Input
-        label="Location"
-        placeholder="e.g., Building A, Room 201"
-        value={location}
-        onChange={(e) => setLocation(e.target.value)}
-        required
-        icon={
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        }
-      />
-
-      {/* ── Image Upload ── */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Attach Images <span className="text-gray-400 font-normal">(optional · multiple allowed)</span>
-        </label>
-
-        {images.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            {images.map((img, idx) => (
-              <div key={idx} className="relative group rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-                <img
-                  src={img}
-                  alt={`Preview ${idx + 1}`}
-                  className="w-full h-32 object-cover"
-                />
-                
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingImageIndex(idx)}
-                    className="p-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-full transition-colors"
-                    title="Edit/Draw"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
-                    title="Remove"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp"
-            onChange={handleImageChange}
-            className="hidden"
-            id="issue-image"
-            multiple={false}
-          />
-          <label
-            htmlFor="issue-image"
-            className="flex-1 flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-500/5 transition-all group text-center"
-          >
-            <svg className="w-6 h-6 text-gray-400 group-hover:text-purple-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-            <span className="text-xs text-gray-500 font-medium">Upload File</span>
-          </label>
-          
-          <label className="flex-1 flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/5 transition-all group text-center">
-            <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} className="hidden" />
-            <svg className="w-6 h-6 text-gray-400 group-hover:text-blue-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            <span className="text-xs text-gray-500 font-medium">Take Photo</span>
-          </label>
-        </div>
-
-        {imageError && (
-          <p className="mt-2 text-sm text-red-500">{imageError}</p>
-        )}
-      </div>
-
-      {error && (
-        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-sm text-red-400">{error}</div>
-      )}
-
-      <Button type="submit" isLoading={isAnalyzing} className="w-full" size="lg">
-        {isAnalyzing ? "Analyzing with AI…" : "Analyze & Continue →"}
-      </Button>
-
-      <p className="text-xs text-gray-400 text-center">
-        AI will automatically categorize your issue and assign a priority level
-      </p>
-      
       {editingImageIndex !== null && (
-        <ImageEditor
-          imageUrl={images[editingImageIndex]}
-          onSave={handleEditorSave}
-          onCancel={() => setEditingImageIndex(null)}
-        />
+        <ImageEditor imageUrl={images[editingImageIndex]} onSave={handleEditorSave} onCancel={() => setEditingImageIndex(null)} />
       )}
     </form>
   );

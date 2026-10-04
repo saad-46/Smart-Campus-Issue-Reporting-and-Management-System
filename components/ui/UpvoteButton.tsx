@@ -1,68 +1,68 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { ThumbsUp } from "lucide-react";
 import { toggleUpvote } from "@/lib/firestore";
 import { useAuthContext } from "@/components/AuthProvider";
+import { logError } from "@/lib/errors";
+import { cn } from "@/lib/cn";
 
 interface UpvoteButtonProps {
   issueId: string;
   upvotes: number;
   upvotedBy?: string[];
+  /** Included in the accessible name so each row's button is distinguishable. */
+  issueTitle?: string;
 }
 
-export default function UpvoteButton({ issueId, upvotes, upvotedBy = [] }: UpvoteButtonProps) {
+/** "Me too" for community issues. Optimistic while the write is in flight. */
+export default function UpvoteButton({ issueId, upvotes, upvotedBy = [], issueTitle }: UpvoteButtonProps) {
   const { userProfile } = useAuthContext();
   const userId = userProfile?.id ?? "";
-  const [optimisticCount, setOptimisticCount] = useState(upvotes);
-  const [optimisticVoted, setOptimisticVoted] = useState(upvotedBy.includes(userId));
-  const [loading, setLoading] = useState(false);
+
+  // Server state comes from props (kept fresh by the real-time listener).
+  // An optimistic override is shown only while our own write is in flight,
+  // so votes from other people are never masked by stale local state.
+  const serverVoted = upvotedBy.includes(userId);
+  const [pendingVote, setPendingVote] = useState<boolean | null>(null);
+
+  const voted = pendingVote ?? serverVoted;
+  const count =
+    pendingVote === null || pendingVote === serverVoted ? upvotes : Math.max(0, upvotes + (pendingVote ? 1 : -1));
 
   const handleUpvote = async () => {
-    if (!userId || loading) return;
-    setLoading(true);
-    // Optimistic update
-    const next = !optimisticVoted;
-    setOptimisticVoted(next);
-    setOptimisticCount((c) => (next ? c + 1 : Math.max(0, c - 1)));
+    if (!userId || pendingVote !== null) return;
+    setPendingVote(!serverVoted);
     try {
       await toggleUpvote(issueId, userId);
-    } catch {
-      // Revert on failure
-      setOptimisticVoted(!next);
-      setOptimisticCount((c) => (next ? Math.max(0, c - 1) : c + 1));
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      logError("toggleUpvote", err);
+      setPendingVote(null); // revert
     }
   };
 
+  useEffect(() => {
+    if (pendingVote !== null && pendingVote === serverVoted) setPendingVote(null);
+  }, [pendingVote, serverVoted]);
+
   return (
     <button
+      type="button"
       onClick={handleUpvote}
-      disabled={!userId || loading}
-      title={userId ? (optimisticVoted ? "Remove upvote" : "Upvote this issue") : "Sign in to upvote"}
-      className={`
-        inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-        border transition-all duration-200 select-none
-        ${optimisticVoted
-          ? "bg-purple-500/20 border-purple-500/40 text-purple-400 hover:bg-purple-500/30"
-          : "bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-purple-400 hover:text-purple-500"
-        }
-        disabled:opacity-40 disabled:cursor-not-allowed
-      `}
-    >
-      <svg
-        className={`w-3.5 h-3.5 transition-transform ${optimisticVoted ? "scale-110" : ""}`}
-        fill={optimisticVoted ? "currentColor" : "none"}
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-      </svg>
-      <span>{optimisticCount}</span>
-      {optimisticCount >= 5 && (
-        <span className="ml-0.5 text-orange-400" title="Trending">🔥</span>
+      disabled={!userId}
+      aria-disabled={pendingVote !== null || undefined}
+      aria-pressed={voted}
+      aria-label={`This affects me too${issueTitle ? `: “${issueTitle}”` : ""} (${count} vote${count === 1 ? "" : "s"})`}
+      className={cn(
+        "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs font-medium transition-colors duration-150 disabled:cursor-default",
+        voted
+          ? "border-brand-subtle-border bg-brand-subtle text-brand-fg"
+          : "border-border bg-surface text-fg-muted hover:border-border-strong hover:text-fg"
       )}
+    >
+      <ThumbsUp className={cn("h-3.5 w-3.5", voted && "fill-current")} aria-hidden="true" />
+      <span className="tabular">{count}</span>
+      <span className="hidden sm:inline">{voted ? "Affects me" : "Me too"}</span>
     </button>
   );
 }
