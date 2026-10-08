@@ -22,6 +22,10 @@ export interface NavItem {
   icon: React.ReactNode;
   /** Extra paths that should mark this item active. */
   match?: (pathname: string, tab: string | null) => boolean;
+  /** Guided-tour anchor (Viewer Mode). */
+  tour?: string;
+  /** Small count shown at the end of the row (e.g. unread notifications). */
+  count?: number;
 }
 
 export interface NavGroup {

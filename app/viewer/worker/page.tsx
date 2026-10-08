@@ -1,159 +1,151 @@
 "use client";
 
 import React, { useState } from "react";
-import { CheckCircle2, Play } from "lucide-react";
+import Link from "next/link";
+import { AlarmClock, CheckCircle2, ClipboardList, Play, Receipt, Wallet } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import { StatStrip, TableWrap, td, th, trHover } from "@/components/ui/Data";
-import { Tabs, tabId } from "@/components/ui/Tabs";
+import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
 import { EmptyState } from "@/components/ui/States";
-import { useViewer } from "@/components/viewer/ViewerProvider";
-import { DemoIssueList, SampleNote, SignInHint, ViewerLoading, WorkflowSteps } from "@/components/viewer/parts";
 import { currency } from "@/components/admin/Kpi";
-import { computeSla, DEFAULT_SLA_CONFIG } from "@/lib/intelligence/sla";
-import { DEMO_TECHNICIANS, DEMO_WORKER_ID } from "@/lib/viewer/demoData";
-import { openPool, workerTasks } from "@/lib/viewer/demoStats";
+import { DemoIssueList, SectionCard, ViewerGate } from "@/components/viewer/parts";
+import { ClaimDialog, ResolveDialog } from "@/components/viewer/ActionDialogs";
+import { DEMO_PERSONA, DemoIssue } from "@/lib/viewer/demoData";
+import { byUrgency, openPool, workerTasks } from "@/lib/viewer/demoStats";
+import { computeSla } from "@/lib/intelligence/sla";
+import { Avatar } from "@/components/viewer/DemoImage";
 
-const CLAIM_TONE = { pending: "warning", approved: "success", rejected: "neutral" } as const;
-const CLAIM_LABEL = { pending: "Awaiting review", approved: "Paid", rejected: "Rejected" } as const;
+const CLAIM_TONE = { pending: "warning", approved: "success", rejected: "danger" } as const;
+const CLAIM_LABEL = { pending: "Awaiting review", approved: "Approved and paid", rejected: "Rejected" } as const;
 
 export default function ViewerWorkerPage() {
-  const { data, promptSignIn } = useViewer();
-  const [tab, setTab] = useState<"tasks" | "pool" | "payouts">("tasks");
-  const tech = DEMO_TECHNICIANS.find((t) => t.id === DEMO_WORKER_ID)!;
-
-  const header = (
-    <PageHeader
-      eyebrow={`Worker view · ${tech.label} (sample)`}
-      title="My work"
-      description="Assigned tasks, most urgent first, and open issues that can be claimed."
-    />
-  );
-  if (!data) return (<>{header}<ViewerLoading /></>);
-
-  const tasks = workerTasks(data);
-  const urgency = (state: string) => (state === "breached" ? 0 : state === "approaching" ? 1 : 2);
-  const active = tasks
-    .filter((i) => i.status !== "Resolved")
-    .map((i) => ({ issue: i, sla: computeSla(i, DEFAULT_SLA_CONFIG, data.now) }))
-    .sort((a, b) => urgency(a.sla.state) - urgency(b.sla.state) || a.sla.remainingMs - b.sla.remainingMs);
-  const needsAttention = active.filter((a) => a.sla.state === "breached" || a.sla.state === "approaching").length;
-  const pool = openPool(data);
-  const claims = tasks.filter((i) => i.claim);
-  const pending = claims.filter((i) => i.claim!.status === "pending");
+  const [resolving, setResolving] = useState<DemoIssue | null>(null);
+  const [claiming, setClaiming] = useState<DemoIssue | null>(null);
+  const me = DEMO_PERSONA.worker;
 
   return (
-    <>
-      {header}
-      <SampleNote>
-        A worker&apos;s dashboard for a sample technician. Buttons explain what they would do — nothing changes in Viewer Mode.
-      </SampleNote>
+    <ViewerGate>
+      {({ data, slaConfig, startIssue, assignIssue }) => {
+        const tasks = workerTasks(data, me.id);
+        const active = byUrgency(tasks.filter((t) => t.status !== "Resolved"), slaConfig, data.now);
+        const done = tasks.filter((t) => t.status === "Resolved");
+        const claims = done.filter((t) => t.claim);
+        const unclaimed = done.filter((t) => !t.claim);
+        const pool = openPool(data);
+        const urgent = active.filter((t) => computeSla(t, slaConfig, data.now).state !== "on-track").length;
+        const earned = claims.filter((c) => c.claim!.status === "approved").reduce((s, c) => s + c.claim!.amount, 0);
+        const pending = claims.filter((c) => c.claim!.status === "pending").reduce((s, c) => s + c.claim!.amount, 0);
 
-      <StatStrip
-        className="mb-6 lg:grid-cols-4"
-        stats={[
-          { label: "Active tasks", value: active.length, hint: `${tasks.filter((i) => i.status === "Resolved").length} resolved` },
-          { label: "Needs attention", value: needsAttention, hint: "Due soon or overdue", tone: needsAttention ? "warning" : "default" },
-          { label: "Open pool", value: pool.length, hint: "Unassigned issues" },
-          { label: "Pending payout", value: currency(pending.reduce((s, i) => s + i.claim!.amount, 0)), hint: `${pending.length} claim${pending.length === 1 ? "" : "s"} awaiting review` },
-        ]}
-      />
-
-      <Card className="mb-6">
-        <div className="px-4 pt-2 sm:px-5">
-          <h2 className="sr-only">Work lists</h2>
-          <Tabs
-            label="Work lists"
-            value={tab}
-            onChange={setTab}
-            panelId="viewer-worker-panel"
-            className="border-b-0"
-            options={[
-              { value: "tasks", label: "My tasks", count: active.length },
-              { value: "pool", label: "Open pool", count: pool.length },
-              { value: "payouts", label: "Claims" },
-            ]}
-          />
-        </div>
-        <div id="viewer-worker-panel" role="tabpanel" aria-labelledby={tabId("viewer-worker-panel", tab)} className="border-t border-border">
-          {tab === "tasks" ? (
-            active.length ? (
-              <DemoIssueList
-                issues={active.map((a) => a.issue)}
-                now={data.now}
-                label="Active tasks"
-                actionFor={(i) =>
-                  i.status === "Open" ? (
-                    <Button size="sm" icon={<Play className="h-3.5 w-3.5" aria-hidden="true" />} onClick={() => promptSignIn("Starting work")} aria-label={`Start work on “${i.title}”`}>
-                      Start work
-                    </Button>
-                  ) : (
-                    <Button size="sm" icon={<CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />} onClick={() => promptSignIn("Resolving a task")} aria-label={`Resolve “${i.title}”`}>
-                      Resolve
-                    </Button>
-                  )
-                }
-              />
-            ) : (
-              <EmptyState compact title="No active tasks" />
-            )
-          ) : tab === "pool" ? (
-            <DemoIssueList
-              issues={pool}
-              now={data.now}
-              label="Open pool"
-              actionFor={(i) => (
-                <Button size="sm" variant="secondary" onClick={() => promptSignIn("Claiming a task")} aria-label={`Claim “${i.title}”`}>
-                  Claim task
-                </Button>
-              )}
+        return (
+          <>
+            <PageHeader
+              eyebrow={
+                <span className="inline-flex items-center gap-2">
+                  <Avatar name={me.name} size={20} />
+                  {me.name} · {me.team} · {me.shift} shift
+                </span>
+              }
+              title="My work"
+              description="Your assigned tasks, most urgent first, and open issues you can take."
             />
-          ) : (
-            <TableWrap label="Expense claims">
-              <thead>
-                <tr>
-                  <th className={th}>Issue</th>
-                  <th className={th}>Spent on</th>
-                  <th className={`${th} text-right`}>Amount</th>
-                  <th className={th}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {claims.map((i) => (
-                  <tr key={i.id} className={trHover}>
-                    <td className={`${td} min-w-[12rem]`}>{i.title}</td>
-                    <td className={`${td} min-w-[10rem] text-fg-muted`}>{i.claim!.description}</td>
-                    <td className={`${td} tabular whitespace-nowrap text-right font-medium`}>{currency(i.claim!.amount)}</td>
-                    <td className={td}>
-                      <Badge tone={CLAIM_TONE[i.claim!.status]}>{CLAIM_LABEL[i.claim!.status]}</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </TableWrap>
-          )}
-        </div>
-      </Card>
 
-      <section aria-labelledby="worker-flow">
-        <h2 id="worker-flow" className="mb-3 text-[15px] font-semibold text-fg">
-          How a task is handled
-        </h2>
-        <WorkflowSteps
-          label="Worker workflow"
-          steps={[
-            { title: "Assigned", text: "By an administrator, or claimed from the open pool." },
-            { title: "Start work", text: "The reporter is told work has started." },
-            { title: "Resolve", text: "Mark it fixed; the reporter is asked to rate it." },
-            { title: "Claim expense", text: "Optional: amount, what it was spent on, receipt photo." },
-            { title: "Admin review", text: "An administrator pays or rejects the claim, exactly once." },
-          ]}
-        />
-      </section>
+            <KpiGrid className="mb-6 xl:grid-cols-4">
+              <KpiCard label="Active tasks" value={active.length} icon={<ClipboardList />} hint={`${active.filter((t) => t.status === "In Progress").length} in progress`} />
+              <KpiCard label="Due soon or overdue" value={urgent} icon={<AlarmClock />} tone={urgent ? "danger" : "success"} hint="Needs attention first" />
+              <KpiCard label="Resolved" value={done.length} icon={<CheckCircle2 />} tone="success" hint="This month in the demo" />
+              <KpiCard label="Paid so far" value={earned} format={currency} icon={<Wallet />} tone="brand" hint={pending ? `${currency(pending)} awaiting review` : "No claims waiting"} />
+            </KpiGrid>
 
-      <SignInHint>Need operational access?</SignInHint>
-    </>
+            <SectionCard title="Assigned to me" description="Start work, then resolve it. A deadline sits on every task." className="mb-6" tour="worker-queue" flush>
+              {active.length === 0 ? (
+                <EmptyState title="Nothing assigned" description="Take an open issue from the pool below." />
+              ) : (
+                <DemoIssueList
+                  issues={active}
+                  now={data.now}
+                  config={slaConfig}
+                  label="Assigned tasks"
+                  actionFor={(i) =>
+                    i.status === "Open" ? (
+                      <Button size="sm" onClick={() => startIssue(i.id)} icon={<Play className="h-3.5 w-3.5" aria-hidden="true" />}>
+                        Start work
+                      </Button>
+                    ) : (
+                      <Button size="sm" onClick={() => setResolving(i)} icon={<CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}>
+                        Mark resolved
+                      </Button>
+                    )
+                  }
+                />
+              )}
+            </SectionCard>
+
+            <div className="mb-6 grid gap-6 lg:grid-cols-2">
+              <SectionCard title="Expense claims" description="What you spent on repairs. An administrator reviews each claim." tour="worker-claims" flush>
+                {claims.length + unclaimed.length === 0 ? (
+                  <EmptyState title="No resolved work yet" compact />
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {claims.map((c) => (
+                      <li key={c.id} className="flex items-start justify-between gap-3 px-4 py-3 sm:px-5">
+                        <div className="min-w-0">
+                          <Link href={`/viewer/issues/${c.id}`} className="block truncate text-sm font-medium text-fg hover:text-brand-fg">
+                            {c.title}
+                          </Link>
+                          <p className="text-[13px] text-fg-subtle">{c.claim!.description}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="tabular text-sm font-semibold text-fg">{currency(c.claim!.amount)}</p>
+                          <Badge tone={CLAIM_TONE[c.claim!.status]} dot>
+                            {CLAIM_LABEL[c.claim!.status]}
+                          </Badge>
+                        </div>
+                      </li>
+                    ))}
+                    {unclaimed.slice(0, 3).map((u) => (
+                      <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
+                        <p className="min-w-0 truncate text-sm text-fg-muted">{u.title}</p>
+                        <Button size="sm" variant="secondary" onClick={() => setClaiming(u)} icon={<Receipt className="h-3.5 w-3.5" aria-hidden="true" />}>
+                          Submit a claim
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </SectionCard>
+
+              <SectionCard title="Open issue pool" description="Unassigned issues you could take on." flush>
+                {pool.length === 0 ? (
+                  <EmptyState title="The pool is empty" description="Every open issue has someone assigned." compact />
+                ) : (
+                  <DemoIssueList
+                    issues={pool.slice(0, 5)}
+                    now={data.now}
+                    config={slaConfig}
+                    label="Open pool"
+                    actionFor={(i) => (
+                      <Button size="sm" variant="secondary" onClick={() => assignIssue(i.id, me.id)}>
+                        Take this task
+                      </Button>
+                    )}
+                  />
+                )}
+              </SectionCard>
+            </div>
+
+            <p className="text-[13px] text-fg-subtle">
+              Looking for something else?{" "}
+              <Link href="/viewer/issues" className="font-medium text-brand-fg hover:underline">
+                Browse all issues
+              </Link>
+            </p>
+
+            <ResolveDialog issue={resolving} onClose={() => setResolving(null)} />
+            <ClaimDialog issue={claiming} onClose={() => setClaiming(null)} />
+          </>
+        );
+      }}
+    </ViewerGate>
   );
 }

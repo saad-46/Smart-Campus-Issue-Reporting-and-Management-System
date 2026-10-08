@@ -26,6 +26,8 @@ export default function CampusMap({
   metric = "open",
   highlight,
   compact = false,
+  values,
+  valueLabel,
 }: {
   hotspots: Hotspot[];
   unplaced: number;
@@ -35,11 +37,15 @@ export default function CampusMap({
   /** Building ids to emphasise (others are dimmed); undefined = all. */
   highlight?: Set<string>;
   compact?: boolean;
+  /** Per-building values for a custom layer (overrides the open/total metric). */
+  values?: Map<string, number>;
+  /** What the values count, e.g. "overdue issue". Used in labels and the legend. */
+  valueLabel?: string;
 }) {
   const byId = new Map(hotspots.map((h) => [h.buildingId, h]));
-  const valueOf = (h: Hotspot | undefined) => (h ? (metric === "open" ? h.open : h.total) : 0);
+  const valueOf = (h: Hotspot | undefined) => (values ? (h ? values.get(h.buildingId) ?? 0 : 0) : h ? (metric === "open" ? h.open : h.total) : 0);
   const max = Math.max(0, ...hotspots.map(valueOf));
-  const metricLabel = metric === "open" ? "open" : "total";
+  const metricLabel = valueLabel ?? (metric === "open" ? "open" : "total");
 
   return (
     <div>
@@ -47,7 +53,7 @@ export default function CampusMap({
         viewBox={`0 0 ${CAMPUS_GRID.width} ${CAMPUS_GRID.height}`}
         className="h-auto w-full rounded-md border border-border bg-surface-2"
         role="group"
-        aria-label={`Campus map — buildings shaded by ${metricLabel} issues`}
+        aria-label={valueLabel ? `Campus map, buildings shaded by ${valueLabel}` : `Campus map — buildings shaded by ${metricLabel} issues`}
       >
         <g aria-hidden="true" stroke="var(--border)" strokeWidth="0.6">
           <line x1="2" y1="19" x2="98" y2="19" />
@@ -59,7 +65,9 @@ export default function CampusMap({
           const level = heatLevel(value, max);
           const selected = selectedId === b.id;
           const dimmed = highlight && !highlight.has(b.id);
-          const label = `${b.name}: ${value} ${metricLabel} issue${value === 1 ? "" : "s"}${h?.topCategory ? `, mostly ${h.topCategory}` : ""}`;
+          const label = valueLabel
+            ? `${b.name}: ${value} ${valueLabel}${value === 1 ? "" : "s"}`
+            : `${b.name}: ${value} ${metricLabel} issue${value === 1 ? "" : "s"}${h?.topCategory ? `, mostly ${h.topCategory}` : ""}`;
           const interactive = !!onSelect;
           return (
             <g
@@ -117,7 +125,7 @@ export default function CampusMap({
               <span key={l} className="h-2.5 w-5" style={{ background: `var(--heat-${l})` }} />
             ))}
           </span>
-          <span>More {metricLabel} issues</span>
+          <span>More {valueLabel ? `${valueLabel}s` : `${metricLabel} issues`}</span>
         </span>
         <span>Schematic layout — not to scale</span>
       </div>

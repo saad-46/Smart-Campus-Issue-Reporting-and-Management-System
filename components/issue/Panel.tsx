@@ -27,7 +27,7 @@ export default function Panel({
 }) {
   const headingId = labelledBy ?? `panel-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
-    <section id={id} aria-labelledby={headingId} className={cn("scroll-mt-20 rounded-lg border border-border bg-surface", className)}>
+    <section id={id} aria-labelledby={headingId} className={cn("glass scroll-mt-20 rounded-xl", className)}>
       <div className="flex items-start justify-between gap-3 px-4 pb-3 pt-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

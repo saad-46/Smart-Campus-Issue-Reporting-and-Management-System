@@ -131,7 +131,7 @@ export default function NotificationBell() {
           role="dialog"
           aria-label="Notifications"
           // Anchored to the viewport, not the bell, so it can never run off-screen.
-          className="fixed left-2 right-2 top-[3.75rem] z-[60] flex max-h-[min(32rem,calc(100dvh-5rem))] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-lg animate-pop-in sm:left-auto sm:right-4 sm:w-[24rem]"
+          className="fixed left-2 right-2 top-[3.75rem] z-[60] flex max-h-[min(32rem,calc(100dvh-5rem))] flex-col overflow-hidden glass-blur rounded-xl animate-pop-in sm:left-auto sm:right-4 sm:w-[24rem]"
         >
           <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <h2 className="text-[15px] font-semibold text-fg">Notifications</h2>

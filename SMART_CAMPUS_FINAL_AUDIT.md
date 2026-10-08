@@ -1301,3 +1301,61 @@ Unit: 212/212 · Rules: 181/181 · npm audit: prod 0 (dev 5 high, unchanged)
 Firestore rules changed: claim description only (no public access added)
 Deployed: NO · Committed / pushed: NO
 ```
+
+
+---
+
+## Final Viewer + UI/UX + Production Verification
+
+Branch `feat/viewer-glass-ui`, built on the verified production release `9fb9989`. Every number below was produced in this pass; anything not run is listed under "Not verified".
+
+### Viewer (public demo, no sign-in)
+
+- **Routes (17):** `/viewer`, `/viewer/student`, `/viewer/worker`, `/viewer/admin`, `/viewer/issues`, `/viewer/issues/[id]`, `/viewer/report`, `/viewer/analytics`, `/viewer/map`, `/viewer/workers`, `/viewer/finance`, `/viewer/locations`, `/viewer/notifications`, `/viewer/search`, `/viewer/timeline`, `/viewer/settings`, `/viewer/how-it-works`. Each has a real URL; a deep link to a role-specific page switches to that perspective (`roleForPath`), and the perspective is remembered for the tab (`sessionStorage`).
+- **Perspectives:** Student, Worker and Admin each have their own menu (the admin menu mirrors the signed-in admin menu), figures and actions. Switching is client-side (a marker set on `window` survived three switches).
+- **Mock data (`lib/viewer/demoData.ts`):** generated with a fixed-seed generator, so it is identical on every visit: about 130 issues over 30 days, 26 locations, 12 workers, 54 students, claims, ratings, incidents, notifications and a timeline. Wording is campus-specific ("Projector not turning on in Room 104"). Tests forbid placeholder wording, emails, phone numbers, ids and links.
+- **Figures are computed, not typed:** `demoStats.ts` runs the same analytics, SLA, incident, risk and insight functions as the admin pages. Tests check that every count adds up and that changing the deadline targets recalculates compliance.
+- **Simulated actions (local state only):** submit a report (with validation, live category/priority suggestions and duplicate detection), assign a worker (ranked suggestions with reasons), start, resolve (validated), submit a claim (validated), approve and pay or reject a claim ("Demo payment: no real transaction"), rate a fix, upvote, change deadline targets, approve a worker request, mark notifications read, export CSV/JSON of demo data. Each shows a "Demo mode — no real data was modified" toast. A report created in the demo appeared in the student's list, the issues table, the admin totals (129 to 130; open 15 to 16) and the notifications.
+- **Guided tour:** 24 steps, Back / Next / Skip / Close, progress bar and counter, spotlight on a real anchor, navigates and switches perspective first. Reopen with the Guide button. A unit test checks that every step's page exists and that its `data-tour` anchor is present in that page's source (or the shell). In the browser, all 24 steps were walked: every targeted step found and highlighted its anchor; the welcome and final steps are centred. On a phone the sidebar anchors are not visible, so the step is shown without a highlight rather than pointing at nothing. The welcome step stays on whatever page was opened, so deep links keep working.
+- **Firebase isolation:** the Viewer lives outside the `(app)` route group, so Firebase Auth is never started there. The Viewer's first-load JavaScript is 131–147 kB (the signed-in pages are 237–376 kB). A unit test walks the whole import graph from every Viewer file (and the shared shell) and fails on any path to `firebase/*`, `lib/firebase`, `lib/firestore`, `useAuth` or `AuthProvider`; it also forbids `fetch`, `XMLHttpRequest`, `WebSocket`, `sendBeacon` and any storage use outside the preferences module.
+- **Images:** generated inline SVG illustrations (per category) and a drawn sample receipt, so nothing is fetched and no private photo can appear. Because they are inline, there is no loading or failure state to show; every image has an `aria-label`/alt.
+
+### UI/UX
+
+- **Glassmorphism and depth:** tokens in `app/globals.css`: `.glass` (cards, no blur), `.glass-blur` (dialogs, menus, drawers, toasts, palette: blurred), `.glass-bar` (sidebar and top bar; blur on `::before` so fixed children are unaffected), `.depth-*` shadows, `.lift` hover elevation, a static ambient background, and a tilted 3D product preview on the landing page (disabled on small screens and with reduced motion). No continuous animation and no large blur layers. The helpers sit in `@layer components` so utility classes can override them (a bug found here: unlayered `position: relative` was overriding `fixed`/`sticky`).
+- **Theme:** the indigo/violet palette replaces the blue, in separate light and dark token sets (not inverted). Both were checked on the landing page and the Viewer. Charts, map heat scale, tooltips and QR dialogs use the same tokens.
+- **Shared shell:** `ShellFrame` is used by both the signed-in app and the Viewer: collapsible sidebar (icons plus tooltips, remembered), mobile drawer, glass top bar, skip link. `KpiCard` / `StatStrip` show animated counters (instant with reduced motion), trends and sparklines.
+- **Filters, tables, search:** `FilterBar` (inline on desktop, bottom sheet on phones, removable chips, Clear all), sortable and paginated `IssueTable` (a list on phones), Ctrl/⌘ K palette (issues, pages, locations, workers, students, analytics sections).
+- **Map:** the existing schematic map gained a layer switcher (issue density, all reports, active incidents, maintenance risk, SLA hotspots), category filter and a building detail panel.
+- **Charts:** line/area, stacked bars, donut, horizontal bars, heat grid, with hidden data tables for screen readers. Charts now get an initial size, so the recharts "width(-1) and height(-1)" warning seen on production no longer appears.
+- **Dialogs, toasts, states:** all dialogs share one component (focus trap, Escape, focus return); toasts gained a `demo` variant; skeletons, empty and error states are used throughout.
+- **Landing page:** redesigned; "Explore as Viewer" is the primary call to action next to Sign in and Create account.
+
+### Security
+
+- `firestore.rules` and `firestore.indexes.json`: **unchanged** (no diff). Rules tests: **181 / 181** on the emulator.
+- Signed-in app on the emulator: admin (8 pages), worker, student and the protected-route redirect still work; a student opening `/admin` is sent to `/dashboard`; a student's report was written to the emulator with its suggested category and priority.
+- Viewer isolation: see above. The Viewer cannot reach roles, receipts, payments or any real record.
+
+### Tests (actual results)
+
+| Check | Result |
+|---|---|
+| Unit tests | PASS — **248 / 248** (9 files; 212 before, +36 for the Viewer: dataset, figures, feed, preferences, navigation, tour anchors, import-graph isolation) |
+| Firestore rules tests | PASS — **181 / 181** |
+| TypeScript `tsc --noEmit` | PASS |
+| ESLint | PASS (0 errors, 0 warnings) |
+| `next build` | PASS — 36 routes |
+| `npm audit --omit=dev` | 0 vulnerabilities (after a non-breaking `source-map-js` lockfile bump) |
+| `npm audit` (all) | 5 high, dev-only: the unchanged `braces` chain through `eslint-config-next`; the fix is a breaking downgrade, so it was not applied |
+| Viewer horizontal overflow, all 17 routes | PASS at 320, 375, 390, 412, 768, 1024, 1280, 1366, 1920 (dark) and 320, 768, 1366 (light). One real overflow was found and fixed (Finance grid) |
+| Viewer accessibility heuristics (names, labels, alt, duplicate ids, headings, landmarks) | PASS after replacing skipped heading levels in issue rows |
+| Keyboard | PASS — palette (Ctrl K, arrows, Enter, Escape, focus return), notification bell (Escape, focus return), mobile drawer (focus in, Escape, focus return) |
+| Automated end-to-end suite | NOT AVAILABLE — the repository has none; flows were run by hand in the browser as listed |
+
+### Not verified in this pass
+
+- Production signed-in flows (student, worker, admin) and payments: need a person to sign in; the one real pending claim must not be paid.
+- Physical QR scan with a phone; screen readers; a Tab-key sweep of the tour; 1440×900.
+- Light-theme overflow at 375, 390, 412, 1024, 1280, 1920.
+- Live chart resizing (the pane does not paint while hidden).

@@ -394,7 +394,7 @@ export default function AdminAnalyticsPage() {
                 <CardHeader title="Issues over time" description={`Reported and resolved per ${granularityFor(from, to)}`} />
                 <CardBody>
                   <div className="h-64" role="img" aria-label={`Issues over time: ${issues.length} reported, ${stats.status.Resolved} resolved`}>
-                    <ResponsiveContainer>
+                    <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
                       <AreaChart data={stats.series} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                         <CartesianGrid stroke={chart.grid} vertical={false} />
                         <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: chart.grid }} minTickGap={24} />
@@ -417,7 +417,7 @@ export default function AdminAnalyticsPage() {
                       <EmptyState compact title="No resolved issues in this range" />
                     ) : (
                       <div style={{ height: Math.max(160, stats.byCategory.length * 34) }} role="img" aria-label="Average resolution time by category">
-                        <ResponsiveContainer>
+                        <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
                           <BarChart data={stats.byCategory} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                             <CartesianGrid stroke={chart.grid} horizontal={false} />
                             <XAxis type="number" tick={axisTick} tickLine={false} axisLine={false} unit="h" />
@@ -435,7 +435,7 @@ export default function AdminAnalyticsPage() {
                   <CardHeader title="Categories" description="Reported issues by category" />
                   <CardBody>
                     <div style={{ height: Math.max(160, stats.categories.length * 34) }} role="img" aria-label="Issues by category">
-                      <ResponsiveContainer>
+                      <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
                         <BarChart data={stats.categories} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                           <CartesianGrid stroke={chart.grid} horizontal={false} />
                           <XAxis type="number" allowDecimals={false} tick={axisTick} tickLine={false} axisLine={false} />

@@ -1,125 +1,111 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, QrCode, Star } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, ClipboardList, Clock, FilePlus2, Hammer, Star } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import Card, { CardHeader } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import { StatStrip } from "@/components/ui/Data";
-import { Tabs, tabId } from "@/components/ui/Tabs";
-import { useViewer } from "@/components/viewer/ViewerProvider";
-import { DemoIssueList, SampleNote, SignInHint, ViewerLoading, WorkflowSteps } from "@/components/viewer/parts";
-import { Stars } from "@/components/viewer/SampleIssueDialog";
-import { studentIssues } from "@/lib/viewer/demoStats";
+import Button, { buttonClasses } from "@/components/ui/Button";
+import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
+import { Tabs } from "@/components/ui/Tabs";
+import { EmptyState } from "@/components/ui/States";
+import { SectionCard, DemoIssueList, ViewerGate } from "@/components/viewer/parts";
+import { RateDialog } from "@/components/viewer/ActionDialogs";
+import { DEMO_PERSONA, DemoIssue } from "@/lib/viewer/demoData";
+import { byNewest, studentIssues } from "@/lib/viewer/demoStats";
+import { greeting } from "@/lib/dates";
+
+type Tab = "mine" | "community";
 
 export default function ViewerStudentPage() {
-  const { data, promptSignIn } = useViewer();
-  const [tab, setTab] = useState<"mine" | "community">("mine");
-
-  const header = (
-    <PageHeader
-      eyebrow="Student view · sample"
-      title="My issues"
-      description="Track what you've reported, from submitted to resolved."
-      actions={
-        <Button icon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => promptSignIn("Reporting an issue")}>
-          Report an issue
-        </Button>
-      }
-    />
-  );
-
-  if (!data) return (<>{header}<ViewerLoading /></>);
-
-  const mine = studentIssues(data);
-  const list = tab === "mine" ? mine : [...data.issues].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  const rated = mine.find((i) => i.feedback);
+  const [tab, setTab] = useState<Tab>("mine");
+  const [rating, setRating] = useState<DemoIssue | null>(null);
 
   return (
-    <>
-      {header}
-      <SampleNote>
-        This is how a student&apos;s dashboard looks. The issues belong to a sample student account; open any of them to see its timeline, deadline and
-        resolution.
-      </SampleNote>
+    <ViewerGate>
+      {({ data, slaConfig }) => {
+        const mine = byNewest(studentIssues(data));
+        const open = mine.filter((i) => i.status === "Open");
+        const progress = mine.filter((i) => i.status === "In Progress");
+        const resolved = mine.filter((i) => i.status === "Resolved");
+        const toRate = resolved.filter((i) => !i.feedback);
+        const community = byNewest(data.issues.filter((i) => !i.mine && i.status !== "Resolved")).slice(0, 12);
+        const shown = tab === "mine" ? mine : community;
 
-      <StatStrip
-        className="mb-6"
-        stats={[
-          { label: "Open", value: mine.filter((i) => i.status === "Open").length, hint: "Waiting to be picked up" },
-          { label: "In progress", value: mine.filter((i) => i.status === "In Progress").length, hint: "A worker is on it" },
-          { label: "Resolved", value: mine.filter((i) => i.status === "Resolved").length, hint: "Marked as fixed" },
-        ]}
-      />
+        return (
+          <>
+            <PageHeader
+              eyebrow={DEMO_PERSONA.student.department + " · " + DEMO_PERSONA.student.year}
+              title={`${greeting(data.now)}, ${DEMO_PERSONA.student.name.split(" ")[0]}`}
+              description="Your reports, their progress and anything waiting for you."
+              actions={
+                <Link href="/viewer/report" className={buttonClasses("primary")}>
+                  <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+                  Report an issue
+                </Link>
+              }
+            />
 
-      <Card className="mb-6">
-        <div className="px-4 pt-2 sm:px-5">
-          <h2 className="sr-only">Issue lists</h2>
-          <Tabs
-            label="Issue lists"
-            value={tab}
-            onChange={setTab}
-            panelId="viewer-student-panel"
-            className="border-b-0"
-            options={[
-              { value: "mine", label: "My issues", count: mine.length },
-              { value: "community", label: "Community", count: data.issues.length },
-            ]}
-          />
-        </div>
-        <div id="viewer-student-panel" role="tabpanel" aria-labelledby={tabId("viewer-student-panel", tab)} className="border-t border-border">
-          <DemoIssueList issues={list} now={data.now} label={tab === "mine" ? "Issues reported by the sample student" : "All sample issues"} />
-        </div>
-      </Card>
+            <div data-tour="student-kpis" className="mb-6">
+              <KpiGrid className="xl:grid-cols-4">
+                <KpiCard label="My reports" value={mine.length} icon={<ClipboardList />} hint="All time in this demo" />
+                <KpiCard label="Waiting" value={open.length} icon={<Clock />} tone="warning" hint="Not started yet" />
+                <KpiCard label="In progress" value={progress.length} icon={<Hammer />} tone="brand" hint="A worker is on it" />
+                <KpiCard label="Resolved" value={resolved.length} icon={<CheckCircle2 />} tone="success" hint={toRate.length ? `${toRate.length} to rate` : "All rated"} />
+              </KpiGrid>
+            </div>
 
-      <section aria-labelledby="student-flow" className="mb-6">
-        <h2 id="student-flow" className="mb-3 text-[15px] font-semibold text-fg">
-          From report to feedback
-        </h2>
-        <WorkflowSteps
-          label="Student workflow"
-          steps={[
-            { title: "Report", text: "Describe the problem and where it is, with optional photos." },
-            { title: "Track", text: "Follow the status, deadline and timeline as it updates live." },
-            { title: "Resolve", text: "A worker fixes it and marks it resolved — you're notified." },
-            { title: "Give feedback", text: "Rate the fix once, from 1 to 5 stars." },
-          ]}
-        />
-      </section>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Report from a QR code" description="Posters at campus locations" />
-          <div className="flex gap-3 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
-            <QrCode className="h-8 w-8 shrink-0 text-fg-subtle" aria-hidden="true" />
-            <p className="text-sm text-fg-muted">
-              Administrators print a QR code for each lab, washroom or classroom. Scanning it opens the report form with that location already filled in;
-              signing in is still required before anything is submitted.
-            </p>
-          </div>
-        </Card>
-        <Card>
-          <CardHeader title="Rating a fix" description="Feedback on resolved issues" />
-          <div className="px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
-            {rated?.feedback ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-sm font-medium text-fg">{rated.title}</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Stars rating={rated.feedback.rating} />
-                  {rated.feedback.comment && <span className="text-sm text-fg-muted">“{rated.feedback.comment}”</span>}
-                </div>
-                <Button variant="secondary" size="sm" className="mt-1 self-start" icon={<Star className="h-3.5 w-3.5" aria-hidden="true" />} onClick={() => promptSignIn("Rating a fix")}>
-                  Rate a fix
-                </Button>
-              </div>
-            ) : (
-              <p className="text-sm text-fg-muted">No rated issues in the sample.</p>
+            {toRate.length > 0 && (
+              <SectionCard title="Rate the fix" description="Tell us how it went. It helps assign the right worker next time." className="mb-6">
+                <ul className="divide-y divide-border">
+                  {toRate.map((i) => (
+                    <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-fg">{i.title}</p>
+                        <p className="text-[13px] text-fg-subtle">{i.resolutionSummary}</p>
+                      </div>
+                      <Button size="sm" variant="secondary" onClick={() => setRating(i)} icon={<Star className="h-3.5 w-3.5" aria-hidden="true" />}>
+                        Rate this fix
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </SectionCard>
             )}
-          </div>
-        </Card>
-      </div>
 
-      <SignInHint>Want to report a real issue?</SignInHint>
-    </>
+            <SectionCard title="Issues" flush>
+              <div className="px-4 sm:px-5">
+                <Tabs
+                  value={tab}
+                  onChange={setTab}
+                  label="Issue lists"
+                  panelId="student-issues"
+                  options={[
+                    { value: "mine", label: "My issues", count: mine.length },
+                    { value: "community", label: "Community", count: community.length },
+                  ]}
+                />
+              </div>
+              <div id="student-issues" role="tabpanel" aria-labelledby={`student-issues-tab-${tab}`}>
+                {shown.length === 0 ? (
+                  <EmptyState title="No issues here yet" description="Report a campus issue and follow it from this page." action={<Link href="/viewer/report" className={buttonClasses("primary")}>Report an issue</Link>} />
+                ) : (
+                  <DemoIssueList issues={shown} now={data.now} config={slaConfig} label={tab === "mine" ? "My issues" : "Community issues"} />
+                )}
+              </div>
+              {tab === "community" && (
+                <p className="border-t border-border px-4 py-3 text-[13px] text-fg-subtle sm:px-5">
+                  Other people&apos;s reports. If you see the same problem, upvote it instead of filing it again.{" "}
+                  <Link href="/viewer/issues" className="font-medium text-brand-fg hover:underline">
+                    See all
+                  </Link>
+                </p>
+              )}
+            </SectionCard>
+
+            <RateDialog issue={rating} onClose={() => setRating(null)} />
+          </>
+        );
+      }}
+    </ViewerGate>
   );
 }

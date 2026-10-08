@@ -12,7 +12,8 @@ const base =
   "focus-visible:outline-2 focus-visible:outline-offset-2";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-brand text-on-brand shadow-xs hover:bg-brand-hover active:bg-brand-active",
+  primary:
+    "bg-brand text-on-brand shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_1px_2px_hsl(var(--shadow-color)/0.2),0_6px_16px_-6px_var(--glow)] hover:bg-brand-hover active:bg-brand-active",
   secondary:
     "bg-surface text-fg border border-border-strong shadow-xs hover:bg-surface-hover hover:border-border-strong active:bg-surface-2",
   tertiary: "text-brand-fg hover:bg-brand-subtle active:bg-brand-subtle",

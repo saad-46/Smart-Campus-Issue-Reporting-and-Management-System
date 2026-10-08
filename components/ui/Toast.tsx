@@ -23,6 +23,8 @@ interface ToastApi {
   show: (toast: ToastInput) => void;
   success: (title: string, description?: string) => void;
   error: (title: string, description?: string) => void;
+  /** Viewer Mode: the action was simulated and nothing was saved. */
+  demo: (title: string, description?: string) => void;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -50,7 +52,7 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: num
 
   return (
     <li
-      className="pointer-events-auto flex w-full items-start gap-3 rounded-lg border border-border bg-surface p-3 pr-2 shadow-md animate-toast-in"
+      className="glass-blur pointer-events-auto flex w-full items-start gap-3 rounded-xl p-3 pr-2 animate-toast-in"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -104,6 +106,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       show,
       success: (title, description) => show({ title, description, tone: "success" }),
       error: (title, description) => show({ title, description, tone: "error" }),
+      demo: (title, description) => show({ title, description: description ?? "Demo mode — no real data was modified.", tone: "success", duration: 5500 }),
     }),
     [show]
   );

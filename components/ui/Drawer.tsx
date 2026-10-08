@@ -47,7 +47,7 @@ export default function Drawer({ open, onClose, title, side = "right", children,
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={cn("absolute flex flex-col border-border bg-surface shadow-lg outline-none", position, className)}
+        className={cn("glass-blur absolute flex flex-col outline-none", position, className)}
       >
         {side === "bottom" && <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 rounded-full bg-border-strong" />}
         {hideHeader ? (

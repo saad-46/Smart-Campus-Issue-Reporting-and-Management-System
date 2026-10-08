@@ -99,7 +99,7 @@ export default function Menu({ trigger, sections, align = "right", header, class
           aria-labelledby={triggerId}
           onKeyDown={onMenuKey}
           className={cn(
-            "absolute top-full z-[60] mt-1.5 max-h-[min(30rem,calc(100dvh-6rem))] min-w-56 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-md animate-pop-in",
+            "absolute top-full z-[60] mt-1.5 max-h-[min(30rem,calc(100dvh-6rem))] min-w-56 max-w-[calc(100vw-1rem)] glass-blur overflow-y-auto rounded-xl py-1 animate-pop-in",
             align === "right" ? "right-0 origin-top-right" : "left-0 origin-top-left"
           )}
         >

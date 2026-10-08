@@ -33,7 +33,7 @@
 - 📊 **Analytics** — ranges (Today, 7/30/90 days, semester, custom) and filters (category, building, status, priority, worker, department), charts, and CSV/JSON exports without reporter identities.
 - 🧭 **Campus Operations overview** — KPIs from real data, SLA alerts, confirmed and suggested incidents, maintenance risk indicator (rule-based, with "not enough data" states), worker workload and factual insights.
 - 🔎 **Search** — issue ID, title, location and category over a bounded projection of recent issues; also from anywhere with Ctrl/⌘K.
-- 👀 **Viewer Mode** (`/viewer`) — a public, read-only tour of the Student, Worker and Admin views, analytics, campus map and workflow, with a short first-visit guide. It uses a static, synthetic sample dataset (`lib/viewer/`) and never reads or writes Firestore; real actions show a "Sign in to use this feature" prompt.
+- 👀 **Viewer Mode** (`/viewer`) — the whole product as a public, no-sign-in demo: Student, Worker and Admin perspectives with their own menus, an issues table with filters, issue pages with deadlines, timeline and assignment suggestions, a report form with live suggestions and duplicate detection, analytics, a layered campus map, workers, finance, location QR codes, notifications, search (Ctrl/⌘ K), the campus timeline and settings, plus a 24-step guided tour. It runs on a generated sample campus (`lib/viewer/`, about 130 issues, 12 workers, 26 locations); actions are simulated in the browser and disappear when you leave. It never loads the Firebase SDK, so it cannot read or write campus records.
 - 🖥️ **Interface** — one design system (semantic colour tokens, light and dark themes, reduced-motion support), role-based sidebar navigation, keyboard-accessible dialogs, menus and tabs, and layouts checked from 320 px phones to 1920 px desktops.
 
 ---
@@ -61,7 +61,7 @@ app/
   worker/               # worker dashboard (SLA "needs attention", tasks, open pool, payouts)
   issues/[id]/          # issue detail: analysis, SLA, timeline, incident, feedback, admin controls, chat
   search/               # global search
-  viewer/               # public read-only Viewer Mode: overview, student/, worker/, admin/, map/, analytics/, how-it-works/
+  viewer/               # public Viewer Mode (outside the (app) route group, so no Firebase): overview, student/, worker/, admin/, issues/, report/, analytics/, map/, workers/, finance/, locations/, notifications/, search/, timeline/, settings/, how-it-works/
   admin/                # Overview, issues/, analytics/, map/, workers/, finance/ (budget, claims), locations/ (QR), settings/ (SLA targets)
 components/
   ui/                   # design system: Button, Field (Input/Select/Textarea), Badge, Card, Dialog, Drawer, Menu, Tabs, Toast, States, Data
@@ -73,7 +73,7 @@ lib/
   firestoreRest.ts      # bounded REST queries with field projection (analytics, map, search)
   intelligence/         # similarity, sla, analytics, maintenance, assignment, insights, ranges
   campus.ts             # schematic campus layout (edit to match your campus)
-  viewer/               # Viewer Mode sample dataset, figures (computed with the real analytics), guide preference, navigation
+  viewer/               # Viewer Mode demo dataset, figures (computed with the real analytics), feed, navigation, tour steps, preferences
 scripts/seed-emulator.mjs  # demo data for the LOCAL emulator only
 tests/unit, tests/rules
 ```

@@ -4,13 +4,14 @@ import ViewerShell from "@/components/viewer/ViewerShell";
 
 export const metadata: Metadata = {
   title: "Viewer Mode",
-  description: "Explore how campus issues are reported, assigned, resolved and analysed — read-only sample data, no account needed.",
+  description: "Explore the whole platform, from reporting to analytics, on a sample campus. No account needed; nothing is saved.",
 };
 
 /**
- * Public, read-only Viewer. No ProtectedRoute and no auth/role checks
- * because nothing here is private: every page renders the static sample
- * dataset in lib/viewer and never reads or writes Firestore.
+ * Public Viewer. No ProtectedRoute and no auth/role checks because nothing
+ * here is private: every page renders the generated demo dataset in
+ * lib/viewer, actions edit a local copy that disappears on leave, and
+ * nothing reads or writes Firestore.
  */
 export default function ViewerLayout({ children }: { children: React.ReactNode }) {
   return (

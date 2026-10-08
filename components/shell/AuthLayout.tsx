@@ -15,7 +15,7 @@ export default function AuthLayout({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas">
+    <div className="flex min-h-dvh flex-col">
       <header className="flex h-14 items-center justify-between px-4 sm:px-6">
         <Logo />
         <ThemeToggle />
@@ -24,7 +24,7 @@ export default function AuthLayout({
         <div className="w-full max-w-[400px]">
           <h1 className="text-2xl font-semibold tracking-tight text-fg">{title}</h1>
           {description && <p className="mt-1.5 text-sm text-fg-muted">{description}</p>}
-          <div className="mt-6 rounded-lg border border-border bg-surface p-5 shadow-xs sm:p-6">{children}</div>
+          <div className="glass depth-2 mt-6 rounded-xl p-5 sm:p-6">{children}</div>
           {footer && <div className="mt-5 text-center text-sm text-fg-muted">{footer}</div>}
         </div>
       </main>

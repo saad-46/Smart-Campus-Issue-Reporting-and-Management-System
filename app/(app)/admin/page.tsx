@@ -239,7 +239,7 @@ export default function AdminOverviewPage() {
               <EmptyState compact title="No issues in the last 30 days" description="The trend will appear once issues are reported." />
             ) : (
               <div className="h-56" role="img" aria-label={`Issue trend: ${trendTotal} reported in the last 30 days`}>
-                <ResponsiveContainer>
+                <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
                   <AreaChart data={trend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                     <CartesianGrid stroke={chart.grid} vertical={false} />
                     <XAxis dataKey="label" tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={{ stroke: chart.grid }} interval="preserveStartEnd" minTickGap={24} />

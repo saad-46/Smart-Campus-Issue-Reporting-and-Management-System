@@ -1,113 +1,245 @@
 "use client";
 
-import React from "react";
-import { Lock } from "lucide-react";
+import React, { useState } from "react";
+import { CheckCircle2, Download, ListChecks, ShieldCheck, Star, Timer } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import Card, { CardHeader } from "@/components/ui/Card";
+import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import { StatStrip } from "@/components/ui/Data";
-import { useViewer } from "@/components/viewer/ViewerProvider";
-import { SampleNote, ViewerLoading } from "@/components/viewer/parts";
-import { HorizontalBars, ShareList, TrendChart } from "@/components/viewer/charts";
+import { Select } from "@/components/ui/Field";
+import { Segmented } from "@/components/ui/Tabs";
+import { FilterBar, FilterChip } from "@/components/ui/Filters";
+import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
+import { TableWrap, td, th, trHover } from "@/components/ui/Data";
+import { EmptyState } from "@/components/ui/States";
 import { formatHours } from "@/components/admin/Kpi";
-import { DEMO_WINDOW_DAYS } from "@/lib/viewer/demoStats";
+import { Donut, Heatmap, HorizontalBars, ShareList, StackedBars, TrendChart } from "@/components/viewer/charts";
+import { SectionCard, ViewerGate } from "@/components/viewer/parts";
+import { useChartTheme } from "@/hooks/useChartTheme";
+import { DEPARTMENTS, ISSUE_CATEGORIES, departmentFor } from "@/lib/constants";
+import { categoryDistribution, priorityCounts, resolutionByCategory, resolutionStats, slaSummary, statusCounts, timeSeries, workerWorkload } from "@/lib/intelligence/analytics";
+import { SLA_LABELS } from "@/lib/intelligence/sla";
+import { downloadText, isoOrEmpty, toCsv, toJson } from "@/lib/export";
+import { DEMO_WORKERS, DemoIssue } from "@/lib/viewer/demoData";
+import { departmentStats, reportingHeatmap, satisfaction, slaCompliance } from "@/lib/viewer/demoStats";
+
+type Range = 7 | 14 | 30;
+const DAY = 86_400_000;
 
 export default function ViewerAnalyticsPage() {
-  const { stats, promptSignIn } = useViewer();
-
-  const header = (
-    <PageHeader
-      eyebrow="Analytics · sample"
-      title="Analytics"
-      description="Trends, resolution performance and satisfaction, computed from the sample dataset."
-      actions={
-        <Button variant="secondary" icon={<Lock className="h-4 w-4" aria-hidden="true" />} onClick={() => promptSignIn("Exporting analytics")}>
-          Export
-        </Button>
-      }
-    />
-  );
-  if (!stats) return (<>{header}<ViewerLoading /></>);
-
-  const resolvedSla = stats.sla.counts.met + stats.sla.counts.missed;
-  const onTime = resolvedSla ? Math.round((stats.sla.counts.met / resolvedSla) * 100) : null;
-  const locations = stats.map.buildings.filter((b) => b.total > 0).sort((a, b) => b.total - a.total).slice(0, 6);
+  const [range, setRange] = useState<Range>(30);
+  const [category, setCategory] = useState("");
+  const [department, setDepartment] = useState("");
+  const chart = useChartTheme();
 
   return (
-    <>
-      {header}
-      <SampleNote>
-        Sample analytics: every chart below is calculated from the {stats.total} sample issues with the same functions as the real Analytics page. The
-        real page adds date ranges, filters and exports for signed-in administrators.
-      </SampleNote>
+    <ViewerGate>
+      {({ data, slaConfig, demoToast }) => {
+        const to = data.now;
+        const from = new Date(to.getTime() - (range - 1) * DAY);
+        const scoped = data.issues.filter(
+          (i) => i.createdAt.getTime() >= from.getTime() - 0 && (!category || i.category === category) && (!department || departmentFor(i.category) === department)
+        );
+        // Issues resolved in the window count even if reported earlier; reported-in-window drives everything else.
+        const status = statusCounts(scoped);
+        const sla = slaSummary(scoped, slaConfig, data.now);
+        const res = resolutionStats(scoped);
+        const compliance = slaCompliance(sla.counts);
+        const trend = timeSeries(scoped, from, to, "day");
+        const cats = categoryDistribution(scoped);
+        const pri = priorityCounts(scoped);
+        const sat = satisfaction(scoped);
+        const load = workerWorkload(scoped);
+        const heat = reportingHeatmap(scoped);
+        const depts = departmentStats(scoped as DemoIssue[], slaConfig, data.now);
 
-      <StatStrip
-        className="mb-6 lg:grid-cols-4"
-        stats={[
-          { label: "Reported", value: stats.total, hint: `Last ${DEMO_WINDOW_DAYS} days` },
-          { label: "Resolved", value: stats.status.Resolved, hint: `${Math.round((stats.status.Resolved / stats.total) * 100)}% of reported` },
-          { label: "Avg. resolution", value: formatHours(stats.resolution.averageHours) ?? "—", hint: `Median ${formatHours(stats.resolution.medianHours) ?? "—"}` },
-          { label: "On time", value: onTime !== null ? `${onTime}%` : "—", hint: `${stats.sla.counts.met} of ${resolvedSla} resolved within target` },
-        ]}
-      />
+        const chips: FilterChip[] = [
+          category && { key: "c", label: category, onRemove: () => setCategory("") },
+          department && { key: "d", label: department, onRemove: () => setDepartment("") },
+        ].filter(Boolean) as FilterChip[];
 
-      <Card className="mb-6">
-        <CardHeader title="Issues over time" description="Reported and resolved per day" />
-        <div className="px-3 pb-4 pt-3 sm:px-5">
-          <TrendChart data={stats.trend} caption={`Issues reported and resolved per day over the last ${DEMO_WINDOW_DAYS} days`} />
-        </div>
-      </Card>
+        const exportRows = (kind: "csv" | "json") => {
+          const columns = [
+            { header: "Issue", value: (i: DemoIssue) => i.id },
+            { header: "Category", value: (i: DemoIssue) => i.category },
+            { header: "Priority", value: (i: DemoIssue) => i.priority },
+            { header: "Status", value: (i: DemoIssue) => i.status },
+            { header: "Location", value: (i: DemoIssue) => i.location },
+            { header: "Reported", value: (i: DemoIssue) => isoOrEmpty(i.createdAt) },
+            { header: "Resolved", value: (i: DemoIssue) => isoOrEmpty(i.resolvedAt) },
+          ];
+          downloadText(`demo-analytics-${range}d.${kind}`, kind === "csv" ? toCsv(scoped, columns) : toJson(scoped, columns), kind === "csv" ? "text/csv" : "application/json");
+          demoToast("Demo analytics exported", `${scoped.length} sample issues, no reporter identities. Demo mode — no real data was modified.`);
+        };
 
-      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Categories" description="Reported issues by category" />
-          <div className="px-3 pb-4 pt-3 sm:px-5">
-            <HorizontalBars data={stats.categories} caption="Number of sample issues per category" valueLabel="Issues" />
-          </div>
-        </Card>
-        <Card>
-          <CardHeader title="Resolution performance" description="Average time to resolve, by category" />
-          <div className="px-3 pb-4 pt-3 sm:px-5">
-            <HorizontalBars
-              data={stats.resolutionByCategory.map((r) => ({ name: r.name, value: r.averageHours }))}
-              caption="Average hours from report to resolution, per category"
-              valueLabel="Average hours"
-              unit="h"
+        return (
+          <>
+            <PageHeader
+              title="Analytics"
+              description="Trends, deadlines and performance computed from the demo data. Change the range or filters and every chart follows."
+              actions={
+                <>
+                  <Button size="sm" variant="secondary" onClick={() => exportRows("csv")} icon={<Download className="h-3.5 w-3.5" aria-hidden="true" />}>
+                    Export CSV
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => exportRows("json")} icon={<Download className="h-3.5 w-3.5" aria-hidden="true" />}>
+                    Export JSON
+                  </Button>
+                </>
+              }
             />
-          </div>
-        </Card>
-      </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader title="Priority" />
-          <div className="px-4 pb-5 pt-3 sm:px-5">
-            <ShareList
-              label="Issues by priority"
-              items={[
-                { name: "High", value: stats.priority.High, tone: "danger" },
-                { name: "Medium", value: stats.priority.Medium, tone: "warning" },
-                { name: "Low", value: stats.priority.Low, tone: "neutral" },
-              ]}
-            />
-          </div>
-        </Card>
-        <Card>
-          <CardHeader title="Locations" description="Buildings with the most reports" />
-          <div className="px-4 pb-5 pt-3 sm:px-5">
-            <ShareList label="Issues by building" items={locations.map((b) => ({ name: b.name, value: b.total }))} />
-          </div>
-        </Card>
-        <Card>
-          <CardHeader title="Satisfaction" description={`${stats.satisfaction.count} ratings · average ${stats.satisfaction.average ?? "—"}/5`} />
-          <div className="px-4 pb-5 pt-3 sm:px-5">
-            <ShareList
-              label="Ratings by number of stars"
-              items={[...stats.satisfaction.distribution].reverse().map((d) => ({ name: `${d.stars} star${d.stars === 1 ? "" : "s"}`, value: d.count }))}
-            />
-          </div>
-        </Card>
-      </div>
-    </>
+            <Card className="mb-6 p-3 sm:p-4" data-tour="analytics-filters">
+              <FilterBar
+                chips={chips}
+                onClear={() => {
+                  setCategory("");
+                  setDepartment("");
+                }}
+                trailing={
+                  <Segmented<string>
+                    label="Date range"
+                    size="sm"
+                    value={String(range)}
+                    onChange={(v) => setRange(Number(v) as Range)}
+                    options={[
+                      { value: "7", label: "7 days" },
+                      { value: "14", label: "14 days" },
+                      { value: "30", label: "30 days" },
+                    ]}
+                  />
+                }
+              >
+                <Select size="sm" aria-label="Category" value={category} onChange={(e) => setCategory(e.target.value)} wrapperClassName="w-auto">
+                  <option value="">All categories</option>
+                  {ISSUE_CATEGORIES.map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </Select>
+                <Select size="sm" aria-label="Department" value={department} onChange={(e) => setDepartment(e.target.value)} wrapperClassName="w-auto">
+                  <option value="">All departments</option>
+                  {DEPARTMENTS.map((d) => (
+                    <option key={d}>{d}</option>
+                  ))}
+                </Select>
+              </FilterBar>
+            </Card>
+
+            {scoped.length === 0 ? (
+              <Card>
+                <EmptyState title="No demo issues in this view" description="Try a longer range or clear a filter." />
+              </Card>
+            ) : (
+              <div data-tour="analytics-charts">
+                <KpiGrid className="mb-6 xl:grid-cols-4">
+                  <KpiCard label="Reported" value={scoped.length} icon={<ListChecks />} hint={`Last ${range} days`} spark={trend.map((t) => t.reported)} />
+                  <KpiCard label="Resolved" value={status.Resolved} icon={<CheckCircle2 />} tone="success" hint={`${status.Open + status["In Progress"]} still open`} spark={trend.map((t) => t.resolved)} />
+                  <KpiCard label="Avg resolution" value={formatHours(res.averageHours) ?? "—"} icon={<Timer />} hint={res.medianHours !== null ? `Median ${formatHours(res.medianHours)}` : "Nothing resolved yet"} />
+                  <KpiCard
+                    label="SLA compliance"
+                    value={compliance}
+                    format={(n) => `${n.toLocaleString("en-IN", { maximumFractionDigits: 1 })}%`}
+                    icon={<ShieldCheck />}
+                    tone={compliance !== null && compliance < 80 ? "warning" : "success"}
+                    hint={`${sla.counts.met} met · ${sla.counts.missed} missed`}
+                  />
+                </KpiGrid>
+
+                <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+                  <SectionCard id="volume" title="Issue volume" description="Reported and resolved per day">
+                    <TrendChart data={trend} caption={`Issues reported and resolved per day over the last ${range} days`} height={256} />
+                  </SectionCard>
+                  <SectionCard id="categories" title="Categories" description="Share of reports">
+                    <Donut data={cats} caption="Reports by category" centerLabel="reports" />
+                  </SectionCard>
+
+                  <SectionCard title="Priority and status" description="How each priority is progressing">
+                    <StackedBars
+                      caption="Issues by priority and status"
+                      data={(["High", "Medium", "Low"] as const).map((p) => ({
+                        name: p,
+                        Open: scoped.filter((i) => i.priority === p && i.status === "Open").length,
+                        "In Progress": scoped.filter((i) => i.priority === p && i.status === "In Progress").length,
+                        Resolved: scoped.filter((i) => i.priority === p && i.status === "Resolved").length,
+                      }))}
+                      series={[
+                        { key: "Open", name: "Open", color: chart.primary },
+                        { key: "In Progress", name: "In progress", color: chart.warning },
+                        { key: "Resolved", name: "Resolved", color: chart.secondary },
+                      ]}
+                    />
+                    <p className="mt-2 text-xs text-fg-subtle">
+                      {pri.High} high · {pri.Medium} medium · {pri.Low} low priority
+                    </p>
+                  </SectionCard>
+                  <SectionCard id="sla" title="Deadline performance" description="Where every issue stands against its target">
+                    <ShareList
+                      label="Deadline states"
+                      items={(Object.keys(SLA_LABELS) as (keyof typeof SLA_LABELS)[]).map((s) => ({
+                        name: SLA_LABELS[s],
+                        value: sla.counts[s],
+                        tone: s === "met" ? "success" : s === "breached" || s === "missed" ? "danger" : s === "approaching" ? "warning" : "brand",
+                      }))}
+                    />
+                  </SectionCard>
+
+                  <SectionCard title="Resolution time by category" description="Average hours from report to resolved">
+                    <HorizontalBars caption="Average resolution hours by category" valueLabel="Average hours" unit=" h" data={resolutionByCategory(scoped).map((r) => ({ name: r.name, value: r.averageHours }))} />
+                  </SectionCard>
+                  <SectionCard title="Satisfaction" description={sat.average !== null ? `${sat.average}/5 across ${sat.count} ratings` : "No ratings in this view"}>
+                    <ShareList label="Ratings" items={[...sat.distribution].reverse().map((d) => ({ name: `${d.stars} star${d.stars === 1 ? "" : "s"}`, value: d.count, tone: d.stars >= 4 ? "success" : d.stars === 3 ? "warning" : "danger" }))} />
+                    <p className="mt-3 flex items-center gap-1.5 text-xs text-fg-subtle">
+                      <Star className="h-3.5 w-3.5" aria-hidden="true" />
+                      Only the reporter can rate a fix, once.
+                    </p>
+                  </SectionCard>
+
+                  <SectionCard id="departments" title="Departments" description="Volume and results by responsible team" className="xl:col-span-2" flush>
+                    <TableWrap label="Department performance">
+                      <thead>
+                        <tr>
+                          {["Department", "Reports", "Open", "Avg resolution", "SLA compliance"].map((h) => (
+                            <th key={h} scope="col" className={th}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {depts.map((d) => (
+                          <tr key={d.name} className={trHover}>
+                            <th scope="row" className={`${td} text-left font-medium`}>
+                              {d.name}
+                            </th>
+                            <td className={`${td} tabular`}>{d.total}</td>
+                            <td className={`${td} tabular`}>{d.open}</td>
+                            <td className={`${td} tabular`}>{formatHours(d.averageHours) ?? "—"}</td>
+                            <td className={`${td} tabular`}>{d.compliance === null ? "—" : `${d.compliance}%`}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </TableWrap>
+                  </SectionCard>
+
+                  <SectionCard id="heatmap" title="When problems are reported" description="Reports by weekday and time of day">
+                    <Heatmap {...heat} caption="Reports by weekday and time of day" />
+                  </SectionCard>
+                  <SectionCard id="workload" title="Worker workload" description="Active and resolved tasks per worker">
+                    <StackedBars
+                      caption="Active and resolved tasks per worker"
+                      height={260}
+                      data={load.map((l) => ({ name: (DEMO_WORKERS.find((w) => w.id === l.workerId)?.name ?? l.workerId).split(" ")[0], Active: l.active, Resolved: l.resolved }))}
+                      series={[
+                        { key: "Active", name: "Active", color: chart.warning },
+                        { key: "Resolved", name: "Resolved", color: chart.secondary },
+                      ]}
+                    />
+                  </SectionCard>
+                </div>
+              </div>
+            )}
+          </>
+        );
+      }}
+    </ViewerGate>
   );
 }

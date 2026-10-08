@@ -2,10 +2,10 @@ import React from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 
-/** Product mark: a solid navy tile with a simple wrench-and-check glyph. */
+/** Product mark: an indigo-to-violet tile with a simple wrench-and-check glyph. */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#0f2557] text-white dark:bg-[#2f62d6]", className)} aria-hidden="true">
+    <span className={cn("inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#4f46e5] to-[#7c3aed] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_4px_10px_-4px_var(--glow)]", className)} aria-hidden="true">
       <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 12.5l4.5 4.5L20 6" />
       </svg>

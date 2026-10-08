@@ -20,7 +20,7 @@ export default function StatusScreen({
   tone?: "neutral" | "danger";
 }) {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-canvas px-4 py-12">
+    <div className="flex min-h-dvh items-center justify-center px-4 py-12">
       <div role={tone === "danger" ? "alert" : undefined} className="w-full max-w-sm text-center">
         <LogoMark className="mx-auto mb-6 h-9 w-9" />
         {code && <p className={cn("tabular mb-1 text-sm font-medium", tone === "danger" ? "text-danger" : "text-fg-subtle")}>{code}</p>}
@@ -35,8 +35,8 @@ export default function StatusScreen({
 /** Neutral app-shaped placeholder while auth/profile load (no spinner wall). */
 export function ShellSkeleton() {
   return (
-    <div className="flex min-h-dvh bg-canvas" role="status" aria-label="Loading">
-      <div className="hidden w-60 shrink-0 border-r border-border bg-surface p-4 lg:block">
+    <div className="flex min-h-dvh" role="status" aria-label="Loading">
+      <div className="glass-bar relative hidden w-60 shrink-0 border-r p-4 lg:block">
         <div className="skeleton mb-8 h-7 w-28" />
         {Array.from({ length: 5 }, (_, i) => (
           <div key={i} className="skeleton mb-3 h-6 w-full" />

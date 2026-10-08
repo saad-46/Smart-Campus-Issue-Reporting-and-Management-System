@@ -72,8 +72,8 @@ export default function Dialog({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          "relative flex max-h-[min(90dvh,48rem)] w-full flex-col bg-surface shadow-lg outline-none",
-          "rounded-t-xl border-t border-border animate-sheet-in sm:animate-dialog-in sm:rounded-lg sm:border",
+          "glass-blur relative flex max-h-[min(90dvh,48rem)] w-full flex-col outline-none",
+          "rounded-t-xl animate-sheet-in sm:animate-dialog-in sm:rounded-xl",
           widths[size],
           className
         )}

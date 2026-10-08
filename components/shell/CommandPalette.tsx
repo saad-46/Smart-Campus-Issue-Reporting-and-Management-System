@@ -175,7 +175,7 @@ export default function CommandPalette({ open, onClose, pages }: { open: boolean
         role="dialog"
         aria-modal="true"
         aria-label="Search"
-        className="relative flex max-h-[70dvh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-lg animate-dialog-in"
+        className="relative flex max-h-[70dvh] w-full max-w-xl flex-col glass-blur overflow-hidden rounded-xl animate-dialog-in"
       >
         <div className="flex items-center gap-2.5 border-b border-border px-4">
           <Search className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />

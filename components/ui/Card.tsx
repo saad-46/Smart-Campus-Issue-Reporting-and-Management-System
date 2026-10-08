@@ -1,5 +1,5 @@
 // ============================================
-// Card — a bordered surface. Not every block needs one: use cards to
+// Card — a glass surface. Not every block needs one: use cards to
 // group related content, not to decorate.
 // ============================================
 
@@ -19,8 +19,8 @@ export default function Card({ as: Tag = "div", interactive, padded = false, cla
   return (
     <Tag
       className={cn(
-        "rounded-lg border border-border bg-surface",
-        interactive && "transition-[border-color,box-shadow] duration-150 hover:border-border-strong hover:shadow-sm",
+        "glass rounded-xl",
+        interactive && "lift",
         padded && "p-4 sm:p-5",
         className
       )}
