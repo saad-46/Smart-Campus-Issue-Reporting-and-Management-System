@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Field";
 import { Notice } from "@/components/ui/States";
 import { recommendWorkers } from "@/lib/intelligence/assignment";
-import { DemoIssue, DEMO_WORKERS, workerName } from "@/lib/viewer/demoData";
+import { DemoIssue } from "@/lib/viewer/demoData";
 import { LIMITS } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { ReceiptPreview } from "./DemoImage";
@@ -32,7 +32,7 @@ interface DialogProps {
 
 /** Ranked worker suggestions, exactly as the admin issue page computes them. */
 export function AssignDialog({ issue, onClose }: DialogProps) {
-  const { data, stats, assignIssue } = useViewer();
+  const { data, stats, assignIssue, workers } = useViewer();
   const [choice, setChoice] = useState("");
   const firstRef = useRef<HTMLButtonElement>(null);
 
@@ -41,8 +41,8 @@ export function AssignDialog({ issue, onClose }: DialogProps) {
     const sums = new Map<string, { total: number; count: number }>();
     for (const i of data.issues) if (i.feedback && i.assignedTo) sums.set(i.assignedTo, { total: (sums.get(i.assignedTo)?.total ?? 0) + i.feedback.rating, count: (sums.get(i.assignedTo)?.count ?? 0) + 1 });
     const ratings = new Map([...sums].map(([id, s]) => [id, { average: Math.round((s.total / s.count) * 10) / 10, count: s.count }]));
-    return recommendWorkers(issue, DEMO_WORKERS.map((w) => ({ id: w.id, name: w.name })), stats.rawWorkload, ratings);
-  }, [issue, data, stats]);
+    return recommendWorkers(issue, workers.map((w) => ({ id: w.id, name: w.name })), stats.rawWorkload, ratings);
+  }, [issue, data, stats, workers]);
 
   useEffect(() => {
     if (issue) setChoice(issue.assignedTo || ranked[0]?.workerId || "");
@@ -76,8 +76,9 @@ export function AssignDialog({ issue, onClose }: DialogProps) {
       <DemoNote />
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-fg">Suggested workers for {issue.category}</legend>
-        <div className="space-y-2">
-          {ranked.slice(0, 5).map((r, i) => (
+        {/* Everyone with worker access, best match first, as the signed-in assign dialog lists them. */}
+        <div className="-mr-2 max-h-[22rem] space-y-2 overflow-y-auto pr-2">
+          {ranked.map((r, i) => (
             <label
               key={r.workerId}
               className={cn("flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors", choice === r.workerId ? "border-brand bg-brand-subtle" : "border-border hover:bg-surface-hover")}
@@ -211,7 +212,7 @@ export function ClaimDialog({ issue, onClose }: DialogProps) {
 
 /** Decision on a pending claim. Approving is a demo payment: no transaction exists. */
 export function PayDialog({ issue, onClose }: DialogProps) {
-  const { decideClaim } = useViewer();
+  const { decideClaim, workerName } = useViewer();
   const ref = useRef<HTMLButtonElement>(null);
   if (!issue?.claim) return null;
   const { claim } = issue;

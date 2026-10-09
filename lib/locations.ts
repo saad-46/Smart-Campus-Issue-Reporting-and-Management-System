@@ -9,9 +9,8 @@ import { ValidationError } from "./errors";
 import { ListenerErrorHandler } from "./firestore";
 import { track } from "./listeners";
 import { normalizeCampusLocation } from "./models";
-import { getBuilding, slugifyLocation } from "./campus";
+import { NewLocationInput, isLocationIdShape, validateLocationInput } from "./sharedRules";
 import { DEFAULT_SLA_CONFIG, normalizeSlaConfig, validateSlaHours } from "./intelligence/sla";
-import { cleanText } from "./validation";
 
 const LOCATIONS = "campusLocations";
 /** Upper bound on QR locations loaded at once (admin-managed, normally far fewer). */
@@ -23,28 +22,14 @@ export async function listCampusLocations(): Promise<CampusLocation[]> {
 }
 
 export async function getCampusLocation(id: string): Promise<CampusLocation | null> {
-  if (!/^[a-z0-9-]{1,60}$/.test(id)) return null;
+  if (!isLocationIdShape(id)) return null;
   const snap = await getDoc(doc(db, LOCATIONS, id));
   return snap.exists() ? normalizeCampusLocation(snap.id, snap.data()) : null;
 }
 
-export interface NewLocationInput {
-  name: string;
-  buildingId: string;
-  floor: string;
-  room: string;
-}
-
-export function validateLocationInput(input: NewLocationInput): NewLocationInput & { id: string } {
-  const name = cleanText(input.name).slice(0, 80);
-  const floor = cleanText(input.floor).slice(0, 10);
-  const room = cleanText(input.room).slice(0, 20);
-  if (!name) throw new ValidationError("Give the location a name.");
-  if (input.buildingId && !getBuilding(input.buildingId)) throw new ValidationError("Choose a building from the list.");
-  const id = slugifyLocation([input.buildingId, name, room].filter(Boolean).join(" "));
-  if (!id) throw new ValidationError("The name needs at least one letter or number.");
-  return { id, name, buildingId: input.buildingId, floor, room };
-}
+// The input rules live in lib/sharedRules.ts so Explore Mode validates with the same code.
+export { validateLocationInput };
+export type { NewLocationInput };
 
 /** Admin only (enforced by the rules). Fails if the id is already taken. */
 export async function createCampusLocation(input: NewLocationInput): Promise<CampusLocation> {

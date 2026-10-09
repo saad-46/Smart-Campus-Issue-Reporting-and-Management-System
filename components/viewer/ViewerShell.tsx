@@ -3,30 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Bell,
-  ChartLine,
-  CircleQuestionMark,
-  ClipboardList,
-  Eye,
-  FilePlus2,
-  GraduationCap,
-  HardHat,
-  History,
-  LayoutDashboard,
-  ListChecks,
-  LogOut,
-  Map as MapIcon,
-  MapPin,
-  Search,
-  Settings,
-  ShieldCheck,
-  Users,
-  Wallet,
-  Workflow,
-  Wrench,
-  Globe2,
-} from "lucide-react";
+import { Bell, ChartLine, CircleQuestionMark, ClipboardList, Eye, FilePlus2, Globe2, GraduationCap, HardHat, History, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, MapPin, RotateCcw, Search, Settings, ShieldCheck, Users, Wallet, Workflow, Wrench } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { IconButton, buttonClasses } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Data";
@@ -34,6 +11,7 @@ import Logo from "@/components/shell/Logo";
 import ShellFrame from "@/components/shell/ShellFrame";
 import type { NavGroup } from "@/components/shell/nav";
 import { cn } from "@/lib/cn";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import { navForViewerRole, VIEWER_PERSPECTIVES, ViewerIcon, VIEWER_ROLE_LABELS } from "@/lib/viewer/nav";
 import { useViewer } from "./viewerContext";
 import ViewerNotificationBell from "./ViewerNotificationBell";
@@ -113,10 +91,34 @@ function PerspectiveSwitcher() {
 
 /** Compact reminder that nothing here is real. */
 function DemoStrip() {
+  const { changes, resetDemo, data } = useViewer();
+  const [confirm, setConfirm] = useState(false);
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-brand-subtle-border bg-brand-subtle/60 px-3 py-1.5 text-[13px] text-fg-muted sm:px-4 lg:px-6">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-subtle-border bg-brand-subtle/60 px-3 py-1.5 text-[13px] text-fg-muted sm:px-4 lg:px-6">
       <ViewerBadge />
-      <span>A safe demo on the real SUES campus map: the issues are samples, no real campus data is read or changed, and nothing you do is saved.</span>
+      <span className="min-w-0 flex-1 basis-64">A safe demo on the real SUES campus map: the issues are samples, no real campus data is read or changed, and nothing you do is saved.</span>
+      <button
+        type="button"
+        disabled={!data}
+        onClick={() => (changes > 0 ? setConfirm(true) : resetDemo())}
+        data-testid="reset-demo"
+        className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-brand-fg hover:bg-brand-subtle hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
+      >
+        <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+        Reset demo
+        {changes > 0 && <span className="tabular rounded-full bg-brand px-1.5 text-[11px] font-semibold text-on-brand" aria-label={`${changes} simulated change${changes === 1 ? "" : "s"}`}>{changes}</span>}
+      </button>
+      <ConfirmDialog
+        open={confirm}
+        title="Reset the demo?"
+        description={`Your ${changes} simulated change${changes === 1 ? "" : "s"} will be discarded and the sample data returns to its starting point. Nothing real is affected.`}
+        confirmLabel="Reset demo"
+        onConfirm={() => {
+          resetDemo();
+          setConfirm(false);
+        }}
+        onCancel={() => setConfirm(false)}
+      />
     </div>
   );
 }

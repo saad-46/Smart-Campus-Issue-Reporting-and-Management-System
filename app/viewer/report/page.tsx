@@ -13,12 +13,13 @@ import { Notice } from "@/components/ui/States";
 import Panel from "@/components/issue/Panel";
 import { ViewerGate, ViewerLoading, ReadyViewer } from "@/components/viewer/parts";
 import { IssuePhoto } from "@/components/viewer/DemoImage";
-import { analyzeIssueDetails } from "@/services/aiService";
+import { analyzeIssueDetails, parseChatMessage } from "@/services/aiService";
 import { findDuplicates } from "@/lib/intelligence/similarity";
-import { DEMO_LOCATIONS, DemoIssue, demoLocation } from "@/lib/viewer/demoData";
+import { DemoIssue } from "@/lib/viewer/demoData";
+import { Segmented } from "@/components/ui/Tabs";
 import CampusMap from "@/components/admin/CampusMap";
 import { VERIFICATION_TONE } from "@/components/viewer/verification";
-import { VERIFICATION_LABELS, getBuilding, getCanonicalLocation, institutionName } from "@/lib/campus";
+import { VERIFICATION_LABELS, findCanonicalLocation, getBuilding, institutionName } from "@/lib/campus";
 import { ISSUE_CATEGORIES, LIMITS, PRIORITIES, departmentFor } from "@/lib/constants";
 import { Priority } from "@/types";
 
@@ -27,9 +28,9 @@ const CAMPUS_NAME = "SUES campus, Mount Pleasant";
 function ReportForm({ viewer }: { viewer: ReadyViewer }) {
   const params = useSearchParams();
   // A QR code carries only a stable location id; anything unknown or retired is refused, never guessed.
+  // The id is looked up in the demo's own location list (researched places plus any added in this visit).
   const requested = params.get("location") ?? "";
-  const known = getCanonicalLocation(requested);
-  const initialLocation = demoLocation(requested) && known?.isActive ? requested : "";
+  const initialLocation = viewer.findLocation(requested)?.id ?? "";
   const unknownQr = requested !== "" && initialLocation === "";
   const [landmark, setLandmark] = useState("");
   const [mapOpen, setMapOpen] = useState(false);
@@ -42,7 +43,7 @@ function ReportForm({ viewer }: { viewer: ReadyViewer }) {
   const [errors, setErrors] = useState<{ title?: string; description?: string; location?: string }>({});
   const [created, setCreated] = useState<DemoIssue | null>(null);
 
-  const place = demoLocation(locationId);
+  const place = viewer.findLocation(locationId);
   const analysis = useMemo(
     () => (title.trim().length >= 4 || description.trim().length >= 10 ? analyzeIssueDetails({ title, description, location: place?.name ?? "" }) : null),
     [title, description, place]
@@ -127,7 +128,7 @@ function ReportForm({ viewer }: { viewer: ReadyViewer }) {
           )}
           <Select label="Location" value={locationId} onChange={(e) => setLocationId(e.target.value)} error={errors.location} required hint="Scanning a location's QR code fills this in. You can also pick the place on the map.">
             <option value="">Choose a place…</option>
-            {DEMO_LOCATIONS.map((l) => (
+            {viewer.locations.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
               </option>
@@ -158,7 +159,7 @@ function ReportForm({ viewer }: { viewer: ReadyViewer }) {
                   unplaced={0}
                   selectedId={place?.buildingId || null}
                   onSelect={(id) => {
-                    const first = DEMO_LOCATIONS.find((l) => l.buildingId === id);
+                    const first = viewer.locations.find((l) => l.buildingId === id);
                     if (first) setLocationId(first.id);
                   }}
                 />
@@ -251,11 +252,156 @@ function ReportForm({ viewer }: { viewer: ReadyViewer }) {
   );
 }
 
+type Parsed = Awaited<ReturnType<typeof parseChatMessage>>;
+
+/**
+ * Quick report: one message in, a structured report out. The extracted
+ * title, place and suggested category are shown for review before anything
+ * is submitted. The same parser as the signed-in quick report.
+ */
+function QuickReport({ viewer }: { viewer: ReadyViewer }) {
+  const params = useSearchParams();
+  const preset = viewer.findLocation(params.get("location") ?? "");
+  const [text, setText] = useState("");
+  const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [locationId, setLocationId] = useState(preset?.id ?? "");
+  const [error, setError] = useState("");
+  const [created, setCreated] = useState<DemoIssue | null>(null);
+
+  const review = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (text.trim().length < 8) return setError("Describe the problem in a few words, including where it is.");
+    setError("");
+    setParsing(true);
+    const result = await parseChatMessage(text);
+    setParsing(false);
+    setParsed(result);
+    // A place is only pre-selected when the message names a known campus location.
+    if (!preset) setLocationId(viewer.findLocation(findCanonicalLocation(text)?.id)?.id ?? "");
+  };
+
+  const submit = () => {
+    if (!parsed) return;
+    if (!locationId) return setError("Choose where the problem is.");
+    const description = parsed.description.length >= 10 ? parsed.description : `${parsed.description} (quick report)`;
+    const issue = viewer.createIssue({ title: parsed.title, description, locationId, category: parsed.category, priority: parsed.priority, withPhoto: false });
+    if (issue) setCreated(issue);
+  };
+
+  if (created) {
+    return (
+      <Card className="mx-auto max-w-xl p-6 text-center sm:p-8">
+        <CheckCircle2 className="mx-auto h-8 w-8 text-success" aria-hidden="true" />
+        <h2 className="mt-3 text-lg font-semibold text-fg">Demo report submitted</h2>
+        <p className="mt-1 text-sm text-fg-muted">{created.id} was added to this demo only. Nothing was saved.</p>
+        <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+          <Link href={`/viewer/issues/${created.id}`} className={buttonClasses("primary")}>
+            Open {created.id}
+          </Link>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setCreated(null);
+              setParsed(null);
+              setText("");
+            }}
+          >
+            Report another
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mx-auto max-w-2xl space-y-4 p-4 sm:p-5">
+      <Notice tone="info">
+        <span className="flex items-start gap-2">
+          <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          Demo mode: submitting adds a sample report to this visit only.
+        </span>
+      </Notice>
+      {!parsed ? (
+        <form onSubmit={review} noValidate className="space-y-4">
+          <Textarea
+            label="What is wrong, and where?"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={4}
+            maxLength={LIMITS.description}
+            error={error || undefined}
+            placeholder="e.g. The projector in the Seminar Hall does not turn on since this morning."
+            required
+          />
+          <Button type="submit" isLoading={parsing}>
+            Review report
+          </Button>
+        </form>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border bg-surface-2/60 p-3" data-testid="quick-review">
+            <p className="text-sm font-medium text-fg">{parsed.title}</p>
+            <p className="mt-1 whitespace-pre-wrap text-[13px] text-fg-muted">{parsed.description}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <PriorityBadge priority={parsed.priority} />
+              <Badge>{parsed.category}</Badge>
+              <span className="text-xs text-fg-subtle">Suggested by keyword rules; staff can change it.</span>
+            </div>
+          </div>
+          <Select
+            label="Location"
+            value={locationId}
+            onChange={(e) => setLocationId(e.target.value)}
+            error={error || undefined}
+            required
+            hint={preset ? "From the QR code you scanned." : "Picked from your message when it names a known place. Check it."}
+          >
+            <option value="">Choose a place…</option>
+            {viewer.locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </Select>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={submit}>Submit report (demo)</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setParsed(null);
+                setError("");
+              }}
+            >
+              Edit message
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function ReportInner() {
+  const [mode, setMode] = useState<"form" | "quick">("form");
   return (
     <>
-      <PageHeader title="Report an issue" description="Tell the campus team what needs fixing. Suggestions appear as you type." />
-      <ViewerGate>{(viewer) => <ReportForm viewer={viewer} />}</ViewerGate>
+      <PageHeader
+        title="Report an issue"
+        description="Tell the campus team what needs fixing. Suggestions appear as you type."
+        actions={
+          <Segmented
+            label="Report mode"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "form", label: "Full form" },
+              { value: "quick", label: "Quick report" },
+            ]}
+          />
+        }
+      />
+      <ViewerGate>{(viewer) => (mode === "quick" ? <QuickReport viewer={viewer} /> : <ReportForm viewer={viewer} />)}</ViewerGate>
     </>
   );
 }

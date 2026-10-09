@@ -11,17 +11,11 @@ import { QUERY_LIMITS } from "./constants";
 import { ValidationError, assertOnline } from "./errors";
 import { normalizeFeedback } from "./models";
 import { queueEvent } from "./timeline";
-import { cleanText } from "./validation";
+import { FEEDBACK_COMMENT_MAX, validateFeedbackInput } from "./sharedRules";
 
 const FEEDBACK = "feedback";
-export const FEEDBACK_COMMENT_MAX = 500;
-
-export function validateFeedbackInput(rating: number, comment: string): { rating: number; comment: string } {
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new ValidationError("Please choose a rating from 1 to 5 stars.");
-  const text = cleanText(comment, true);
-  if (text.length > FEEDBACK_COMMENT_MAX) throw new ValidationError(`Comments must be ${FEEDBACK_COMMENT_MAX} characters or fewer.`);
-  return { rating, comment: text };
-}
+// The input rules live in lib/sharedRules.ts so Explore Mode validates with the same code.
+export { FEEDBACK_COMMENT_MAX, validateFeedbackInput };
 
 export async function submitFeedback(issue: Issue, userId: string, rating: number, comment: string): Promise<void> {
   const input = validateFeedbackInput(rating, comment);

@@ -28,6 +28,7 @@ import { queueNotification } from "./notifications";
 import { queueEvent } from "./timeline";
 import { parseAmount } from "./validation";
 import { payoutNote } from "./claims";
+import { assertRealId } from "./sharedRules";
 
 const BUDGET_ID = "budget";
 const FINANCE_COLLECTION = "finance";
@@ -155,6 +156,7 @@ export async function setWorkerAccess(
  * can't pay the same claim twice.
  */
 export async function approveClaim(issueId: string, workerName: string, adminId: string): Promise<void> {
+  assertRealId(issueId, "issue");
   const budgetRef = doc(db, FINANCE_COLLECTION, BUDGET_ID);
   const issueRef = doc(db, ISSUES_COLLECTION, issueId);
   const newTxRef = doc(collection(db, TRANSACTIONS_COLLECTION));
@@ -233,6 +235,7 @@ export async function approveClaim(issueId: string, workerName: string, adminId:
 
 /** Reject a receipt claim */
 export async function rejectReceipt(issueId: string, adminId: string): Promise<void> {
+  assertRealId(issueId, "issue");
   const issueRef = doc(db, ISSUES_COLLECTION, issueId);
 
   await runTransaction(db, async (transaction) => {

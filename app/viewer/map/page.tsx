@@ -23,7 +23,9 @@ import {
   PLACE_TYPE_LABELS,
   PlaceType,
   VERIFICATION_LABELS,
+  VERIFICATION_MEANINGS,
   VerificationStatus,
+  researchSource,
   buildingForIssue,
   getBuilding,
   institutionName,
@@ -31,7 +33,6 @@ import {
 import { computeSla } from "@/lib/intelligence/sla";
 import { hotspots as computeHotspots } from "@/lib/intelligence/analytics";
 import { ISSUE_CATEGORIES, ISSUE_STATUSES, PRIORITIES } from "@/lib/constants";
-import { LOCATION_BUILDINGS } from "@/lib/viewer/demoStats";
 import { formatRelative } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 
@@ -66,15 +67,15 @@ export default function ViewerMapPage() {
 
   return (
     <ViewerGate>
-      {({ data, stats, slaConfig }) => {
+      {({ data, stats, slaConfig, locations }) => {
         const since = data.now.getTime() - Number(f.days) * DAY;
         const issues = data.issues.filter(
           (i) => i.createdAt.getTime() >= since && (!f.category || i.category === f.category) && (!f.status || i.status === f.status) && (!f.priority || i.priority === f.priority)
         );
-        const spots = computeHotspots(issues, LOCATION_BUILDINGS);
+        const spots = computeHotspots(issues, stats.locationBuildings);
         const values = new Map<string, number>();
         const add = (id: string | undefined, n = 1) => id && values.set(id, (values.get(id) ?? 0) + n);
-        const placeOf = (i: (typeof issues)[number]) => buildingForIssue(i, LOCATION_BUILDINGS)?.id;
+        const placeOf = (i: (typeof issues)[number]) => buildingForIssue(i, stats.locationBuildings)?.id;
 
         if (layer === "incidents") {
           const active = new Set(stats.incidents.filter((c) => c.status !== "Resolved").flatMap((c) => [c.masterIssueId, ...c.relatedIssueIds]));
@@ -117,7 +118,7 @@ export default function ViewerMapPage() {
         const here = issues.filter((i) => placeOf(i) === selected).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         const openHere = here.filter((i) => i.status !== "Resolved");
         const risks = stats.risk.sufficient ? stats.risk.indicators.filter((r) => r.buildingId === selected) : [];
-        const locationsHere = CAMPUS_LOCATIONS.filter((l) => l.placeId === selected && l.isActive);
+        const locationsHere = locations.filter((l) => l.buildingId === selected);
 
         return (
           <>
@@ -258,6 +259,21 @@ export default function ViewerMapPage() {
                         {institutionName(place.institutionId, true) && <Badge>{institutionName(place.institutionId, true)}</Badge>}
                       </div>
                       <p className="text-[13px] leading-relaxed text-fg-muted">{place.notes}</p>
+                      <p className="text-xs text-fg-subtle" data-testid="place-sources">
+                        {VERIFICATION_MEANINGS[place.verificationStatus]} Based on:{" "}
+                        {place.sourceIds
+                          .map((id) => researchSource(id))
+                          .filter((s): s is NonNullable<typeof s> => !!s)
+                          .map((s, k) => (
+                            <React.Fragment key={s.id}>
+                              {k > 0 && "; "}
+                              <a href={s.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-fg">
+                                {s.title}
+                              </a>
+                            </React.Fragment>
+                          ))}
+                        .
+                      </p>
                       <DescriptionList
                         columns={2}
                         items={[

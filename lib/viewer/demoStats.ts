@@ -19,11 +19,11 @@ import {
   workerWorkload,
 } from "@/lib/intelligence/analytics";
 import { DEFAULT_SLA_CONFIG, computeSla } from "@/lib/intelligence/sla";
-import { confirmedClusters } from "@/lib/intelligence/similarity";
+import { confirmedClusters, suggestClusters } from "@/lib/intelligence/similarity";
 import { generateInsights } from "@/lib/intelligence/insights";
 import { maintenanceRisk } from "@/lib/intelligence/maintenance";
 import { payoutNote } from "@/lib/claims";
-import { DEMO_BUDGET_TOTAL, DEMO_LOCATIONS, DEMO_PERSONA, DEMO_WINDOW_DAYS, DEMO_WORKERS, DemoData, DemoIssue } from "./demoData";
+import { DEMO_BUDGET_TOTAL, DEMO_LOCATIONS, DEMO_PERSONA, DEMO_WINDOW_DAYS, DEMO_WORKERS, DemoData, DemoIssue, DemoLocation, DemoWorker } from "./demoData";
 
 export { DEMO_WINDOW_DAYS };
 
@@ -50,7 +50,7 @@ export interface DemoTransaction {
   at: Date;
 }
 
-export function finance(issues: DemoIssue[]) {
+export function finance(issues: DemoIssue[], budget: number = DEMO_BUDGET_TOTAL) {
   const claims = issues.filter((i) => i.claim).map((i) => ({ issue: i, claim: i.claim! }));
   const sum = (status: "pending" | "approved" | "rejected") =>
     claims.filter((c) => c.claim.status === status).reduce((s, c) => s + c.claim.amount, 0);
@@ -63,15 +63,15 @@ export function finance(issues: DemoIssue[]) {
       workerId: c.issue.assignedTo,
       amount: c.claim.amount,
       note: payoutNote(c.issue.title, c.claim.description),
-      at: new Date((c.issue.resolvedAt ?? c.issue.createdAt).getTime() + 2 * HOUR),
+      at: c.claim.decidedAt ?? new Date((c.issue.resolvedAt ?? c.issue.createdAt).getTime() + 2 * HOUR),
     }))
     .sort((a, b) => b.at.getTime() - a.at.getTime());
   const spendByCategory = new Map<string, number>();
   for (const c of claims) if (c.claim.status === "approved") spendByCategory.set(c.issue.category, (spendByCategory.get(c.issue.category) ?? 0) + c.claim.amount);
   return {
-    budget: DEMO_BUDGET_TOTAL,
+    budget,
     spent,
-    available: DEMO_BUDGET_TOTAL - spent,
+    available: budget - spent,
     pendingAmount: sum("pending"),
     pendingCount: claims.filter((c) => c.claim.status === "pending").length,
     rejectedCount: claims.filter((c) => c.claim.status === "rejected").length,
@@ -122,8 +122,19 @@ export function departmentStats(issues: DemoIssue[], config: SlaConfig, now: Dat
     .sort((a, b) => b.total - a.total);
 }
 
-export function demoStats(data: DemoData, config: SlaConfig = DEFAULT_SLA_CONFIG) {
+/** What simulated actions can change besides the issues: the team, the budget and the location list. */
+export interface DemoStatsExtras {
+  workers?: DemoWorker[];
+  budget?: number;
+  locations?: DemoLocation[];
+}
+
+export function demoStats(data: DemoData, config: SlaConfig = DEFAULT_SLA_CONFIG, extras: DemoStatsExtras = {}) {
   const { issues, now } = data;
+  const team = extras.workers ?? DEMO_WORKERS;
+  const places = extras.locations ?? DEMO_LOCATIONS;
+  const locationBuildings = extras.locations ? new Map(places.map((l) => [l.id, l.buildingId])) : LOCATION_BUILDINGS;
+  const locationNames = extras.locations ? new Map(places.map((l) => [l.id, l.name])) : LOCATION_NAMES;
   const sla = slaSummary(issues, config, now);
   const open = issues.filter((i) => i.status !== "Resolved");
   const from = new Date(now.getTime() - (DEMO_WINDOW_DAYS - 1) * DAY);
@@ -146,7 +157,7 @@ export function demoStats(data: DemoData, config: SlaConfig = DEFAULT_SLA_CONFIG
 
   const ratingsByWorker = new Map<string, number[]>();
   for (const i of issues) if (i.feedback && i.assignedTo) ratingsByWorker.set(i.assignedTo, [...(ratingsByWorker.get(i.assignedTo) ?? []), i.feedback.rating]);
-  const fin = finance(issues);
+  const fin = finance(issues, extras.budget);
 
   return {
     total: issues.length,
@@ -179,8 +190,9 @@ export function demoStats(data: DemoData, config: SlaConfig = DEFAULT_SLA_CONFIG
       resolved: trend.slice(-14).map((d) => d.resolved),
       backlog,
     },
-    map: hotspots(issues, LOCATION_BUILDINGS),
-    workload: DEMO_WORKERS.map((w) => {
+    locationBuildings,
+    map: hotspots(issues, locationBuildings),
+    workload: team.map((w) => {
       const load = workload.find((l) => l.workerId === w.id) ?? { active: 0, resolved: 0, averageResolutionHours: null, resolvedByCategory: {} };
       const ratings = ratingsByWorker.get(w.id) ?? [];
       return {
@@ -193,8 +205,9 @@ export function demoStats(data: DemoData, config: SlaConfig = DEFAULT_SLA_CONFIG
     }),
     rawWorkload: workload,
     incidents: confirmedClusters(issues),
-    insights: generateInsights(issues, 14, config, now, LOCATION_BUILDINGS),
-    risk: maintenanceRisk(issues, now, LOCATION_BUILDINGS, LOCATION_NAMES),
+    suggestedIncidents: suggestClusters(issues),
+    insights: generateInsights(issues, 14, config, now, locationBuildings),
+    risk: maintenanceRisk(issues, now, locationBuildings, locationNames),
     satisfaction: satisfaction(issues),
     finance: fin,
     departments: departmentStats(issues, config, now),

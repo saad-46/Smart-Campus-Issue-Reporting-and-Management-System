@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Banknote, Hourglass, PiggyBank, Wallet } from "lucide-react";
+import { Banknote, Hourglass, PiggyBank, Plus, Wallet } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -15,7 +15,10 @@ import { currency } from "@/components/admin/Kpi";
 import { Donut } from "@/components/viewer/charts";
 import { PayDialog } from "@/components/viewer/ActionDialogs";
 import { SectionCard, ViewerGate } from "@/components/viewer/parts";
-import { DemoIssue, workerName } from "@/lib/viewer/demoData";
+import { DEMO_BUDGET_TOTAL, DemoIssue } from "@/lib/viewer/demoData";
+import Dialog from "@/components/ui/Dialog";
+import { Input } from "@/components/ui/Field";
+import { LIMITS } from "@/lib/constants";
 import { formatDate } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 
@@ -27,10 +30,13 @@ export default function ViewerFinancePage() {
   const [tab, setTab] = useState<Tab>("pending");
   const [page, setPage] = useState(1);
   const [paying, setPaying] = useState<DemoIssue | null>(null);
+  const [fundsOpen, setFundsOpen] = useState(false);
+  const [funds, setFunds] = useState("");
+  const [fundsError, setFundsError] = useState("");
 
   return (
     <ViewerGate>
-      {({ stats }) => {
+      {({ stats, workerName, addFunds }) => {
         const f = stats.finance;
         const shown = f.claims.filter((c) => tab === "all" || c.claim.status === tab).sort((a, b) => (b.issue.resolvedAt?.getTime() ?? 0) - (a.issue.resolvedAt?.getTime() ?? 0));
         const counts = { pending: f.pendingCount, approved: f.claims.filter((c) => c.claim.status === "approved").length, rejected: f.rejectedCount, all: f.claims.length };
@@ -40,11 +46,19 @@ export default function ViewerFinancePage() {
 
         return (
           <>
-            <PageHeader title="Finance" description="Budget, expense claims and the payment ledger. Approving a claim here is a demo: no money moves." />
+            <PageHeader
+              title="Finance"
+              description="Budget, expense claims and the payment ledger. Approving a claim here is a demo: no money moves."
+              actions={
+                <Button variant="secondary" icon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setFunds(""); setFundsError(""); setFundsOpen(true); }}>
+                  Add funds
+                </Button>
+              }
+            />
 
             <div data-tour="finance-summary" className="mb-6">
               <KpiGrid className="xl:grid-cols-4">
-                <KpiCard label="Budget" value={f.budget} format={currency} icon={<Wallet />} hint="Sample annual maintenance budget" />
+                <KpiCard label="Budget" value={f.budget} format={currency} icon={<Wallet />} hint={f.budget > DEMO_BUDGET_TOTAL ? "Includes funds added in this demo" : "Sample annual maintenance budget"} />
                 <KpiCard label="Spent" value={f.spent} format={currency} icon={<Banknote />} tone="brand" hint={`${usedPct}% of budget`} />
                 <KpiCard label="Available" value={f.available} format={currency} icon={<PiggyBank />} tone="success" hint="Before pending claims" />
                 <KpiCard label="Pending claims" value={f.pendingCount} icon={<Hourglass />} tone={f.pendingCount ? "warning" : "success"} hint={currency(f.pendingAmount)} />
@@ -150,6 +164,37 @@ export default function ViewerFinancePage() {
             </SectionCard>
 
             <PayDialog issue={paying} onClose={() => setPaying(null)} />
+
+            <Dialog
+              open={fundsOpen}
+              onClose={() => setFundsOpen(false)}
+              title="Add funds"
+              description="Increase the maintenance budget available for paying claims. Demo only: no real money moves."
+              size="sm"
+              footer={
+                <>
+                  <Button variant="secondary" onClick={() => setFundsOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" form="demo-add-funds">
+                    Add funds (demo)
+                  </Button>
+                </>
+              }
+            >
+              <form
+                id="demo-add-funds"
+                noValidate
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const problem = addFunds(funds);
+                  setFundsError(problem ?? "");
+                  if (!problem) setFundsOpen(false);
+                }}
+              >
+                <Input label="Amount" type="number" inputMode="decimal" min={1} max={LIMITS.maxFundsAmount} step="0.01" value={funds} onChange={(e) => setFunds(e.target.value)} error={fundsError || undefined} placeholder="e.g. 50000" required />
+              </form>
+            </Dialog>
           </>
         );
       }}

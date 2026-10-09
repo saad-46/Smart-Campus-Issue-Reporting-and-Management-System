@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { AlarmClock, CheckCircle2, ClipboardList, Play, Receipt, Wallet } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import RepairTip from "@/components/issue/RepairTip";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
@@ -66,6 +67,7 @@ export default function ViewerWorkerPage() {
                   now={data.now}
                   config={slaConfig}
                   label="Assigned tasks"
+                  footerFor={(i) => <RepairTip issue={i} />}
                   actionFor={(i) =>
                     i.status === "Open" ? (
                       <Button size="sm" onClick={() => startIssue(i.id)} icon={<Play className="h-3.5 w-3.5" aria-hidden="true" />}>

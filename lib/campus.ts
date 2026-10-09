@@ -19,6 +19,7 @@
 import campusJson from "@/data/campuses/sues-hyderabad/campus.json";
 import institutionsJson from "@/data/campuses/sues-hyderabad/institutions.json";
 import locationsJson from "@/data/campuses/sues-hyderabad/locations.json";
+import sourcesJson from "@/data/campuses/sues-hyderabad/research-sources.json";
 
 export type VerificationStatus = "verified" | "corroborated" | "approximate" | "conflicting" | "unverified";
 
@@ -51,6 +52,12 @@ export const INSTITUTIONS_ELSEWHERE = institutionsJson.elsewhere;
 export function institutionName(id: string | null | undefined, short = false): string | undefined {
   const i = INSTITUTIONS.find((x) => x.id === id);
   return i ? (short ? i.shortName : i.name) : undefined;
+}
+
+/** The research source behind a record: its title, kind and link (see docs/SUES_CAMPUS_RESEARCH.md). */
+export function researchSource(id: string): { id: string; title: string; kind: string; url: string } | undefined {
+  const s = sourcesJson.sources.find((x) => x.id === id);
+  return s ? { id: s.id, title: s.title, kind: s.kind, url: s.url } : undefined;
 }
 
 // ---------- Projection ----------

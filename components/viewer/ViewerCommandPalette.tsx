@@ -9,7 +9,7 @@ import { useOverlay } from "@/hooks/useOverlay";
 import { StatusBadge } from "@/components/ui/Badge";
 import { usePortalReady } from "@/components/ui/Dialog";
 import { cn } from "@/lib/cn";
-import { DEMO_LOCATIONS, DEMO_STUDENTS, DEMO_WORKERS } from "@/lib/viewer/demoData";
+import { DEMO_STUDENTS } from "@/lib/viewer/demoData";
 import { navForViewerRole } from "@/lib/viewer/nav";
 import { useViewer } from "./viewerContext";
 
@@ -41,7 +41,7 @@ interface Result {
 export default function ViewerCommandPalette({ open, onClose, now }: { open: boolean; onClose: () => void; now: Date }) {
   const router = useRouter();
   const ready = usePortalReady();
-  const { data, role } = useViewer();
+  const { data, role, locations, workers } = useViewer();
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
@@ -71,10 +71,10 @@ export default function ViewerCommandPalette({ open, onClose, now }: { open: boo
     out.push(...pages.filter((p) => p.label.toLowerCase().includes(q)).slice(0, 4));
     if (role === "admin") {
       out.push(
-        ...DEMO_LOCATIONS.filter((l) => l.name.toLowerCase().includes(q))
+        ...locations.filter((l) => l.name.toLowerCase().includes(q))
           .slice(0, 4)
           .map((l): Result => ({ group: "Locations", key: `l-${l.id}`, label: l.name, hint: "Location and QR code", href: `/viewer/locations?location=${l.id}`, icon: <MapPin className="h-4 w-4" /> })),
-        ...DEMO_WORKERS.filter((w) => w.name.toLowerCase().includes(q) || w.team.toLowerCase().includes(q))
+        ...workers.filter((w) => w.name.toLowerCase().includes(q) || w.team.toLowerCase().includes(q))
           .slice(0, 4)
           .map((w): Result => ({ group: "Workers", key: `w-${w.id}`, label: w.name, hint: w.team, href: `/viewer/workers?worker=${w.id}`, icon: <HardHat className="h-4 w-4" /> })),
         ...DEMO_STUDENTS.filter((s) => s.name.toLowerCase().includes(q))
@@ -86,7 +86,7 @@ export default function ViewerCommandPalette({ open, onClose, now }: { open: boo
       );
     }
     return out;
-  }, [query, data, role]);
+  }, [query, data, role, locations, workers]);
 
   useEffect(() => setActive(0), [query]);
 

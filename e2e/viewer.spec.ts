@@ -292,12 +292,14 @@ test.describe("analytics, theme and interface", () => {
     const { problems } = watch(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/viewer/analytics");
-    const widthsFit = async () => {
-      for (const svg of await page.locator(".recharts-wrapper > svg.recharts-surface").all()) {
-        const [sw, cw] = await svg.evaluate((el) => [el.getBoundingClientRect().width, (el.closest(".recharts-responsive-container") as HTMLElement | null)?.getBoundingClientRect().width ?? 0]);
-        if (cw > 0) expect(Math.abs(sw - cw)).toBeLessThanOrEqual(2);
-      }
-    };
+    // Charts resize a moment after their container does; the same tolerance (2 px) must be reached, however busy the machine is.
+    const widthsFit = () =>
+      expect(async () => {
+        for (const svg of await page.locator(".recharts-wrapper > svg.recharts-surface").all()) {
+          const [sw, cw] = await svg.evaluate((el) => [el.getBoundingClientRect().width, (el.closest(".recharts-responsive-container") as HTMLElement | null)?.getBoundingClientRect().width ?? 0]);
+          if (cw > 0) expect(Math.abs(sw - cw)).toBeLessThanOrEqual(2);
+        }
+      }).toPass({ timeout: 8000 });
     await expect(page.locator(".recharts-wrapper > svg.recharts-surface").first()).toBeVisible();
     await widthsFit();
     await page.getByRole("button", { name: "Collapse sidebar" }).click();
@@ -417,6 +419,7 @@ test.describe("analytics, theme and interface", () => {
 
   test("search palette (Ctrl K), notifications and toasts", async ({ page }) => {
     await page.goto("/viewer/admin");
+    await ready(page); // the shortcut is registered once the page has hydrated
     await page.keyboard.press("Control+k");
     const palette = page.getByRole("dialog", { name: "Search the demo" });
     await expect(palette.getByRole("combobox")).toBeFocused();

@@ -32,9 +32,9 @@ export interface DemoActivity {
 }
 
 /** Every recorded event across the campus, newest first. */
-export function demoActivity(data: DemoData, limit = 400): DemoActivity[] {
+export function demoActivity(data: DemoData, limit = 400, nameOf?: (workerId: string) => string): DemoActivity[] {
   return data.issues
-    .flatMap((issue) => demoTimeline(issue, data.now).map((e, k) => ({ id: `${issue.id}-${k}`, type: e.type, at: e.at, text: e.text, issue })))
+    .flatMap((issue) => demoTimeline(issue, data.now, nameOf).map((e, k) => ({ id: `${issue.id}-${k}`, type: e.type, at: e.at, text: e.text, issue })))
     .sort((a, b) => b.at.getTime() - a.at.getTime())
     .slice(0, limit);
 }

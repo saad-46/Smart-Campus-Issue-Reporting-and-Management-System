@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, Inbox, Lightbulb, Play, Wallet } from "lucide-react";
+import { CheckCircle2, Inbox, Play, Wallet } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
 import IssueRow from "@/components/IssueCard";
 import BillSubmissionForm from "@/components/BillSubmissionForm";
@@ -16,7 +16,7 @@ import { useToast } from "@/components/ui/Toast";
 import { Issue, Transaction } from "@/types";
 import { subscribeToAssignedIssues, subscribeToOpenPool, updateIssueStatus, assignIssue, submitBill } from "@/lib/firestore";
 import { subscribeToTransactions } from "@/lib/finance";
-import { getSuggestedSolution } from "@/services/aiAssistService";
+import RepairTip from "@/components/issue/RepairTip";
 import { useSlaConfig } from "@/hooks/useSlaConfig";
 import { useNow } from "@/hooks/useNow";
 import { computeSla } from "@/lib/intelligence/sla";
@@ -24,35 +24,6 @@ import { formatDate, greeting } from "@/lib/dates";
 import { getFriendlyErrorMessage, logError } from "@/lib/errors";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-
-/** Keyword-based repair tip, collapsed by default so the list stays scannable. */
-function RepairTip({ issue }: { issue: Issue }) {
-  const [tip, setTip] = useState("");
-  const { description, category, location } = issue;
-  useEffect(() => {
-    let cancelled = false;
-    getSuggestedSolution({ description, category, location })
-      .then((text) => {
-        if (!cancelled) setTip(text);
-      })
-      .catch((e) => logError("getSuggestedSolution", e));
-    return () => {
-      cancelled = true;
-    };
-  }, [description, category, location]);
-  if (!tip) return null;
-  return (
-    <details className="group/tip text-[13px]">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded text-fg-subtle hover:text-fg">
-        <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
-        Suggested checks
-        <span className="text-xs">(keyword-based tip)</span>
-        <ChevronDown className="h-3.5 w-3.5 transition-transform group-open/tip:rotate-180" aria-hidden="true" />
-      </summary>
-      <p className="mt-1.5 max-w-2xl rounded-md border border-border bg-surface-2/60 px-3 py-2 text-fg-muted">{tip}</p>
-    </details>
-  );
-}
 
 export default function WorkerPage() {
   const { userProfile, activeRole } = useAuthContext();

@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CheckCircle2, MapPin, Play, Receipt, Sparkles, ThumbsUp, UserPlus, Star, TriangleAlert, Users } from "lucide-react";
+import { ArrowLeft, CheckCircle2, MapPin, Play, Receipt, Sparkles, ThumbsUp, Star, TriangleAlert } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Badge, { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -14,10 +14,12 @@ import { SlaMeterView } from "@/components/issue/SlaView";
 import { currency } from "@/components/admin/Kpi";
 import { ViewerGate } from "@/components/viewer/parts";
 import { AssignDialog, ClaimDialog, PayDialog, RateDialog, ResolveDialog } from "@/components/viewer/ActionDialogs";
+import { DiscussionPanel, ManagePanel, RelatedPanel } from "@/components/viewer/IssuePanels";
 import { EventTimeline } from "@/components/viewer/Timeline";
 import { IssuePhoto, ReceiptPreview } from "@/components/viewer/DemoImage";
 import { analyzeIssueDetails } from "@/services/aiService";
-import { DEMO_PERSONA, DemoIssue, demoTimeline, workerName } from "@/lib/viewer/demoData";
+import { DEMO_PERSONA, DemoIssue, demoTimeline } from "@/lib/viewer/demoData";
+import { useViewer } from "@/components/viewer/viewerContext";
 import { formatDate, formatRelative } from "@/lib/dates";
 import { departmentFor } from "@/lib/constants";
 
@@ -49,7 +51,7 @@ export default function ViewerIssuePage() {
       {({ data, slaConfig, role, startIssue, assignIssue, upvoteIssue }) => {
         const issue = data.issues.find((i) => i.id === id);
         if (!issue) return <NotInDemo id={String(id)} />;
-        return <Detail issue={issue} now={data.now} dialog={dialog} setDialog={setDialog} slaConfig={slaConfig} role={role} startIssue={startIssue} assignIssue={assignIssue} upvoteIssue={upvoteIssue} allIssues={data.issues} />;
+        return <Detail issue={issue} now={data.now} dialog={dialog} setDialog={setDialog} slaConfig={slaConfig} role={role} startIssue={startIssue} assignIssue={assignIssue} upvoteIssue={upvoteIssue} />;
       }}
     </ViewerGate>
   );
@@ -65,7 +67,6 @@ function Detail({
   startIssue,
   assignIssue,
   upvoteIssue,
-  allIssues,
 }: {
   issue: DemoIssue;
   now: Date;
@@ -73,14 +74,13 @@ function Detail({
   setDialog: (d: null | "assign" | "resolve" | "claim" | "pay" | "rate") => void;
   slaConfig: Parameters<typeof SlaMeterView>[0]["config"];
   role: "student" | "worker" | "admin";
-  startIssue: (id: string) => void;
-  assignIssue: (id: string, workerId: string) => void;
-  upvoteIssue: (id: string) => void;
-  allIssues: DemoIssue[];
+  startIssue: (id: string) => unknown;
+  assignIssue: (id: string, workerId: string) => unknown;
+  upvoteIssue: (id: string) => unknown;
 }) {
   const analysis = useMemo(() => analyzeIssueDetails({ title: issue.title, description: issue.description, location: issue.location }), [issue.title, issue.description, issue.location]);
-  const events = demoTimeline(issue, now);
-  const related = allIssues.filter((i) => i.duplicateOf === issue.id || (issue.duplicateOf && (i.id === issue.duplicateOf || i.duplicateOf === issue.duplicateOf) && i.id !== issue.id));
+  const { workerName } = useViewer();
+  const events = demoTimeline(issue, now, workerName);
   const nextStep = issue.status === "Open" ? (issue.assignedTo ? "Work starts" : "A worker is assigned") : issue.status === "In Progress" ? "Marked resolved" : undefined;
   const iAmWorker = role === "worker" && (issue.assignedTo === DEMO_PERSONA.worker.id || !issue.assignedTo);
 
@@ -114,7 +114,7 @@ function Detail({
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card className="overflow-hidden">
             {issue.hasPhoto && (
               <div className="aspect-[16/7] w-full border-b border-glass-border">
@@ -140,20 +140,7 @@ function Detail({
             />
           </Panel>
 
-          {related.length > 0 && (
-            <Panel title="Related reports" badge={<Badge tone="warning" icon={<Users aria-hidden="true" />}>Incident</Badge>} description="Reports of the same fault, linked so it is fixed once.">
-              <ul className="divide-y divide-border">
-                {related.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-3 py-2">
-                    <Link href={`/viewer/issues/${r.id}`} className="min-w-0 truncate text-sm text-fg hover:text-brand-fg">
-                      {r.title}
-                    </Link>
-                    <StatusBadge status={r.status} />
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          )}
+          <RelatedPanel issue={issue} />
 
           {issue.status === "Resolved" && (
             <Panel title="Resolution" description={issue.resolvedAt ? `Resolved ${formatDate(issue.resolvedAt, { month: "short", day: "numeric" })}` : undefined}>
@@ -193,9 +180,11 @@ function Detail({
               <EventTimeline events={events} pending={nextStep} />
             </div>
           </Panel>
+
+          <DiscussionPanel issue={issue} />
         </div>
 
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           <Panel title="Deadline">
             <div data-tour="issue-sla">
               <SlaMeterView issue={issue} config={slaConfig} now={now} />
@@ -213,21 +202,18 @@ function Detail({
             />
           </Panel>
 
+          {role === "admin" && <ManagePanel issue={issue} onAssign={() => setDialog("assign")} />}
+
           <Panel title="Actions" description="Demo only: nothing is saved.">
             <div className="flex flex-col gap-2">
               {role === "admin" && (
-                <div data-tour="issue-assign" className="flex flex-col gap-2">
-                  {issue.status !== "Resolved" && (
-                    <Button variant={issue.assignedTo ? "secondary" : "primary"} onClick={() => setDialog("assign")} icon={<UserPlus className="h-4 w-4" aria-hidden="true" />}>
-                      {issue.assignedTo ? "Reassign worker" : "Assign worker"}
-                    </Button>
-                  )}
+                <div className="flex flex-col gap-2">
                   {issue.claim?.status === "pending" && (
                     <Button onClick={() => setDialog("pay")} icon={<Receipt className="h-4 w-4" aria-hidden="true" />}>
                       Review claim
                     </Button>
                   )}
-                  {issue.status === "Resolved" && !issue.claim && <p className="text-[13px] text-fg-subtle">Nothing to do: this issue is resolved.</p>}
+                  <p className="text-[13px] text-fg-subtle">{issue.status === "Resolved" ? (issue.claim?.status === "pending" ? "The work is done; the claim is waiting for you." : "Nothing to do: this issue is resolved.") : "Use Manage issue above to assign, escalate or unassign."}</p>
                 </div>
               )}
               {role === "worker" && (
@@ -256,8 +242,8 @@ function Detail({
               {role === "student" && (
                 <>
                   {!issue.mine && issue.status !== "Resolved" && (
-                    <Button variant="secondary" onClick={() => upvoteIssue(issue.id)} icon={<ThumbsUp className="h-4 w-4" aria-hidden="true" />}>
-                      Upvote ({issue.upvotes})
+                    <Button variant={issue.upvotedByMe ? "primary" : "secondary"} aria-pressed={!!issue.upvotedByMe} onClick={() => upvoteIssue(issue.id)} icon={<ThumbsUp className="h-4 w-4" aria-hidden="true" />}>
+                      {issue.upvotedByMe ? "Remove upvote" : "Upvote"} ({issue.upvotes})
                     </Button>
                   )}
                   {issue.mine && issue.status === "Resolved" && !issue.feedback && (

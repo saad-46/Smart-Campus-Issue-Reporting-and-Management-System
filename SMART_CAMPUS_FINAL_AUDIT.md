@@ -1469,3 +1469,123 @@ The fictional sample campus was replaced by a researched model of the Sultan-ul-
 - **Results:** unit 265 / 265 (17 new dataset checks); Firestore rules 181 / 181; tsc and eslint clean; build passes; end-to-end 96 / 96 locally (4 new: map geometry and detail, layers/search/filters, QR ids, pick on the map), including the 10-viewport, two-theme matrix, the axe scans and the Viewer isolation test. Signed-in smoke test on the local emulators with seed accounts: 15 / 15 (admin map, locations, analytics filter; student report by campus place, QR id, unknown id; the new report counted at its place).
 - **Limitations:** which footprint is which block is unknown; the auditorium has two official geotags 240 m apart; the library and five institutions are unplaced; gates are mapped barrier nodes, not confirmed entrances; the bank may be outside the campus; the society's own website could not be read beyond its name; signed-in production flows and a physical QR scan still need a person.
 - **Deployment:** `4d24254` fast-forwarded to `main` and deployed by Vercel (production project: success; the obsolete duplicate project `smart-campus-unifix` failed again, as on every push). Against the live URL after the deployment was ready: end-to-end 96 / 96; signed-out Firestore reads of seven collections and a write all returned 403; content security policy unchanged. Nothing in this pass read or wrote production data, so the pending expense claim was not touched. One local end-to-end run had a single focus-timing failure in the search-palette test; it passed 5 / 5 on repeat and in the next two full runs.
+
+---
+
+## Explore / Signed-In Parity, Map Labels and Isolation (2026-10-09)
+
+Scope: make Explore Mode offer every action the signed-in app does, on demo data and with no access to real data; fix overlapping map labels; prove the boundary between the two modes; review QR handling, the duplicate Vercel project and the Firebase key. Details: [docs/EXPLORE_PARITY.md](docs/EXPLORE_PARITY.md), manual steps: [docs/MANUAL_VERIFICATION.md](docs/MANUAL_VERIFICATION.md).
+
+Every result below says where it was verified: **code** (unit tests), **browser** (Playwright on a local production build), **emulator** (signed-in, local Firebase emulators, seed accounts), **production** (read-only, live URL) or **manual** (not done; needs a person).
+
+### Explore / signed-in feature parity
+
+An audit of every signed-in data operation against Explore found these missing in Explore. All were added:
+
+| Added to Explore | Signed-in counterpart |
+| --- | --- |
+| Discussion on an issue, private to the reporter and staff | `sendChatMessage` |
+| Manage issue panel: escalate, clear escalation, unassign | `AdminIssueControls` |
+| Related reports panel: similar open reports, link to and remove from an incident | `IncidentPanel` |
+| "Group as one incident" for suggested clusters; escalate from "Needs attention" | Admin dashboard |
+| Add funds | `addFundsToBudget` |
+| Remove worker access; an approved request now joins the team and can be assigned work | `setWorkerAccess` |
+| Add a location with a QR code; delete it | `createCampusLocation`, `deleteCampusLocation` |
+| Quick report (one message, parsed, reviewed) | `ChatReporter` |
+| Repair tip on a worker's task (now one shared component) | Worker page |
+| Upvote can be taken back | `toggleUpvote` |
+| Assign dialog lists everyone with worker access | Assign dialog |
+| Filters: campus place on the issues table; place, status, priority and worker in analytics | Admin issues and analytics |
+| Reset demo, with a count of simulated changes and a confirmation | (Explore only) |
+
+Also fixed: simulated steps were missing from issue timelines and the campus activity feed, because the demo clock stayed at page-load time. The clock now advances with each action.
+
+Deliberate differences that remain (no accounts, generated photos and receipts, a 30-day dataset, researched locations can't be deleted, no "mark unread" in either mode) are listed with reasons in docs/EXPLORE_PARITY.md.
+
+### Shared application architecture
+
+- New `lib/viewer/demoStore.ts`: the whole Explore state as one immutable value and one pure function, `applyDemoAction(state, action, role)`. It replaces ad-hoc state in the provider. A refused action returns an error and changes nothing; the page shows the reason instead of a success message.
+- New `lib/sharedRules.ts`: location and feedback validation moved out of the Firebase-importing modules so both modes run the same code; also the demo-id check.
+- The demo engine uses the real validation (`parseAmount`, `validateChatMessage`, `validateClaimDescription`, `validateSlaHours`, `canTransition`) and the same role restrictions the Firestore rules enforce (17 refusals tested).
+- Explore and signed-in pages stay separate route files sharing components and logic. They were not merged into one page set: the signed-in pages depend on live Firestore listeners, and importing those on the Explore route is what the isolation tests forbid.
+
+### Demo-data isolation and authorization boundaries
+
+| Guarantee | Verified |
+| --- | --- |
+| Explore files import nothing that loads Firebase, directly or transitively | code |
+| The demo engine completes every workflow with `firebase/*` mocked to throw on import | code |
+| Every Explore action leaves the site's origin untouched: no external request, none to Firebase | browser (asserted after each of the 19 new tests and across all routes) |
+| No demo data is written to browser storage; a reload returns to the baseline | browser |
+| 10 signed-in write functions refuse a demo id (`SC-…`) before any Firestore call | code |
+| A denied Firestore write rejects; nothing falls back to the demo | code |
+| Signed in as admin, Explore still shows only its baseline and `SC-…` issues, and makes no Firestore or Auth request | emulator |
+| A demo "add funds" does not change the real budget | emulator |
+| A student who selects the demo Admin perspective is still redirected from `/admin`, `/admin/finance`, `/admin/workers` and `/worker` | emulator |
+| A worker is kept out of `/admin/finance` | emulator |
+| Signed-in escalation and discussion messages persist across a reload | emulator |
+| Signed-out reads of seven collections and a write are denied | production |
+| Firestore rules unchanged; 181 rules tests pass | emulator |
+
+`firestore.rules`, the indexes and all environment configuration are unchanged.
+
+### Campus map label collisions
+
+- New `lib/mapLabels.ts`: each label takes the first free position of eight around its marker; a label with no free position is hidden rather than drawn over a neighbour, and appears on hover, keyboard focus or selection. The selected place always shows its label. Positions depend on the markers and zoom only, not the pan offset, so labels don't jitter while dragging.
+- A hidden label never hides a place: all nine markers stay focusable buttons with their full name and confidence as the accessible name.
+- Keyboard: `+`, `-`, `0` and the arrow keys zoom, reset and pan the map.
+- Verified: no visible labels overlap at five zoom levels (code) and at 1440, 768 and 390 px across four zoom steps (browser); on the signed-in admin map (emulator). The Ghulam Ahmed Hall / Blocks 1, 2 and 5 overlap reported after the last release is gone.
+- No dependency, tile service or API key was added. OpenStreetMap attribution is unchanged.
+
+### Location verification and uncertainty
+
+- No verification status was changed. Counts are still: places 0 verified, 0 corroborated, 7 approximate, 1 conflicting, 1 unverified; 6 of 19 locations have no known position and no marker.
+- The place panel now states what the status means and links the sources behind it.
+- A location an administrator adds inherits nothing stronger than its map place, and is "Unverified" with no marker when added without one.
+- One alias was added to the dataset: "Seminar Hall" for "Seminar Hall, Block 4" (the college's own name for it), so a quick report that mentions it selects the right place.
+- The six unplaced locations are unchanged: Central Library, the Colleges of Law, Business Administration and Education, the Junior College and the Public School. No new public source for their positions was found, so none was placed.
+
+### QR workflow
+
+- The id in a QR link is treated as untrusted: it must match `^[a-z0-9-]{1,60}$` and name a known location. Unknown, malformed, retired and script-like ids are refused in both modes (code, browser, emulator).
+- The place shown after "scanning" is the place submitted, including for a location added in Explore (browser).
+- **Not verified:** scanning with a real phone camera. Steps are in docs/MANUAL_VERIFICATION.md.
+
+### Automated testing (run on 2026-10-09 after these changes)
+
+| Suite | Result |
+| --- | --- |
+| Unit | 326 / 326 (61 new: demo engine 33, mode boundary 17, map labels 11) |
+| Firestore rules | 181 / 181 |
+| Type check, lint, production build | clean |
+| Browser, local production build | 115 / 115 (19 new parity, filter, reset and label tests) |
+| Signed-in emulator checks | 18 / 18 after one correction (see below) |
+
+- Two existing browser tests were made timing-safe without changing what they assert: the search-palette test now waits for the page to hydrate before pressing Ctrl K, and the chart-size test retries its 2 px check for up to 8 s instead of once after a fixed 500 ms.
+- The 19th emulator check, "signed-in pages talk to the emulator, not production", failed because my pattern matched `identitytoolkit.googleapis.com` inside the emulator's own URL path. Listing the hosts contacted showed only the app and the two local emulators.
+- A regression found by the responsive suite and fixed: the new panels made the Explore issue page overflow at 320 px.
+
+### Vercel duplicate project: PENDING (manual)
+
+The repository has no `vercel.json` and no project binding; nothing in the code selects a Vercel project. The failing check comes from the second project, `smart-campus-unifix`, being connected to the same GitHub repository. It can only be disconnected in the Vercel dashboard, which was not done. Steps: docs/MANUAL_VERIFICATION.md, section C.
+
+### Firebase API key: no old key exists; restriction PENDING (manual)
+
+This corrects two earlier entries in this audit. Every key-shaped value in the Git history was extracted and inspected (masked):
+
+- `AIzaSyDemo…REPLACE_WITH_YOUR_KEY` (4 occurrences, a fallback string in an old `lib/firebase.ts` and a setup document);
+- `AIzaSyXXXX…` (6 occurrences, documentation placeholders).
+
+Both are placeholders. Google's Identity Toolkit answers "API key not valid" for the first. No real browser key, service-account file, private key or `.env` file has ever been committed, and neither placeholder appears in the current source or in the local environment file. There is therefore nothing to disable or rotate, and no history rewrite is warranted.
+
+The live key was not changed. Restricting it by website and API needs the Google Cloud console, which this session cannot reach. Steps: docs/MANUAL_VERIFICATION.md, section D.
+
+### Known limitations and follow-up
+
+- Signed-in flows were verified on the emulator, not in production. Production checks were read-only.
+- A physical QR scan was not tested.
+- Explore and signed-in pages share components and logic, not page files.
+- A location added in Explore exists only in that tab, so its QR code works there only.
+- The six unplaced campus locations and the block-to-footprint mapping still need an on-site check.
+- The duplicate Vercel project and the key restriction are pending manual tasks.
+- The existing pending expense claim was not read, changed or used.

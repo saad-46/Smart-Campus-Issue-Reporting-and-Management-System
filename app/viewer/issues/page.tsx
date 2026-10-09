@@ -14,8 +14,9 @@ import { ISSUE_CATEGORIES, ISSUE_STATUSES, PRIORITIES } from "@/lib/constants";
 import { computeSla, SLA_LABELS } from "@/lib/intelligence/sla";
 import { searchIssues } from "@/lib/search";
 import { toCsv, toJson, downloadText, isoOrEmpty } from "@/lib/export";
-import { DEMO_STUDENTS, DEMO_WORKERS, DemoIssue, workerName } from "@/lib/viewer/demoData";
+import { DEMO_STUDENTS, DemoIssue } from "@/lib/viewer/demoData";
 import { SlaState } from "@/types";
+import { BUILDINGS, buildingForIssue, getBuilding } from "@/lib/campus";
 
 interface Filters {
   q: string;
@@ -24,8 +25,9 @@ interface Filters {
   category: string;
   sla: string;
   worker: string;
+  place: string;
 }
-const NONE: Filters = { q: "", status: "", priority: "", category: "", sla: "", worker: "" };
+const NONE: Filters = { q: "", status: "", priority: "", category: "", sla: "", worker: "", place: "" };
 
 function IssuesInner() {
   const params = useSearchParams();
@@ -36,13 +38,14 @@ function IssuesInner() {
 
   return (
     <ViewerGate>
-      {({ data, slaConfig, role, demoToast }) => {
+      {({ data, stats, slaConfig, role, demoToast, workers, workerName }) => {
         const student = reporter ? DEMO_STUDENTS.find((s) => s.id === reporter) : undefined;
-        const filtered = filterIssues(data.issues, f, reporter, slaConfig, data.now);
+        const filtered = filterIssues(data.issues, f, reporter, slaConfig, data.now, stats.locationBuildings);
         const chips: FilterChip[] = [
           f.status && { key: "status", label: `Status: ${f.status}`, onRemove: () => set({ status: "" }) },
           f.priority && { key: "priority", label: `Priority: ${f.priority}`, onRemove: () => set({ priority: "" }) },
           f.category && { key: "category", label: f.category, onRemove: () => set({ category: "" }) },
+          f.place && { key: "place", label: getBuilding(f.place)?.name ?? f.place, onRemove: () => set({ place: "" }) },
           f.sla && { key: "sla", label: `Deadline: ${SLA_LABELS[f.sla as SlaState]}`, onRemove: () => set({ sla: "" }) },
           f.worker && { key: "worker", label: f.worker === "none" ? "Unassigned" : workerName(f.worker), onRemove: () => set({ worker: "" }) },
           student && { key: "reporter", label: `Reported by ${student.name}`, onRemove: () => router.replace("/viewer/issues") },
@@ -122,6 +125,14 @@ function IssuesInner() {
                     <option key={s}>{s}</option>
                   ))}
                 </Select>
+                <Select size="sm" aria-label="Campus place" value={f.place} onChange={(e) => set({ place: e.target.value })} wrapperClassName="w-auto">
+                  <option value="">All places</option>
+                  {BUILDINGS.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </Select>
                 <Select size="sm" aria-label="Deadline state" value={f.sla} onChange={(e) => set({ sla: e.target.value })} wrapperClassName="w-auto">
                   <option value="">Any deadline state</option>
                   {(Object.keys(SLA_LABELS) as SlaState[]).map((s) => (
@@ -133,7 +144,7 @@ function IssuesInner() {
                 <Select size="sm" aria-label="Assigned to" value={f.worker} onChange={(e) => set({ worker: e.target.value })} wrapperClassName="w-auto">
                   <option value="">Anyone</option>
                   <option value="none">Unassigned</option>
-                  {DEMO_WORKERS.map((w) => (
+                  {workers.map((w) => (
                     <option key={w.id} value={w.id}>
                       {w.name}
                     </option>
@@ -152,7 +163,7 @@ function IssuesInner() {
 }
 
 /** Filtering as a plain function (hooks must not run inside the data gate's render callback). */
-function filterIssues(issues: DemoIssue[], f: Filters, reporter: string, config: Parameters<typeof computeSla>[1], now: Date): DemoIssue[] {
+function filterIssues(issues: DemoIssue[], f: Filters, reporter: string, config: Parameters<typeof computeSla>[1], now: Date, locationBuildings: Map<string, string>): DemoIssue[] {
   const base = f.q.trim() ? searchIssues(issues, f.q, {}, 500).map((h) => h.issue as DemoIssue) : [...issues].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   return base.filter(
     (i) =>
@@ -161,6 +172,7 @@ function filterIssues(issues: DemoIssue[], f: Filters, reporter: string, config:
       (!f.category || i.category === f.category) &&
       (!reporter || i.reporterId === reporter) &&
       (!f.worker || (f.worker === "none" ? !i.assignedTo : i.assignedTo === f.worker)) &&
+      (!f.place || buildingForIssue(i, locationBuildings)?.id === f.place) &&
       (!f.sla || computeSla(i, config, now).state === f.sla)
   );
 }

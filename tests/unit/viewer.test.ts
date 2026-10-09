@@ -296,7 +296,9 @@ describe("the guided tour points only at things that exist", () => {
     if (step.learnMore) expect(existsSync(join(ROOT, pageFile(step.learnMore.href)))).toBe(true);
     if (!step.target) return;
     const anchor = new RegExp(`(data-tour=["'{]\\s*["']?${step.target}["']?|tour: ["']${step.target}["']|tour="${step.target}")`);
-    const inPage = anchor.test(read(pageFile(step.path)));
+    // The issue page is composed of panels that carry some of its anchors.
+    const parts = pageFile(step.path) === "app/viewer/issues/[id]/page.tsx" ? read("components/viewer/IssuePanels.tsx") : "";
+    const inPage = anchor.test(read(pageFile(step.path)) + parts);
     const inShell = anchor.test(shellSources);
     expect(inPage || inShell, `anchor "${step.target}" exists for ${step.path}`).toBe(true);
   });

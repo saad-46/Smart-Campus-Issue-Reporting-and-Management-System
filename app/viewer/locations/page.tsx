@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import React, { Suspense, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
-import { Copy, Download, Printer, QrCode } from "lucide-react";
+import { Copy, Download, Plus, Printer, QrCode } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Button, { buttonClasses } from "@/components/ui/Button";
@@ -16,7 +17,9 @@ import { ViewerGate, ViewerLoading } from "@/components/viewer/parts";
 import { BUILDINGS, VERIFICATION_LABELS, getBuilding, institutionName } from "@/lib/campus";
 import Badge from "@/components/ui/Badge";
 import { VERIFICATION_TONE } from "@/components/viewer/verification";
-import { DEMO_LOCATIONS, DemoLocation } from "@/lib/viewer/demoData";
+import { DemoLocation } from "@/lib/viewer/demoData";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import { Input } from "@/components/ui/Field";
 import { cn } from "@/lib/cn";
 
 function useQr(url: string, width: number) {
@@ -51,7 +54,7 @@ function QrThumb({ url, label }: { url: string; label: string }) {
   );
 }
 
-function QrDialog({ location, origin, onClose, onCopy }: { location: DemoLocation | null; origin: string; onClose: () => void; onCopy: () => void }) {
+function QrDialog({ location, origin, onClose, onCopy, onDelete }: { location: DemoLocation | null; origin: string; onClose: () => void; onCopy: () => void; onDelete: () => void }) {
   const url = location ? reportUrl(origin, location.id) : "";
   const { dataUrl, failed } = useQr(url, 512);
   const [printing, setPrinting] = useState(false);
@@ -100,6 +103,17 @@ function QrDialog({ location, origin, onClose, onCopy }: { location: DemoLocatio
           <p className="mt-4 text-sm font-medium text-fg">{location.name}</p>
           <p className="mt-0.5 text-[13px] text-fg-subtle">Scan to report an issue here.</p>
           <p className="mt-3 max-w-full break-all rounded bg-surface-2 px-2 py-1 font-mono text-[11px] text-fg-subtle">{url}</p>
+          <Link href={`/viewer/report?location=${location.id}`} className="mt-3 text-[13px] font-medium text-brand-fg hover:underline">
+            Open the report form as a scan would
+          </Link>
+          {location.custom && <p className="mt-2 text-xs text-fg-subtle">Added in this demo, so its code works in this tab only, until you leave or reset.</p>}
+          {location.custom ? (
+            <Button variant="ghost" size="sm" className="mt-3 text-danger hover:text-danger" onClick={onDelete}>
+              Delete this location
+            </Button>
+          ) : (
+            <p className="mt-3 text-xs text-fg-subtle">Part of the researched campus dataset, so it can&apos;t be deleted here.</p>
+          )}
         </div>
       )}
       {/* Portalled to <body>: inside the dialog, its (animated) panel would become the containing block for position:fixed and clip the printed sheet. */}
@@ -126,16 +140,35 @@ function LocationsInner() {
   const [building, setBuilding] = useState("");
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(window.location.origin), []);
-  const selected = DEMO_LOCATIONS.find((l) => l.id === params.get("location")) ?? null;
+  const [addOpen, setAddOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", buildingId: "", floor: "", room: "" });
+  const [formError, setFormError] = useState("");
+  const [deleting, setDeleting] = useState<DemoLocation | null>(null);
 
   return (
     <ViewerGate>
-      {({ demoToast }) => {
-        const rows = DEMO_LOCATIONS.filter((l) => (!building || l.buildingId === building) && (!q.trim() || l.name.toLowerCase().includes(q.trim().toLowerCase())));
+      {({ demoToast, locations, findLocation, addLocation, deleteLocation }) => {
+        const selected = findLocation(params.get("location")) ?? null;
+        const rows = locations.filter((l) => (!building || l.buildingId === building) && (!q.trim() || l.name.toLowerCase().includes(q.trim().toLowerCase())));
         const chips: FilterChip[] = building ? [{ key: "b", label: getBuilding(building)?.name ?? building, onRemove: () => setBuilding("") }] : [];
         return (
           <>
-            <PageHeader title="Locations and QR codes" description="Researched SUES campus locations. Each has a QR code that carries only its stable id; scanning it opens the report form with the place filled in." />
+            <PageHeader
+              title="Locations and QR codes"
+              description="Researched SUES campus locations, plus any you add. Each has a QR code that carries only its stable id; scanning it opens the report form with the place filled in."
+              actions={
+                <Button
+                  icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+                  onClick={() => {
+                    setForm({ name: "", buildingId: "", floor: "", room: "" });
+                    setFormError("");
+                    setAddOpen(true);
+                  }}
+                >
+                  Add location
+                </Button>
+              }
+            />
             <Card className="mb-4 p-3 sm:p-4">
               <FilterBar search={q} onSearch={setQ} searchLabel="Search locations" placeholder="Search locations" chips={chips} onClear={() => setBuilding("")}>
                 <Select size="sm" aria-label="Map place" value={building} onChange={(e) => setBuilding(e.target.value)} wrapperClassName="w-auto">
@@ -169,9 +202,10 @@ function LocationsInner() {
                           <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
                           <span className="truncate">{institutionName(l.institutionId, true) ?? "Campus"} · {getBuilding(l.buildingId)?.name ?? "not on the map"}</span>
                         </span>
-                        <Badge tone={VERIFICATION_TONE[l.verificationStatus]} className="mt-1.5">
-                          {VERIFICATION_LABELS[l.verificationStatus]}
-                        </Badge>
+                        <span className="mt-1.5 flex flex-wrap gap-1">
+                          <Badge tone={VERIFICATION_TONE[l.verificationStatus]}>{VERIFICATION_LABELS[l.verificationStatus]}</Badge>
+                          {l.custom && <Badge tone="info">Added in this demo</Badge>}
+                        </span>
                       </span>
                     </button>
                   </li>
@@ -187,6 +221,68 @@ function LocationsInner() {
                 if (selected) void navigator.clipboard?.writeText(reportUrl(origin, selected.id)).catch(() => undefined);
                 demoToast("Link copied", "It opens the demo report form.");
               }}
+              onDelete={() => setDeleting(selected)}
+            />
+
+            <Dialog
+              open={addOpen}
+              onClose={() => setAddOpen(false)}
+              title="Add location"
+              description="A place people can report against, with its own QR code. Demo only: it lasts until you leave or reset the demo."
+              size="sm"
+              footer={
+                <>
+                  <Button variant="secondary" onClick={() => setAddOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" form="demo-add-location">
+                    Add location (demo)
+                  </Button>
+                </>
+              }
+            >
+              <form
+                id="demo-add-location"
+                noValidate
+                className="space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const result = addLocation(form);
+                  setFormError(result.error ?? "");
+                  if (result.id) {
+                    setAddOpen(false);
+                    router.replace(`/viewer/locations?location=${result.id}`);
+                  }
+                }}
+              >
+                <Input label="Name" placeholder="e.g. Staff room" maxLength={80} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} error={formError || undefined} required />
+                <Select label="Map place" hint="Places the location on the campus map. Leave empty when its position isn't known." value={form.buildingId} onChange={(e) => setForm({ ...form, buildingId: e.target.value })}>
+                  <option value="">Not on the map</option>
+                  {BUILDINGS.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </Select>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="Floor (optional)" maxLength={10} value={form.floor} onChange={(e) => setForm({ ...form, floor: e.target.value })} />
+                  <Input label="Room (optional)" maxLength={20} value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} />
+                </div>
+                <p className="text-xs text-fg-subtle">Floors and rooms you type are your own description; the researched dataset doesn&apos;t list any.</p>
+              </form>
+            </Dialog>
+
+            <ConfirmDialog
+              open={!!deleting}
+              title={deleting ? `Delete ${deleting.name}?` : ""}
+              description="Its QR code will stop working. Reports already made there keep their text. Demo only: nothing real changes."
+              confirmLabel="Delete location"
+              tone="danger"
+              onConfirm={() => {
+                if (deleting && deleteLocation(deleting.id)) router.replace("/viewer/locations");
+                setDeleting(null);
+              }}
+              onCancel={() => setDeleting(null)}
             />
           </>
         );

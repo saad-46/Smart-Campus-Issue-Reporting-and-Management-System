@@ -37,6 +37,7 @@ import { track } from "./listeners";
 import { normalizeIssue, normalizeIssueSummary } from "./models";
 import { queueNotification } from "./notifications";
 import { queueEvent } from "./timeline";
+import { assertRealId } from "./sharedRules";
 import {
   isDisplayableImageUrl,
   isSafeImageDataUrl,
@@ -412,6 +413,7 @@ export async function updateIssueStatus(
   status: IssueStatus,
   actor: Actor
 ): Promise<void> {
+  assertRealId(issueId, "issue");
   const issueRef = doc(db, ISSUES_COLLECTION, issueId);
 
   await runTransaction(db, async (transaction) => {
@@ -452,6 +454,7 @@ function notifyReporter(transaction: Transaction, issue: Issue, status: IssueSta
  * only accept approved workers or admins as assignees.
  */
 export async function adminAssignIssue(issueId: string, workerId: string, admin: Actor): Promise<void> {
+  assertRealId(issueId, "issue");
   const issueRef = doc(db, ISSUES_COLLECTION, issueId);
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(issueRef);
@@ -478,11 +481,13 @@ export async function adminAssignIssue(issueId: string, workerId: string, admin:
  * existing admin-only `escalated` field; it changes no roles or permissions.
  */
 export async function setIssueEscalation(issueId: string, escalated: boolean): Promise<void> {
+  assertRealId(issueId, "issue");
   await updateDoc(doc(db, ISSUES_COLLECTION, issueId), { escalated, updatedAt: serverTimestamp() });
 }
 
 /** Admin links a report into an incident (masterId) or removes the link (""). */
 export async function linkIssueToIncident(issueId: string, masterId: string, admin: Actor): Promise<void> {
+  assertRealId(issueId, "issue");
   if (masterId === issueId) throw new ValidationError("An issue can't be linked to itself.");
   const issueRef = doc(db, ISSUES_COLLECTION, issueId);
   await runTransaction(db, async (transaction) => {
@@ -511,6 +516,7 @@ export async function submitBill(
   receiptImage: string,
   description = ""
 ): Promise<void> {
+  assertRealId(issueId, "issue");
   const workerId = worker.id;
   const claimAmount = parseAmount(amount, LIMITS.maxClaimAmount);
   const claimDescription = validateClaimDescription(description);
@@ -563,6 +569,7 @@ export async function assignIssue(
   assigneeId: string,
   role: UserRole = "worker"
 ): Promise<void> {
+  assertRealId(issueId, "issue");
   const issueRef = doc(db, ISSUES_COLLECTION, issueId);
 
   await runTransaction(db, async (transaction) => {
@@ -588,6 +595,7 @@ export async function assignIssue(
  * and unassigned, and for admins (enforced by firestore.rules).
  */
 export async function deleteIssue(issueId: string): Promise<void> {
+  assertRealId(issueId, "issue");
   const issueRef = doc(db, ISSUES_COLLECTION, issueId);
   // Firestore doesn't cascade deletes: remove the photo documents too.
   const images = await getDocs(collection(issueRef, IMAGES_SUBCOLLECTION));
@@ -603,6 +611,7 @@ export async function deleteIssue(issueId: string): Promise<void> {
  * Uses a transaction to ensure atomicity.
  */
 export async function toggleUpvote(issueId: string, userId: string): Promise<void> {
+  assertRealId(issueId, "issue");
   const issueRef = doc(db, ISSUES_COLLECTION, issueId);
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(issueRef);

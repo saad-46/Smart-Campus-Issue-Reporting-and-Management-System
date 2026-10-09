@@ -137,12 +137,37 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
+## 👀 Explore Mode and the signed-in app
+
+The same product runs in two data environments that are kept strictly apart:
+
+| | Explore Mode (`/viewer`) | Signed-in app |
+| --- | --- | --- |
+| Sign-in | None | Required |
+| Data | Fictional people and sample issues on the real SUES campus map | Your authorized records in Firestore |
+| Actions | Simulated in the page's memory | Saved to Firestore, checked by the security rules |
+| After a reload | Back to the same starting data | Still there |
+
+- **Enter:** "Explore the Platform" on the landing page, or open `/viewer`.
+- **Switch role:** "Explore as" Student / Worker / Admin. It picks a fictional account; it grants nothing real.
+- **Try it:** report an issue (form, quick report, QR link or map), assign and escalate it as Admin, start and resolve it as Worker, claim and pay an expense, rate the fix, link reports into an incident, add a location, add funds, approve or remove a worker.
+- **Reset:** "Reset demo" in the demo strip (it counts your simulated changes), or reload.
+- **Real app:** "Sign in". Nothing done in Explore is carried over.
+
+Explore never loads Firebase, and a demo record can never be written to Firestore; both are tested. The full feature-by-feature comparison, the architecture and the QR rules are in [docs/EXPLORE_PARITY.md](docs/EXPLORE_PARITY.md). Explore is a demonstration and not an official SUES system.
+
+---
+
 ## 🧪 Testing and demo data (emulators only)
 
 ```bash
-npm test             # unit tests
+npm test             # unit tests (demo engine, isolation boundary, campus dataset, map labels, …)
 npm run test:rules   # Firestore rules tests (needs Java 21+ for the emulator)
+npm run test:e2e     # Playwright browser tests against a local production build (run `npm run build` first)
+npm run typecheck && npm run lint && npm run build
 ```
+
+`E2E_BASE_URL=https://… npm run test:e2e` runs the browser tests against a deployed site; they only read public pages and Explore Mode. What still needs a person (signed-in production flows, a QR scan on a real phone, the Vercel and Google Cloud dashboards) is in [docs/MANUAL_VERIFICATION.md](docs/MANUAL_VERIFICATION.md).
 
 To try the app with demo data, run against the **local** Firebase Emulator Suite — never the real project:
 

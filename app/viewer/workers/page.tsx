@@ -17,7 +17,8 @@ import { currency, formatHours } from "@/components/admin/Kpi";
 import { SectionCard, ViewerGate, ViewerLoading } from "@/components/viewer/parts";
 import { Avatar } from "@/components/viewer/DemoImage";
 import { StatusBadge } from "@/components/ui/Badge";
-import { DEMO_WORKERS } from "@/lib/viewer/demoData";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import { DemoWorker } from "@/lib/viewer/demoData";
 
 function WorkersInner() {
   const params = useSearchParams();
@@ -25,11 +26,12 @@ function WorkersInner() {
   const [q, setQ] = useState("");
   const [team, setTeam] = useState("");
   const selectedId = params.get("worker");
-  const teams = [...new Set(DEMO_WORKERS.map((w) => w.team))];
+  const [removing, setRemoving] = useState<DemoWorker | null>(null);
 
   return (
     <ViewerGate>
-      {({ data, stats, workerRequests, approveWorkerRequest }) => {
+      {({ data, stats, workers, workerRequests, approveWorkerRequest, removeWorker }) => {
+        const teams = [...new Set(workers.map((w) => w.team))];
         const rows = stats.workload.filter((r) => (!team || r.worker.team === team) && (!q.trim() || `${r.worker.name} ${r.worker.team} ${r.worker.skills.join(" ")}`.toLowerCase().includes(q.trim().toLowerCase())));
         const chips: FilterChip[] = team ? [{ key: "team", label: team, onRemove: () => setTeam("") }] : [];
         const selected = stats.workload.find((r) => r.worker.id === selectedId);
@@ -88,6 +90,9 @@ function WorkersInner() {
                           {h}
                         </th>
                       ))}
+                      <th scope="col" className={th}>
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -115,6 +120,11 @@ function WorkersInner() {
                           )}
                         </td>
                         <td className={`${td} tabular`}>{r.earnings ? currency(r.earnings) : "—"}</td>
+                        <td className={`${td} text-right`}>
+                          <Button size="sm" variant="ghost" onClick={() => setRemoving(r.worker)} aria-label={`Remove worker access from ${r.worker.name}`} className="whitespace-nowrap text-fg-subtle hover:text-danger">
+                            Remove
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -162,9 +172,25 @@ function WorkersInner() {
                       {tasks.length === 0 && <li className="py-2 text-[13px] text-fg-subtle">No tasks yet.</li>}
                     </ul>
                   </div>
+                  <Button size="sm" variant="ghost" className="-ml-2 text-danger hover:text-danger" onClick={() => setRemoving(selected.worker)}>
+                    Remove access
+                  </Button>
                 </div>
               )}
             </Drawer>
+
+            <ConfirmDialog
+              open={!!removing}
+              title={removing ? `Remove worker access from ${removing.name}?` : ""}
+              description="They will no longer see the worker workspace or be able to claim issues. Issues already assigned to them stay assigned until you reassign them. Demo only: nothing real changes."
+              confirmLabel="Remove access"
+              tone="danger"
+              onConfirm={() => {
+                if (removing && removeWorker(removing.id) && selectedId === removing.id) router.replace("/viewer/workers");
+                setRemoving(null);
+              }}
+              onCancel={() => setRemoving(null)}
+            />
           </>
         );
       }}

@@ -15,11 +15,12 @@ import { formatHours } from "@/components/admin/Kpi";
 import { Donut, Heatmap, HorizontalBars, ShareList, StackedBars, TrendChart } from "@/components/viewer/charts";
 import { SectionCard, ViewerGate } from "@/components/viewer/parts";
 import { useChartTheme } from "@/hooks/useChartTheme";
-import { DEPARTMENTS, ISSUE_CATEGORIES, departmentFor } from "@/lib/constants";
+import { DEPARTMENTS, ISSUE_CATEGORIES, departmentFor, ISSUE_STATUSES, PRIORITIES } from "@/lib/constants";
 import { categoryDistribution, priorityCounts, resolutionByCategory, resolutionStats, slaSummary, statusCounts, timeSeries, workerWorkload } from "@/lib/intelligence/analytics";
 import { SLA_LABELS } from "@/lib/intelligence/sla";
 import { downloadText, isoOrEmpty, toCsv, toJson } from "@/lib/export";
-import { DEMO_WORKERS, DemoIssue } from "@/lib/viewer/demoData";
+import { DemoIssue } from "@/lib/viewer/demoData";
+import { BUILDINGS, buildingForIssue, getBuilding } from "@/lib/campus";
 import { departmentStats, reportingHeatmap, satisfaction, slaCompliance } from "@/lib/viewer/demoStats";
 
 type Range = 7 | 14 | 30;
@@ -29,18 +30,29 @@ export default function ViewerAnalyticsPage() {
   const [range, setRange] = useState<Range>(30);
   const [category, setCategory] = useState("");
   const [department, setDepartment] = useState("");
+  const [place, setPlace] = useState("");
+  const [status, setStatus] = useState("");
+  const [priority, setPriority] = useState("");
+  const [worker, setWorker] = useState("");
   const chart = useChartTheme();
 
   return (
     <ViewerGate>
-      {({ data, slaConfig, demoToast }) => {
+      {({ data, slaConfig, demoToast, workerName, workers, stats }) => {
         const to = data.now;
         const from = new Date(to.getTime() - (range - 1) * DAY);
         const scoped = data.issues.filter(
-          (i) => i.createdAt.getTime() >= from.getTime() - 0 && (!category || i.category === category) && (!department || departmentFor(i.category) === department)
+          (i) =>
+            i.createdAt.getTime() >= from.getTime() - 0 &&
+            (!category || i.category === category) &&
+            (!department || departmentFor(i.category) === department) &&
+            (!status || i.status === status) &&
+            (!priority || i.priority === priority) &&
+            (!worker || i.assignedTo === worker) &&
+            (!place || buildingForIssue(i, stats.locationBuildings)?.id === place)
         );
         // Issues resolved in the window count even if reported earlier; reported-in-window drives everything else.
-        const status = statusCounts(scoped);
+        const statusTotals = statusCounts(scoped);
         const sla = slaSummary(scoped, slaConfig, data.now);
         const res = resolutionStats(scoped);
         const compliance = slaCompliance(sla.counts);
@@ -55,6 +67,10 @@ export default function ViewerAnalyticsPage() {
         const chips: FilterChip[] = [
           category && { key: "c", label: category, onRemove: () => setCategory("") },
           department && { key: "d", label: department, onRemove: () => setDepartment("") },
+          place && { key: "b", label: getBuilding(place)?.name ?? place, onRemove: () => setPlace("") },
+          status && { key: "s", label: `Status: ${status}`, onRemove: () => setStatus("") },
+          priority && { key: "p", label: `Priority: ${priority}`, onRemove: () => setPriority("") },
+          worker && { key: "w", label: workerName(worker), onRemove: () => setWorker("") },
         ].filter(Boolean) as FilterChip[];
 
         const exportRows = (kind: "csv" | "json") => {
@@ -94,6 +110,10 @@ export default function ViewerAnalyticsPage() {
                 onClear={() => {
                   setCategory("");
                   setDepartment("");
+                  setPlace("");
+                  setStatus("");
+                  setPriority("");
+                  setWorker("");
                 }}
                 trailing={
                   <Segmented<string>
@@ -121,6 +141,34 @@ export default function ViewerAnalyticsPage() {
                     <option key={d}>{d}</option>
                   ))}
                 </Select>
+                <Select size="sm" aria-label="Campus place" value={place} onChange={(e) => setPlace(e.target.value)} wrapperClassName="w-auto">
+                  <option value="">All places</option>
+                  {BUILDINGS.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </Select>
+                <Select size="sm" aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)} wrapperClassName="w-auto">
+                  <option value="">Any status</option>
+                  {ISSUE_STATUSES.map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </Select>
+                <Select size="sm" aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)} wrapperClassName="w-auto">
+                  <option value="">Any priority</option>
+                  {PRIORITIES.map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </Select>
+                <Select size="sm" aria-label="Worker" value={worker} onChange={(e) => setWorker(e.target.value)} wrapperClassName="w-auto">
+                  <option value="">All workers</option>
+                  {workers.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </Select>
               </FilterBar>
             </Card>
 
@@ -132,7 +180,7 @@ export default function ViewerAnalyticsPage() {
               <div data-tour="analytics-charts">
                 <KpiGrid className="mb-6 xl:grid-cols-4">
                   <KpiCard label="Reported" value={scoped.length} icon={<ListChecks />} hint={`Last ${range} days`} spark={trend.map((t) => t.reported)} />
-                  <KpiCard label="Resolved" value={status.Resolved} icon={<CheckCircle2 />} tone="success" hint={`${status.Open + status["In Progress"]} still open`} spark={trend.map((t) => t.resolved)} />
+                  <KpiCard label="Resolved" value={statusTotals.Resolved} icon={<CheckCircle2 />} tone="success" hint={`${statusTotals.Open + statusTotals["In Progress"]} still open`} spark={trend.map((t) => t.resolved)} />
                   <KpiCard label="Avg resolution" value={formatHours(res.averageHours) ?? "—"} icon={<Timer />} hint={res.medianHours !== null ? `Median ${formatHours(res.medianHours)}` : "Nothing resolved yet"} />
                   <KpiCard
                     label="SLA compliance"
@@ -227,7 +275,7 @@ export default function ViewerAnalyticsPage() {
                     <StackedBars
                       caption="Active and resolved tasks per worker"
                       height={260}
-                      data={load.map((l) => ({ name: (DEMO_WORKERS.find((w) => w.id === l.workerId)?.name ?? l.workerId).split(" ")[0], Active: l.active, Resolved: l.resolved }))}
+                      data={load.map((l) => ({ name: workerName(l.workerId).split(" ")[0], Active: l.active, Resolved: l.resolved }))}
                       series={[
                         { key: "Active", name: "Active", color: chart.warning },
                         { key: "Resolved", name: "Resolved", color: chart.secondary },

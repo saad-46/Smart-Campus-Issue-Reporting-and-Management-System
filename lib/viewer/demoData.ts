@@ -93,6 +93,8 @@ type Zone = "class" | "lab" | "wash" | "hall" | "outdoor" | "office" | "library"
 export interface DemoLocation {
   /** Stable canonical location id (the same id a QR code carries). */
   id: string;
+  /** Added by the demo administrator during this visit (not part of the researched dataset). */
+  custom?: boolean;
   name: string;
   /** Map place the location belongs to, or "" when its position on campus is not known. */
   buildingId: string;
@@ -215,11 +217,15 @@ export interface DemoClaim {
   amount: number;
   description: string;
   status: "pending" | "approved" | "rejected";
+  /** When a simulated decision was made (baseline claims derive theirs from the resolution time). */
+  decidedAt?: Date;
 }
 
 export interface DemoFeedback {
   rating: number;
   comment: string;
+  /** When a simulated rating was given. */
+  at?: Date;
 }
 
 export interface DemoIssue extends IssueSummary {
@@ -238,6 +244,12 @@ export interface DemoIssue extends IssueSummary {
   claim?: DemoClaim;
   /** Created during this visit by a simulated action. */
   simulated?: boolean;
+  /** When a simulated assignment happened (baseline issues derive theirs). */
+  assignedAt?: Date;
+  /** The Student perspective's account has upvoted this report. */
+  upvotedByMe?: boolean;
+  /** Steps recorded by simulated actions that the issue's own fields can't express (linking, unlinking). */
+  events?: DemoEvent[];
 }
 
 export interface DemoEvent {
@@ -409,24 +421,26 @@ export function workerName(id: string): string {
 }
 
 /** Timeline derived from the issue's own fields (the same lifecycle the real app records). */
-export function demoTimeline(issue: DemoIssue, now?: Date): DemoEvent[] {
+export function demoTimeline(issue: DemoIssue, now?: Date, nameOf: (workerId: string) => string = workerName): DemoEvent[] {
   const events: DemoEvent[] = [
     { type: "reported", at: issue.createdAt, text: `Reported by ${issue.reporterName} · suggested ${issue.category}, ${issue.priority.toLowerCase()} priority` },
   ];
-  if (issue.duplicateOf) events.push({ type: "linked", at: new Date(issue.createdAt.getTime() + 60_000), text: `Linked to ${issue.duplicateOf} as the same problem` });
+  const recorded = issue.events ?? [];
+  if (issue.duplicateOf && !recorded.some((e) => e.type === "linked")) events.push({ type: "linked", at: new Date(issue.createdAt.getTime() + 60_000), text: `Linked to ${issue.duplicateOf} as the same problem` });
+  events.push(...recorded);
   if (issue.assignedTo) {
-    const assignedAt = new Date(Math.min(issue.startedAt?.getTime() ?? Infinity, issue.createdAt.getTime() + HOUR / 2));
-    events.push({ type: "assigned", at: assignedAt, text: `Assigned to ${workerName(issue.assignedTo)}` });
+    const assignedAt = issue.assignedAt ?? new Date(Math.min(issue.startedAt?.getTime() ?? Infinity, issue.createdAt.getTime() + HOUR / 2));
+    events.push({ type: "assigned", at: assignedAt, text: `Assigned to ${nameOf(issue.assignedTo)}` });
   }
   if (issue.startedAt) events.push({ type: "started", at: issue.startedAt, text: "Work started" });
   if (issue.resolvedAt) events.push({ type: "resolved", at: issue.resolvedAt, text: issue.resolutionSummary ? `Resolved · ${issue.resolutionSummary}` : "Resolved" });
   if (issue.claim && issue.resolvedAt) {
-    const decided = new Date(issue.resolvedAt.getTime() + 2 * HOUR);
+    const decided = issue.claim.decidedAt ?? new Date(issue.resolvedAt.getTime() + 2 * HOUR);
     if (issue.claim.status === "approved") events.push({ type: "claim_approved", at: decided, text: "Expense claim approved and paid" });
     if (issue.claim.status === "rejected") events.push({ type: "claim_rejected", at: decided, text: "Expense claim rejected" });
   }
   if (issue.feedback && issue.resolvedAt) {
-    events.push({ type: "feedback", at: new Date(issue.resolvedAt.getTime() + 3 * HOUR), text: `${issue.reporterName} rated the fix ${issue.feedback.rating}/5` });
+    events.push({ type: "feedback", at: issue.feedback.at ?? new Date(issue.resolvedAt.getTime() + 3 * HOUR), text: `${issue.reporterName} rated the fix ${issue.feedback.rating}/5` });
   }
   // A decision or rating that would fall after "now" has not happened yet.
   return events.filter((e) => !now || e.at.getTime() <= now.getTime()).sort((a, b) => a.at.getTime() - b.at.getTime());

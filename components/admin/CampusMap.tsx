@@ -6,6 +6,7 @@ import geometry from "@/data/campuses/sues-hyderabad/geometry.json";
 import { BUILDINGS, CAMPUS_GRID, project, VERIFICATION_LABELS } from "@/lib/campus";
 import { Hotspot } from "@/lib/intelligence/analytics";
 import { cn } from "@/lib/cn";
+import { layoutLabels } from "@/lib/mapLabels";
 
 type Metric = "open" | "total";
 
@@ -134,12 +135,43 @@ export default function CampusMap({
   const endDrag = () => {
     drag.current = null;
   };
+  // Keyboard: + and - zoom, 0 resets, arrow keys pan a zoomed map (focus is on a marker or the zoom buttons).
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (compact || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === "+" || e.key === "=") zoom(1.5);
+    else if (e.key === "-") zoom(1 / 1.5);
+    else if (e.key === "0") setView({ k: 1, x: W / 2, y: H / 2 });
+    else if (view.k > 1 && e.key.startsWith("Arrow")) {
+      const step = vw / 6;
+      setView((v) => clamp({ ...v, x: v.x + (e.key === "ArrowRight" ? step : e.key === "ArrowLeft" ? -step : 0), y: v.y + (e.key === "ArrowDown" ? step : e.key === "ArrowUp" ? -step : 0) }));
+    } else return;
+    e.preventDefault();
+  };
 
   const roadNames = of("road").filter((r) => r.name === "Road No. 3").slice(0, 1);
 
+  // Marker sizes and collision-free label positions (see lib/mapLabels.ts).
+  const radiusOf = (id: string) => ((compact ? 9 : 10) + (max > 0 ? (valueOf(byId.get(id)) / max) * 9 : 0)) * fontScale;
+  const labelSize = 8.5 * fontScale;
+  const labels = new Map(
+    layoutLabels(
+      BUILDINGS.map((b) => ({
+        id: b.id,
+        x: b.x,
+        y: b.y,
+        r: radiusOf(b.id),
+        text: b.short,
+        pinned: selectedId === b.id,
+        priority: (highlight?.has(b.id) ? 1000 : 0) + valueOf(byId.get(b.id)),
+      })),
+      labelSize,
+      { width: W, height: H }
+    ).map((l) => [l.id, l])
+  );
+
   return (
     <div>
-      <div className="relative">
+      <div className="relative" onKeyDown={onKeyDown}>
         <svg
           ref={svgRef}
           viewBox={`${(view.x - vw / 2).toFixed(1)} ${(view.y - vh / 2).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`}
@@ -221,7 +253,8 @@ export default function CampusMap({
                 const level = heatLevel(value, max);
                 const selected = selectedId === b.id;
                 const dimmed = highlight && !highlight.has(b.id);
-                const r = (compact ? 9 : 10) + (max > 0 ? (value / max) * 9 : 0);
+                const r = radiusOf(b.id);
+                const placed = labels.get(b.id)!;
                 const label = valueLabel
                   ? `${b.name}: ${value} ${valueLabel}${value === 1 ? "" : "s"}. ${VERIFICATION_LABELS[b.verificationStatus]}.`
                   : `${b.name}: ${value} ${metricLabel} issue${value === 1 ? "" : "s"}${h?.topCategory ? `, mostly ${h.topCategory}` : ""}. ${VERIFICATION_LABELS[b.verificationStatus]}.`;
@@ -245,7 +278,7 @@ export default function CampusMap({
                         : undefined
                     }
                     opacity={dimmed ? 0.3 : 1}
-                    className={cn("transition-opacity", interactive && "cursor-pointer outline-none [&:focus-visible>circle.marker]:stroke-[var(--fg)] [&:hover>circle.marker]:stroke-[var(--fg)]")}
+                    className={cn("group/place transition-opacity", interactive && "cursor-pointer outline-none [&:focus-visible>circle.marker]:stroke-[var(--fg)] [&:hover>circle.marker]:stroke-[var(--fg)]")}
                   >
                     <title>{label}</title>
                     {/* How far the true position may be from the marker. */}
@@ -254,7 +287,7 @@ export default function CampusMap({
                       className="marker transition-[stroke]"
                       cx={b.x}
                       cy={b.y}
-                      r={r * fontScale}
+                      r={r}
                       fill={`var(--heat-${level})`}
                       stroke={selected ? "var(--fg)" : "var(--brand-fg)"}
                       strokeWidth={selected ? 2.2 : 1}
@@ -264,16 +297,20 @@ export default function CampusMap({
                     </text>
                     {!compact && (
                       <text
-                        x={b.x}
-                        y={b.y - (r + 4) * fontScale}
-                        textAnchor="middle"
-                        fontSize={8.5 * fontScale}
-                        fontWeight="600"
+                        x={placed.x}
+                        y={placed.y}
+                        textAnchor={placed.anchor}
+                        fontSize={labelSize}
+                        fontWeight={selected ? "700" : "600"}
                         fill="var(--fg)"
                         stroke="var(--surface-2)"
                         strokeWidth={2.4 * fontScale}
                         paintOrder="stroke"
                         aria-hidden="true"
+                        data-label={b.id}
+                        data-label-visible={placed.visible}
+                        // A label with no free position is shown on hover or keyboard focus instead of on top of its neighbours.
+                        className={placed.visible ? undefined : "opacity-0 transition-opacity group-hover/place:opacity-100 group-focus-visible/place:opacity-100"}
                       >
                         {b.short}
                       </text>

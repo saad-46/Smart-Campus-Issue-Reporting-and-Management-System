@@ -4,7 +4,9 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Clock, ListChecks, ShieldCheck, Timer, TriangleAlert, UserPlus } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import Button from "@/components/ui/Button";
+import Button, { buttonClasses } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import { IncidentCluster } from "@/lib/intelligence/similarity";
 import Badge from "@/components/ui/Badge";
 import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
 import { EmptyState } from "@/components/ui/States";
@@ -19,10 +21,11 @@ import { formatRelative, greeting } from "@/lib/dates";
 export default function ViewerAdminPage() {
   const [assigning, setAssigning] = useState<DemoIssue | null>(null);
   const [paying, setPaying] = useState<DemoIssue | null>(null);
+  const [pendingCluster, setPendingCluster] = useState<IncidentCluster | null>(null);
 
   return (
     <ViewerGate>
-      {({ data, stats, slaConfig, workerRequests, approveWorkerRequest }) => {
+      {({ data, stats, slaConfig, workerRequests, approveWorkerRequest, setEscalation, groupIncident }) => {
         const byId = new Map(data.issues.map((i) => [i.id, i]));
         const attention = stats.sla.alerts.slice(0, 5).map((a) => byId.get(a.issue.id)!).filter(Boolean);
         const pendingClaims = data.issues.filter((i) => i.claim?.status === "pending");
@@ -85,18 +88,52 @@ export default function ViewerAdminPage() {
                     now={data.now}
                     config={slaConfig}
                     label="Issues needing attention"
-                    actionFor={(i) =>
-                      i.assignedTo ? undefined : (
-                        <Button size="sm" onClick={() => setAssigning(i)} icon={<UserPlus className="h-3.5 w-3.5" aria-hidden="true" />}>
-                          Assign worker
-                        </Button>
-                      )
-                    }
+                    actionFor={(i) => (
+                      <span className="flex flex-wrap items-center gap-2">
+                        {!i.assignedTo && (
+                          <Button size="sm" onClick={() => setAssigning(i)} icon={<UserPlus className="h-3.5 w-3.5" aria-hidden="true" />}>
+                            Assign worker
+                          </Button>
+                        )}
+                        {i.escalated ? (
+                          <Badge tone="danger" icon={<TriangleAlert aria-hidden="true" />}>
+                            Escalated
+                          </Badge>
+                        ) : (
+                          <Button size="sm" variant="tertiary" onClick={() => setEscalation(i.id, true)} aria-label={`Escalate ${i.id}`}>
+                            Escalate
+                          </Button>
+                        )}
+                      </span>
+                    )}
                   />
                 )}
               </SectionCard>
 
               <SectionCard title="Incidents" description="Reports of the same fault, linked into one" tour="admin-incidents" flush>
+                {stats.suggestedIncidents.length > 0 && (
+                  <div className="border-b border-border px-4 py-3 sm:px-5">
+                    <p className="mb-2 text-xs font-medium text-fg-subtle">Suggested — please review</p>
+                    <ul className="space-y-2">
+                      {stats.suggestedIncidents.slice(0, 4).map((c) => (
+                        <li key={c.masterIssueId} className="rounded-md border border-border px-3 py-2.5">
+                          <p className="text-sm text-fg">
+                            <span className="font-medium">{c.reportCount} similar reports</span> · {c.title}
+                          </p>
+                          <p className="text-xs text-fg-subtle">{c.location}</p>
+                          <div className="mt-1.5 flex gap-1">
+                            <Link href={`/viewer/issues/${c.masterIssueId}`} className={buttonClasses("ghost", "sm", "h-7 px-2 text-xs")}>
+                              Review
+                            </Link>
+                            <Button variant="tertiary" size="sm" className="h-7 px-2 text-xs" onClick={() => setPendingCluster(c)}>
+                              Group as one incident
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {stats.incidents.length === 0 ? (
                   <EmptyState title="No linked incidents" compact />
                 ) : (
@@ -175,6 +212,21 @@ export default function ViewerAdminPage() {
 
             <AssignDialog issue={assigning} onClose={() => setAssigning(null)} />
             <PayDialog issue={paying} onClose={() => setPaying(null)} />
+            <ConfirmDialog
+              open={!!pendingCluster}
+              title="Group these reports as one incident?"
+              description={
+                pendingCluster
+                  ? `${pendingCluster.relatedIssueIds.length} report${pendingCluster.relatedIssueIds.length === 1 ? "" : "s"} will be linked to “${pendingCluster.title}”. Each keeps its own status and its reporter still gets updates. Demo only: nothing is saved.`
+                  : undefined
+              }
+              confirmLabel="Group as one incident"
+              onConfirm={() => {
+                if (pendingCluster) groupIncident(pendingCluster.masterIssueId, pendingCluster.relatedIssueIds);
+                setPendingCluster(null);
+              }}
+              onCancel={() => setPendingCluster(null)}
+            />
           </>
         );
       }}

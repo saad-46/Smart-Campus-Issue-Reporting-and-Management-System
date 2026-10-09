@@ -42,8 +42,8 @@ export default function ViewerTimelinePage() {
 
   return (
     <ViewerGate>
-      {({ data, role }) => {
-        const all = demoActivity(data);
+      {({ data, role, workerName }) => {
+        const all = demoActivity(data, 400, workerName);
         const types = GROUPS.find((g) => g.value === group)!.types;
         const categories = [...new Set(data.issues.map((i) => i.category))].sort();
         const filtered = all.filter((a) => (!types.length || types.includes(a.type)) && (!category || a.issue.category === category) && (role !== "student" || a.issue.mine || a.type === "reported"));

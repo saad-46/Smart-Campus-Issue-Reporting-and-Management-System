@@ -10,7 +10,7 @@ import { Pagination, SortButton } from "@/components/ui/Filters";
 import { TableWrap, td, th, trHover } from "@/components/ui/Data";
 import { SlaBadgeView } from "@/components/issue/SlaView";
 import { computeSla } from "@/lib/intelligence/sla";
-import { DemoData, DemoIssue, workerName } from "@/lib/viewer/demoData";
+import { DemoData, DemoIssue } from "@/lib/viewer/demoData";
 import { DemoStats } from "@/lib/viewer/demoStats";
 import { formatRelative } from "@/lib/dates";
 import { cn } from "@/lib/cn";
@@ -45,7 +45,8 @@ export function ViewerGate({ children }: { children: (viewer: ReadyViewer) => Re
 }
 
 /** One issue in a list; the whole row opens the issue page. */
-export function DemoIssueRow({ issue, now, config, showAssignee, action }: { issue: DemoIssue; now: Date; config: ReadyViewer["slaConfig"]; showAssignee?: boolean; action?: React.ReactNode }) {
+export function DemoIssueRow({ issue, now, config, showAssignee, action, footer }: { issue: DemoIssue; now: Date; config: ReadyViewer["slaConfig"]; showAssignee?: boolean; action?: React.ReactNode; footer?: React.ReactNode }) {
+  const { workerName } = useViewer();
   return (
     // Container query: rows sit in full-width lists and in narrow side cards, so lay out by the row's own width.
     <li className="@container relative px-4 py-3 transition-colors hover:bg-surface-hover sm:px-5">
@@ -82,15 +83,16 @@ export function DemoIssueRow({ issue, now, config, showAssignee, action }: { iss
       </div>
       {/* Above the row's stretched link so it stays clickable. */}
       {action && <div className="relative z-10 mt-2.5">{action}</div>}
+      {footer && <div className="relative z-10 mt-2">{footer}</div>}
     </li>
   );
 }
 
-export function DemoIssueList({ issues, now, config, label, showAssignee, actionFor }: { issues: DemoIssue[]; now: Date; config: ReadyViewer["slaConfig"]; label: string; showAssignee?: boolean; actionFor?: (i: DemoIssue) => React.ReactNode }) {
+export function DemoIssueList({ issues, now, config, label, showAssignee, actionFor, footerFor }: { issues: DemoIssue[]; now: Date; config: ReadyViewer["slaConfig"]; label: string; showAssignee?: boolean; actionFor?: (i: DemoIssue) => React.ReactNode; footerFor?: (i: DemoIssue) => React.ReactNode }) {
   return (
     <ul aria-label={label} className="divide-y divide-border">
       {issues.map((i) => (
-        <DemoIssueRow key={i.id} issue={i} now={now} config={config} showAssignee={showAssignee} action={actionFor?.(i)} />
+        <DemoIssueRow key={i.id} issue={i} now={now} config={config} showAssignee={showAssignee} action={actionFor?.(i)} footer={footerFor?.(i)} />
       ))}
     </ul>
   );
@@ -123,6 +125,7 @@ export function IssueTable({
   emptyAction?: React.ReactNode;
   tour?: string;
 }) {
+  const { workerName } = useViewer();
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "created", dir: "desc" });
   const [page, setPage] = useState(1);
 
