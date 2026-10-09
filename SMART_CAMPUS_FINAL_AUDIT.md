@@ -1438,3 +1438,18 @@ An earlier live run, started while the deployment was still building, showed 12 
 - **Not verified:** signing in as student, worker and admin on the live site; the payment flow on production (no controlled test claim exists, so it must stay untested); a physical QR scan; screen readers (axe cannot judge wording or reading order); Safari and Firefox (Chromium only).
 - **Failed:** nothing outstanding.
 - **Open:** the red check from `smart-campus-unifix`; the old browser key; the dev-only audit findings.
+
+
+---
+
+## Landing Page Redesign (2026-10-09)
+
+Code `c8ccad2`, deployed as `dpl_DKKyZ7J2…` (READY, production, built from `main`) on project `smart-campus-issue-reporting-and-management-system`.
+
+- **Design:** asymmetric hero (headline "Every campus issue. One connected system.", primary action Explore the Platform to `/viewer`, Sign in secondary, a drawn product preview with two selective glass annotations); a value section; the seven-step lifecycle taken from `components/viewer/lifecycle.ts` (horizontal on desktop, vertical on phones); five alternating capability stories with drawn panels (issue and deadline, ranked assignment, analytics, the real `CampusMap` with sample counts, notifications); a live-demo section with one entry point per role; an access-and-data section; a final call to action; a finished footer. Indigo/violet tokens and light/dark themes are the existing ones. No customer logos, testimonials, statistics or certifications. "AI" is not claimed: suggestions are described as rule-based. The preview is an illustration with sample figures of the same scale as the demo dataset and is labelled as such.
+- **Footer:** the hackathon wording is removed. The footer ends with exactly `Built with love by SoloDev`; the live HTML contains it once and contains no "hackathon". It lived only in the landing page, so no other route changed.
+- **Components:** new `components/landing/{LandingNav,ProductPreview,Showcases}.tsx`; reused `Drawer` (mobile menu), `ThemeToggle`, `Logo` (now has an accessible name, needed when its wordmark is hidden at 320 px), `CampusMap`, badges and the lifecycle data. No Firebase, rules, schema, payment or authorization code was touched.
+- **Found and fixed by the tests:** the header pushed the menu button off-screen at 320–390 px (Sign in is now in the menu below 768 px, the wordmark collapses below 360 px).
+- **Results:** unit 248 / 248; tsc and eslint clean; build passes; end-to-end 93 / 93 locally and 93 / 93 against the live URL after the deployment was READY. The 93 include the responsive matrix (10 viewports × dark and light) and axe A/AA over the landing page, plus 6 landing tests: every link resolves and no `href="#"`, every in-page anchor has a target, Explore opens the Viewer (not login), Sign in / Register / logo routes, section links leave the heading below the sticky bar, the mobile menu (visible button, focus stays inside, Escape closes and returns focus, link closes it), theme toggle, and no Firestore or sign-in-service request from a signed-out visitor.
+- **Visual review:** screenshots at 1440×900 (dark and light, hero and full page) and 390×844 (dark and light, hero) were looked at; the mobile light full page and the intermediate widths were covered only by the automated checks.
+- **Limitations:** the landing page sits in the `(app)` route group because it redirects signed-in users to their dashboard, so the Firebase Auth SDK still loads there (the Viewer does not); a signed-out visitor makes no Firestore or sign-in-service request. Screen-reader wording and non-Chromium browsers were not tested. Page weight and Core Web Vitals were not measured; the page adds no new dependency or image.
