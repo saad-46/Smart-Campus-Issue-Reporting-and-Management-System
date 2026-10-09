@@ -6,8 +6,8 @@ const demoToast = (page: import("@playwright/test").Page) => page.getByRole("lis
 test.describe("entry and roles", () => {
   test("landing page leads to the Viewer, which shows the demo badge", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Campus operations");
-    await page.getByRole("link", { name: "Explore as Viewer" }).first().click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Every campus issue.");
+    await page.getByRole("main").getByRole("link", { name: "Explore the Platform" }).first().click();
     await expect(page).toHaveURL(/\/viewer$/);
     await expect(page.getByText("Viewer mode").first()).toBeVisible();
   });

@@ -15,7 +15,7 @@ export function LogoMark({ className }: { className?: string }) {
 
 export default function Logo({ href = "/", className, subtitle }: { href?: string; className?: string; subtitle?: string }) {
   return (
-    <Link href={href} className={cn("inline-flex items-center gap-2.5 rounded-md", className)}>
+    <Link href={href} aria-label="UniFix" className={cn("inline-flex items-center gap-2.5 rounded-md", className)}>
       <LogoMark />
       <span className="flex flex-col leading-none">
         <span className="text-[15px] font-semibold tracking-tight text-fg">UniFix</span>

@@ -3,119 +3,74 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowRight,
-  BarChart3,
-  BellRing,
-  ClipboardCheck,
-  Clock,
-  Eye,
-  GraduationCap,
-  HardHat,
-  Lock,
-  Map as MapIcon,
-  QrCode,
-  ShieldCheck,
-  Sparkles,
-  Users,
-  Wrench,
-} from "lucide-react";
-import ThemeToggle from "@/components/ThemeToggle";
+import { ArrowRight, Check, Eye, GraduationCap, HardHat, Play, ShieldCheck } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
 import Logo from "@/components/shell/Logo";
 import { buttonClasses } from "@/components/ui/Button";
-import Badge, { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
+import LandingNav from "@/components/landing/LandingNav";
+import ProductPreview from "@/components/landing/ProductPreview";
+import { ActivityPanel, AnalyticsPanel, AssignPanel, IssuePanel, MapPanel } from "@/components/landing/Showcases";
+import { LIFECYCLE } from "@/components/viewer/lifecycle";
 import { dashboardPathForRole } from "@/lib/roles";
+import { cn } from "@/lib/cn";
 
-const STEPS = [
-  { icon: QrCode, title: "Report", body: "Scan the QR code at the location or describe the problem. A category and priority are suggested; you confirm." },
-  { icon: Users, title: "Assign", body: "Administrators see similar reports grouped together and assign an approved worker, with a ranked suggestion." },
-  { icon: ClipboardCheck, title: "Resolve", body: "Workers update progress. Every step is recorded on the issue timeline against a clear deadline." },
-  { icon: BarChart3, title: "Learn", body: "Reporters rate the fix. Trends, hotspots and recurring faults surface from the recorded history." },
-];
+const PROBLEMS = [
+  ["Report", "A student describes the problem or scans the QR code at the location. A category, priority and team are suggested, and similar open reports are shown first."],
+  ["Resolve", "An administrator assigns a worker from ranked suggestions. Every status change lands on one timeline, against a deadline."],
+  ["Understand", "Trends, hotspots, workload and satisfaction come from the same records, so decisions don't depend on memory or spreadsheets."],
+] as const;
 
-const CAPABILITIES = [
-  { icon: ClipboardCheck, title: "Issue management", text: "One queue for every report, with filters, deadlines, a timeline and an audit trail on each issue." },
-  { icon: Sparkles, title: "Operational intelligence", text: "Suggested category and priority with the reason shown, duplicate detection and incident linking." },
-  { icon: BarChart3, title: "Analytics", text: "Volume, deadline performance, department results and when problems get reported." },
-  { icon: MapIcon, title: "Campus map", text: "Issue density, incidents, maintenance risk and deadline hotspots by building." },
-  { icon: HardHat, title: "Worker workflow", text: "Assigned tasks by urgency, expense claims with receipts, paid exactly once." },
-  { icon: BellRing, title: "Notifications", text: "People are told when work is assigned, started or resolved, and when a claim is decided." },
-];
+const FEATURES = [
+  {
+    id: "issues",
+    eyebrow: "Issue management",
+    title: "Every report has an owner, a deadline and a history.",
+    text: "Reports go into one queue with filters and search. Each priority has a target time, and the deadline state is calculated from timestamps, so it can't drift. Reports of the same fault are linked into a single incident rather than fixed five times.",
+    points: ["Deadline per priority, with early warnings", "Duplicate suggestions before a report is submitted", "A timeline of every recorded step"],
+    visual: <IssuePanel />,
+  },
+  {
+    id: "workers",
+    eyebrow: "Worker coordination",
+    title: "Assign the right person, and settle the cost once.",
+    text: "Suggestions rank workers by experience in the category, current workload and ratings, and show the reason. Workers see their tasks by urgency. Expense claims carry an amount, what it was for and a receipt, and an administrator reviews each one.",
+    points: ["Ranked suggestions with the reason shown", "Worker access approved by an administrator", "Claims reviewed and paid exactly once"],
+    visual: <AssignPanel />,
+  },
+  {
+    id: "analytics",
+    eyebrow: "Operational analytics",
+    title: "See what is happening across the campus.",
+    text: "Volume, resolution time, deadline performance and department results update from the same data as the issue queue. Filter by range and category, and export the figures as CSV or JSON without reporter identities.",
+    points: ["Trends, categories and priorities", "Deadline compliance by department", "When problems get reported"],
+    visual: <AnalyticsPanel />,
+  },
+  {
+    id: "map",
+    eyebrow: "Campus map and QR reporting",
+    title: "Know where problems cluster.",
+    text: "A schematic campus map shades each building by open issues, linked incidents, maintenance risk or overdue work. Every location can have a printable QR code that opens the report form with the place filled in.",
+    points: ["Four map layers and a building detail panel", "Recurring-fault indicator per place", "QR codes per location"],
+    visual: <MapPanel />,
+  },
+  {
+    id: "activity",
+    eyebrow: "Notifications and feedback",
+    title: "Keep everyone informed without chasing.",
+    text: "Reporters are told when work starts and when it is resolved, workers when a task arrives or a claim is decided, and administrators when something needs review. The reporter then rates the fix once, which feeds worker suggestions.",
+    points: ["In-app notifications for status changes", "One rating per resolved issue", "Unread markers and mark all read"],
+    visual: <ActivityPanel />,
+  },
+] as const;
 
 const ROLES = [
-  { icon: GraduationCap, title: "Students", text: "Report in under a minute, follow progress, rate the fix." },
-  { icon: Wrench, title: "Workers", text: "A prioritised queue, one-tap status updates, claims." },
-  { icon: ShieldCheck, title: "Administrators", text: "Assignment, deadlines, finance and campus-wide analytics." },
-];
+  { href: "/viewer/student", icon: GraduationCap, name: "Student", text: "Report, follow and rate" },
+  { href: "/viewer/worker", icon: HardHat, name: "Worker", text: "Tasks, resolution and claims" },
+  { href: "/viewer/admin", icon: ShieldCheck, name: "Administrator", text: "Assignment, deadlines and analytics" },
+] as const;
 
-const SECURITY = [
-  { icon: ShieldCheck, text: "Every permission is enforced by the database rules, not only the interface." },
-  { icon: Users, text: "Administrator and worker access is granted by people, never self-assigned." },
-  { icon: Lock, text: "Receipts are visible only to the worker who filed them and administrators." },
-  { icon: Clock, text: "Rate limits and validation protect the system from spam and malformed data." },
-];
-
-/** Static illustration of the product (sample content, not live data). Tilted slightly in 3D on wide screens. */
-function ProductPreview() {
-  const bars = [38, 52, 44, 66, 58, 74, 62, 80, 70, 88, 76, 94];
-  return (
-    <figure className="stage-3d relative">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 lg:-inset-6 bg-[radial-gradient(closest-side,var(--glow),transparent)]" />
-      <div aria-hidden="true" className="tilt-3d glass-blur depth-2 overflow-hidden rounded-2xl">
-        <div className="flex items-center gap-1.5 border-b border-glass-border px-4 py-2.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-danger/70" />
-          <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
-          <span className="h-2.5 w-2.5 rounded-full bg-success/70" />
-          <span className="ml-3 h-4 w-40 rounded-full bg-surface-2" />
-        </div>
-        <div className="grid grid-cols-[3.25rem_1fr] sm:grid-cols-[9rem_1fr]">
-          <div className="space-y-1.5 border-r border-glass-border p-2.5 sm:p-3">
-            {["Overview", "Issues", "Analytics", "Campus map", "Workers"].map((l, i) => (
-              <div key={l} className={`flex h-7 items-center gap-2 rounded-md px-2 text-[11px] ${i === 0 ? "bg-brand-subtle font-medium text-brand-fg" : "text-fg-subtle"}`}>
-                <span className="h-3 w-3 shrink-0 rounded-sm bg-current opacity-60" />
-                <span className="hidden sm:inline">{l}</span>
-              </div>
-            ))}
-          </div>
-          <div className="min-w-0 p-3 sm:p-4">
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                ["Open", "24", "text-warning"],
-                ["Resolved", "103", "text-success"],
-                ["SLA", "91%", "text-brand-fg"],
-              ].map(([label, value, tone]) => (
-                <div key={label} className="rounded-lg border border-glass-border bg-surface/60 p-2.5">
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-fg-subtle">{label}</p>
-                  <p className={`mt-0.5 text-lg font-semibold ${tone}`}>{value}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex h-20 items-end gap-1 rounded-lg border border-glass-border bg-surface/50 p-2">
-              {bars.map((h, i) => (
-                <span key={i} className="flex-1 rounded-t bg-gradient-to-t from-brand/40 to-accent/80" style={{ height: `${h}%` }} />
-              ))}
-            </div>
-            <div className="mt-3 space-y-2">
-              {[
-                ["Projector not turning on in Room 104", "In Progress", "High"],
-                ["Water leaking in the washroom", "Open", "High"],
-              ].map(([title, status, priority]) => (
-                <div key={title} className="flex items-center justify-between gap-2 rounded-lg border border-glass-border bg-surface/60 px-2.5 py-2">
-                  <span className="truncate text-[11px] font-medium text-fg">{title}</span>
-                  <span className="hidden shrink-0 gap-1 sm:flex">
-                    <StatusBadge status={status as "Open" | "In Progress"} />
-                    <PriorityBadge priority={priority as "High"} />
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-      <figcaption className="mt-4 text-center text-xs text-fg-subtle">Illustration with sample content</figcaption>
-    </figure>
-  );
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-fg">{children}</p>;
 }
 
 export default function LandingPage() {
@@ -128,87 +83,94 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-dvh">
-      <header className="glass-bar sticky top-0 z-40 border-b">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
-          <Logo />
-          <nav aria-label="Sections" className="hidden items-center gap-1 md:flex">
-            {[
-              ["How it works", "#how-it-works"],
-              ["Capabilities", "#capabilities"],
-              ["Security", "#security"],
-            ].map(([label, href]) => (
-              <a key={href} href={href} className="rounded-lg px-2.5 py-1.5 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg">
-                {label}
-              </a>
-            ))}
-            <Link href="/viewer" className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-brand-fg transition-colors hover:bg-surface-hover">
-              Explore as Viewer
-            </Link>
-          </nav>
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-            <ThemeToggle />
-            <Link href="/login" className={buttonClasses("ghost", "md", "max-sm:hidden")}>
-              Sign in
-            </Link>
-            <Link href="/register" className={buttonClasses("primary")}>
-              Create account
-            </Link>
-          </div>
-        </div>
-      </header>
+      <a href="#main" className="sr-only z-[100] rounded-md bg-surface px-3 py-2 text-sm font-medium text-fg shadow-md focus:not-sr-only focus:fixed focus:left-3 focus:top-3">
+        Skip to content
+      </a>
+      <LandingNav />
 
-      <main>
+      <main id="main" tabIndex={-1} className="outline-none">
         {/* Hero */}
-        <section className="border-b border-glass-border">
-          <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:py-24">
+        <section className="relative overflow-x-clip">
+          <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 pb-20 pt-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.12fr)] lg:gap-10 lg:pb-28 lg:pt-20">
             <div>
-              <Badge tone="info" icon={<Sparkles aria-hidden="true" />}>
-                Smart campus management
-              </Badge>
-              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-fg sm:text-5xl sm:leading-[1.08]">
-                Campus operations, <span className="text-gradient">under control.</span>
-              </h1>
-              <p className="mt-5 max-w-xl text-lg leading-relaxed text-fg-muted">
-                UniFix gives students, maintenance staff and administrators one place to report, assign, resolve and learn from every campus issue, with a clear record of
-                who did what, and when.
+              <p className="inline-flex items-center gap-2 rounded-full border border-brand-subtle-border bg-brand-subtle px-3 py-1 text-xs font-medium text-brand-fg">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-fg" aria-hidden="true" />
+                Campus issue reporting and operations
               </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <h1 className="mt-5 text-[2.5rem] font-semibold leading-[1.06] tracking-[-0.03em] text-fg sm:text-5xl lg:text-[3.4rem]">
+                <span className="block">Every campus issue.</span>
+                <span className="text-gradient block">One connected system.</span>
+              </h1>
+              <p className="mt-5 max-w-xl text-[1.0625rem] leading-relaxed text-fg-muted sm:text-lg">
+                UniFix connects reporting, assignment, resolution and analytics for students, maintenance teams and administrators, so every problem has an owner, a
+                deadline and a record.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Link href="/viewer" className={buttonClasses("primary", "lg", "glow-brand")}>
-                  <Eye className="h-4 w-4" aria-hidden="true" />
-                  Explore as Viewer
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  <Play className="h-4 w-4" aria-hidden="true" />
+                  Explore the Platform
                 </Link>
                 <Link href="/login" className={buttonClasses("secondary", "lg")}>
                   Sign in
                 </Link>
-                <Link href="/register" className={buttonClasses("secondary", "lg")}>
-                  Create account
-                </Link>
               </div>
-              <p className="mt-4 text-[13px] text-fg-subtle">
-                The Viewer is the whole product on a sample campus: no account, nothing saved, no real data. Try it as a student, a worker or an administrator.
+              <p className="mt-4 max-w-md text-[13px] leading-relaxed text-fg-subtle">
+                The live demo needs no account. It runs on sample data, and nothing you do is saved. New here?{" "}
+                <Link href="/register" className="font-medium text-brand-fg underline-offset-2 hover:underline">
+                  Create an account
+                </Link>
+                .
               </p>
             </div>
             <ProductPreview />
           </div>
         </section>
 
-        {/* How it works */}
-        <section id="how-it-works" className="scroll-mt-16 border-b border-glass-border">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
-            <h2 className="text-2xl font-semibold tracking-tight text-fg">How it works</h2>
-            <p className="mt-2 max-w-2xl text-fg-muted">One flow from the moment something breaks to the moment it&apos;s confirmed fixed.</p>
-            <ol className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {STEPS.map((step, i) => (
-                <li key={step.title} className="glass lift rounded-xl p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-brand-subtle-border bg-brand-subtle text-brand-fg">
-                      <step.icon className="h-[18px] w-[18px]" aria-hidden="true" />
-                    </span>
-                    <span className="tabular text-xs font-medium text-fg-subtle">Step {i + 1}</span>
+        {/* Value */}
+        <section id="product" className="scroll-mt-20 border-y border-glass-border bg-surface/40">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_1.35fr] lg:gap-16 lg:py-24">
+            <div className="lg:sticky lg:top-28 lg:self-start">
+              <Eyebrow>Why it exists</Eyebrow>
+              <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-tight text-fg sm:text-4xl">Problems on campus shouldn&apos;t depend on who you happened to tell.</h2>
+              <p className="mt-4 max-w-md text-fg-muted">
+                A broken projector reported by phone, a leak mentioned in passing, a claim on paper: none of it connects. UniFix gives each issue one record from the first
+                report to the final rating.
+              </p>
+            </div>
+            <ol className="divide-y divide-glass-border border-y border-glass-border">
+              {PROBLEMS.map(([title, text], i) => (
+                <li key={title} className="grid grid-cols-[2.5rem_1fr] gap-4 py-6 sm:grid-cols-[3.5rem_1fr] sm:py-8">
+                  <span className="tabular font-mono text-sm text-brand-fg">0{i + 1}</span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-fg">{title}</h3>
+                    <p className="mt-1.5 max-w-xl leading-relaxed text-fg-muted">{text}</p>
                   </div>
-                  <h3 className="mt-4 font-semibold text-fg">{step.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* Workflow */}
+        <section id="workflow" className="scroll-mt-20">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
+            <div className="max-w-2xl">
+              <Eyebrow>Workflow</Eyebrow>
+              <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-tight text-fg sm:text-4xl">From a report to a rated fix, in seven steps.</h2>
+              <p className="mt-3 text-fg-muted">This is the lifecycle the product follows today. Every step is recorded on the issue.</p>
+            </div>
+            <ol className="relative mt-12 grid gap-0 lg:grid-cols-7 lg:gap-4">
+              <span aria-hidden="true" className="absolute bottom-4 left-[1.1rem] top-4 w-px bg-gradient-to-b from-brand via-accent to-transparent lg:bottom-auto lg:left-4 lg:right-4 lg:top-[1.1rem] lg:h-px lg:w-auto lg:bg-gradient-to-r" />
+              {LIFECYCLE.map((step, i) => (
+                <li key={step.title} className="relative flex gap-4 pb-8 last:pb-0 lg:block lg:pb-0">
+                  <span className="tabular relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-subtle-border bg-surface text-sm font-semibold text-brand-fg shadow-sm ring-4 ring-canvas">
+                    {i + 1}
+                  </span>
+                  <div className="lg:mt-4">
+                    <h3 className="font-semibold text-fg">{step.title}</h3>
+                    <p className="mt-0.5 text-[13px] leading-relaxed text-fg-muted">{step.short}</p>
+                    <p className="mt-1 text-xs text-fg-subtle">{step.who}</p>
+                  </div>
                 </li>
               ))}
             </ol>
@@ -216,64 +178,67 @@ export default function LandingPage() {
         </section>
 
         {/* Capabilities */}
-        <section id="capabilities" className="scroll-mt-16 border-b border-glass-border">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
-            <h2 className="text-2xl font-semibold tracking-tight text-fg">Built for the people who keep a campus running</h2>
-            <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {CAPABILITIES.map((c) => (
-                <li key={c.title} className="glass lift flex gap-3 rounded-xl p-5">
-                  <c.icon className="mt-0.5 h-5 w-5 shrink-0 text-brand-fg" aria-hidden="true" />
-                  <div>
-                    <h3 className="font-semibold text-fg">{c.title}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-fg-muted">{c.text}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
-              {ROLES.map((r) => (
-                <div key={r.title} className="rounded-xl border border-glass-border bg-surface/40 p-5">
-                  <r.icon className="h-5 w-5 text-accent" aria-hidden="true" />
-                  <h3 className="mt-3 font-semibold text-fg">{r.title}</h3>
-                  <p className="mt-1 text-sm text-fg-muted">{r.text}</p>
-                </div>
-              ))}
+        <section id="capabilities" className="scroll-mt-20 border-t border-glass-border bg-surface/40">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
+            <div className="max-w-2xl">
+              <Eyebrow>Capabilities</Eyebrow>
+              <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-tight text-fg sm:text-4xl">Built around how campus teams actually work.</h2>
             </div>
-
-            <div className="glass depth-1 mt-10 grid items-center gap-8 rounded-2xl p-6 sm:p-8 lg:grid-cols-[1fr_1.2fr]">
-              <div>
-                <h3 className="text-lg font-semibold text-fg">See where problems cluster</h3>
-                <p className="mt-2 text-sm leading-relaxed text-fg-muted">
-                  A campus map shows open issues by building, and a maintenance indicator points to places where the same fault keeps coming back, so repairs can be planned
-                  instead of repeated.
-                </p>
-              </div>
-              <figure>
-                <div aria-hidden="true" className="grid grid-cols-5 gap-1.5">
-                  {[1, 2, 0, 1, 3, 2, 4, 1, 0, 2, 0, 1, 5, 2, 1].map((level, i) => (
-                    <div key={i} className="h-10 rounded-md border border-glass-border" style={{ background: `var(--heat-${level})` }} />
-                  ))}
-                </div>
-                <figcaption className="mt-2 text-xs text-fg-subtle">Illustration of the campus heatmap</figcaption>
-              </figure>
+            <div className="mt-14 space-y-20 lg:space-y-28">
+              {FEATURES.map((f, i) => (
+                <article key={f.id} id={f.id} className="grid scroll-mt-24 items-center gap-8 lg:grid-cols-2 lg:gap-16">
+                  <div className={cn(i % 2 === 1 && "lg:order-2")}>
+                    <Eyebrow>{f.eyebrow}</Eyebrow>
+                    <h3 className="mt-3 text-2xl font-semibold leading-snug tracking-tight text-fg sm:text-3xl">{f.title}</h3>
+                    <p className="mt-3 leading-relaxed text-fg-muted">{f.text}</p>
+                    <ul className="mt-5 space-y-2">
+                      {f.points.map((p) => (
+                        <li key={p} className="flex gap-2.5 text-sm text-fg">
+                          <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className={cn("min-w-0", i % 2 === 1 && "lg:order-1")}>{f.visual}</div>
+                </article>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* Security */}
-        <section id="security" className="scroll-mt-16 border-b border-glass-border">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
-            <div className="grid gap-10 lg:grid-cols-[1fr_1.4fr]">
+        {/* Live demo */}
+        <section id="demo" className="scroll-mt-20">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
+            <div className="glass depth-2 grid gap-10 rounded-3xl p-6 sm:p-10 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:gap-14">
               <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-fg">Secure by design</h2>
-                <p className="mt-2 text-fg-muted">Access is decided by who you are, checked on every request.</p>
+                <Eyebrow>Live demo</Eyebrow>
+                <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-tight text-fg sm:text-4xl">See the entire platform in action.</h2>
+                <p className="mt-4 leading-relaxed text-fg-muted">
+                  Explore the student, worker and administrator views on a sample campus, with a 24-step guided tour. Submit a report, assign a worker, resolve it and watch the
+                  analytics change. No sign-in, no real data, and nothing is saved.
+                </p>
+                <div className="mt-7 flex flex-wrap items-center gap-3">
+                  <Link href="/viewer" className={buttonClasses("primary", "lg")}>
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                    Explore the Platform
+                  </Link>
+                  <span className="text-[13px] text-fg-subtle">Opens the demo, not the sign-in page.</span>
+                </div>
               </div>
-              <ul className="grid gap-5 sm:grid-cols-2">
-                {SECURITY.map((s) => (
-                  <li key={s.text} className="flex gap-3">
-                    <s.icon className="mt-0.5 h-5 w-5 shrink-0 text-fg-subtle" aria-hidden="true" />
-                    <p className="text-sm leading-relaxed text-fg-muted">{s.text}</p>
+              <ul className="grid gap-3" aria-label="Open the demo as">
+                {ROLES.map(({ href, icon: Icon, name, text }) => (
+                  <li key={href}>
+                    <Link href={href} className="lift group flex items-center gap-4 rounded-2xl border border-glass-border bg-surface/60 p-4">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand-subtle-border bg-brand-subtle text-brand-fg">
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-fg">{name}</span>
+                        <span className="block text-sm text-fg-muted">{text}</span>
+                      </span>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-fg-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-brand-fg" aria-hidden="true" />
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -281,35 +246,97 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Final call to action */}
-        <section>
-          <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-            <div className="glass depth-2 flex flex-col items-start gap-6 rounded-2xl p-6 sm:p-8 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-fg">See it before you sign up</h2>
-                <p className="mt-1 text-fg-muted">The Viewer needs no account. Or sign in to report something real.</p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Link href="/viewer" className={buttonClasses("primary", "lg")}>
-                  <Eye className="h-4 w-4" aria-hidden="true" />
-                  Explore as Viewer
-                </Link>
-                <Link href="/login" className={buttonClasses("secondary", "lg")}>
-                  Sign in
-                </Link>
-                <Link href="/register" className={buttonClasses("secondary", "lg")}>
-                  Create account
-                </Link>
-              </div>
+        {/* Security and honesty */}
+        <section id="security" className="scroll-mt-20 border-t border-glass-border">
+          <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 sm:px-6 lg:grid-cols-[1fr_1.4fr] lg:py-20">
+            <div>
+              <Eyebrow>Access and data</Eyebrow>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-fg sm:text-3xl">Permissions live in the database, not just the interface.</h2>
+            </div>
+            <ul className="grid gap-x-8 gap-y-4 text-sm leading-relaxed text-fg-muted sm:grid-cols-2">
+              <li>Administrator access is granted separately and can&apos;t be self-assigned; worker accounts are approved by an administrator.</li>
+              <li>Receipts are visible only to the worker who filed them and to administrators.</li>
+              <li>Each payment settles exactly one claim, and a settled claim can&apos;t be rewritten.</li>
+              <li>The public demo uses a separate generated dataset and never loads the sign-in system or reads campus records.</li>
+            </ul>
+          </div>
+        </section>
+
+        {/* Final CTA */}
+        <section className="border-t border-glass-border bg-surface/40">
+          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-16 sm:px-6 md:flex-row md:items-center md:justify-between lg:py-20">
+            <h2 className="max-w-xl text-2xl font-semibold leading-snug tracking-tight text-fg sm:text-3xl">Explore a clearer way to manage campus operations.</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href="/viewer" className={buttonClasses("primary", "lg")}>
+                Explore the Platform
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <Link href="/login" className={buttonClasses("secondary", "lg")}>
+                Sign in
+              </Link>
             </div>
           </div>
         </section>
       </main>
 
       <footer className="border-t border-glass-border">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-fg-subtle sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <Logo />
-          <p>Built for the DEV ARENA Hackathon by GDG, UCE-OU.</p>
+        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+          <div className="grid gap-10 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+            <div>
+              <Logo href="/" />
+              <p className="mt-3 max-w-xs text-sm text-fg-muted">Campus issue reporting, assignment and analytics in one connected system.</p>
+            </div>
+            <nav aria-label="Product">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">Product</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                {[
+                  ["Workflow", "#workflow"],
+                  ["Capabilities", "#capabilities"],
+                  ["Access and data", "#security"],
+                ].map(([label, href]) => (
+                  <li key={href}>
+                    <a href={href} className="text-fg-muted hover:text-fg">
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+            <nav aria-label="Explore">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">Explore</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li>
+                  <Link href="/viewer" className="text-fg-muted hover:text-fg">
+                    Live demo
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/viewer/how-it-works" className="text-fg-muted hover:text-fg">
+                    How it works
+                  </Link>
+                </li>
+              </ul>
+            </nav>
+            <nav aria-label="Account">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">Account</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li>
+                  <Link href="/login" className="text-fg-muted hover:text-fg">
+                    Sign in
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/register" className="text-fg-muted hover:text-fg">
+                    Create account
+                  </Link>
+                </li>
+              </ul>
+            </nav>
+          </div>
+          <div className="mt-10 flex flex-col gap-2 border-t border-glass-border pt-6 text-sm text-fg-subtle sm:flex-row sm:items-center sm:justify-between">
+            <p>© 2026 UniFix</p>
+            <p>Built with love by SoloDev</p>
+          </div>
         </div>
       </footer>
     </div>
