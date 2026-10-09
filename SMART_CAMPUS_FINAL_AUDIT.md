@@ -1369,3 +1369,72 @@ Branch `feat/viewer-glass-ui`, built on the verified production release `9fb9989
 - **Responsive on production:** no horizontal overflow on any Viewer route at 320 and 768 (dark) and 1366 (light).
 - **Signed out:** the 16 direct Firestore REST checks (reads and forged writes) were all denied again after the deploy; `firestore.rules` was not changed or redeployed.
 - **Requires manual production verification:** signing in as a student, worker and administrator on the live site, the signed-in flows, the payment flow and anything involving the one real pending claim. The signed-in app was exercised only on the local emulators (see above).
+
+
+---
+
+## Final Production Stabilization
+
+Dated 2026-10-09. Status: **PRODUCTION VERIFIED WITH DOCUMENTED LIMITATIONS** (see "Not verified" below).
+
+### Identities
+
+| Item | Value |
+|---|---|
+| Production URL | `https://smart-campus-issue-reporting-and-ma.vercel.app/` |
+| Serving Vercel project | `smart-campus-issue-reporting-and-management-system` (`prj_8fj3OyEv…`), alias confirmed on the deployment |
+| Verified deployment | `dpl_4p4FtCG4…`, state READY, target production, built from `main` at `2e689f3` |
+| Code under test | `2e689f3` (on top of `083e827` and `688532c`); branch `chore/production-stabilization`, fast-forwarded into `main` |
+| Starting state | local `main` = GitHub `main` = `083e827`; production was serving `688532c`'s code |
+
+### What the new tests found and fixed
+
+1. **Firebase was loading inside the Viewer.** The Viewer's links to `/login` and `/` were prefetched, which pulled in the signed-in route group and initialised the Firebase SDK (IndexedDB `firebaseLocalStorageDb` and `firebase-heartbeat-database` appeared in a fresh browser). No network request was made, so the earlier "0 Firebase requests" check passed, but the isolation was weaker than claimed. Fixed with `prefetch={false}` on those links; the browser test now asserts that no IndexedDB database exists after browsing every Viewer route.
+2. **Horizontal overflow on phones:** the landing page's glow layer (320–390 px); visually hidden text inside scroll containers (analytics heat grid, data tables) that widened the page at 320 px; the locations grid and segmented controls at 320 px.
+3. **Accessibility (axe):** chart surfaces and donut slices were keyboard-focusable inside `aria-hidden` regions. Fixed in the Viewer and the signed-in admin charts (`accessibilityLayer={false}`, `rootTabIndex={-1}`).
+4. Test-only corrections: selectors that matched legend icons, and measurements taken mid-animation. No test was removed or weakened.
+
+### Test results (actual)
+
+| Check | Result |
+|---|---|
+| Unit tests | PASS — 248 / 248 |
+| Firestore rules tests (emulator) | PASS — 181 / 181 |
+| TypeScript, ESLint, `next build` | PASS (0 errors, 0 warnings) |
+| End-to-end (Playwright + Chromium), local production build | PASS — **87 / 87** |
+| End-to-end against the live URL, after the deployment was READY | PASS — **87 / 87** |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm audit` | 5 high, dev-only (`braces` chain via `eslint-config-next`); the fix is a breaking downgrade, not applied |
+
+An earlier live run, started while the deployment was still building, showed 12 failures from a mixed old/new rollout (404 chunks); it passed after the deployment was READY.
+
+### End-to-end coverage (`e2e/`, `npm run test:e2e`; `E2E_BASE_URL` targets any deployment)
+
+- **Workflows (24 tests):** landing to Viewer; Student, Worker, Admin, Student without a reload; deep link, refresh and back/forward; unknown issue; tour first-visit, skip remembered, all 24 steps highlighting a visible element, Back, Guide restart, phone (no highlight on hidden anchors), keyboard (focus on Next, Tab and Shift+Tab stay inside, Enter, arrows, Escape, focus not lost); issue search, filter chips, sort, pagination; open an issue; simulated report with validation; assign, start, resolve; demo payment wording; analytics filters; charts keep their size through sidebar collapse, viewport changes, drawer, theme and navigation, with no Recharts warnings; theme toggle persisted; map layers and building detail; Ctrl K palette, notifications; QR dialog; reduced motion; mobile drawer; signed-out redirects.
+- **Isolation:** browsing all Viewer routes and approving a demo payment makes no request outside the site, none to Firebase, Google APIs or localhost, logs nothing, stores only the known preference keys and creates no IndexedDB database.
+- **Responsive matrix (60 tests):** 10 viewports (320×568, 375×667, 390×844, 412×915, 768×1024, 1024×768, 1280×720, 1366×768, 1440×900, 1920×1080) × 2 themes × {landing, login, register; all 17 Viewer routes; tour card and a dialog inside the viewport}. Each checks page overflow, elements sticking out of the viewport and the console.
+- **Accessibility (3 tests):** axe-core WCAG 2.0/2.1 A and AA on the landing, login and all 17 Viewer routes in both themes, plus the tour card, a dialog and the search palette.
+
+### Security regression
+
+- `firestore.rules` and the indexes are unchanged; rules tests 181 / 181 (roles, worker approval, ownership, claims, payments, receipts, notifications, SLA settings).
+- Signed out against production: the 16 direct Firestore reads and forged writes are all denied; response headers (CSP with `frame-ancestors 'none'`, HSTS, `X-Frame-Options: DENY`, nosniff, referrer and permissions policies) are present.
+- Production data: 7 issues, 2 transactions and 1 admin document, as before. The pending ₹1,046 claim was not used, paid or modified.
+- Signed-in UI on the local emulators was exercised in the previous pass (admin, worker, student, `/admin` blocked for a student). It was **not repeated** after this pass's CSS-only changes to shared tables, tabs and chart attributes.
+
+### Obsolete Vercel project `smart-campus-unifix`
+
+- Inspected via the Vercel API: it owns only its own `*.vercel.app` addresses (`smart-campus-unifix.vercel.app` and two generated ones), no custom domain, and both of its deployments (for `688532c` and `083e827`) are in state ERROR. The live domain belongs to the other project. It is connected to the same GitHub repository, which is why every push gets a failing check from it.
+- Not changed. The available tools can't disconnect a Git integration, and a project must not be removed on its name alone. Manual steps: Vercel dashboard, project `smart-campus-unifix`, Settings, Git, Disconnect (reversible; leaves the project in place). Delete the project only after that if you no longer want it.
+- Confirmed afterwards: the live project still deploys from `main` (`dpl_4p4FtCG4…`, source git, branch `main`).
+
+### Firebase web API key
+
+- The key found in history (`SETUP_COMPLETE.md` at `d08cc12` and earlier, and `lib/firebase.ts` at `5bf050b` and earlier) is a Firebase **browser** API key, not a secret: it is a different value from the key the live site uses (compared by hash only), and no service-account or private-key material exists anywhere in the history. At `HEAD`, only placeholders remain.
+- No remediation was applied: restricting or deleting a key needs the Google Cloud console for the project that owns it, which this session cannot access, and a browser key is public by design. Recommended: in Google Cloud, APIs & Services, Credentials, open the old key and either delete it (the live site doesn't use it) or restrict it to your site's referrers and the Firebase APIs. Deleting it cannot affect production because production uses a different key. No history rewrite is needed.
+
+### Not verified / remaining risks
+
+- **Not verified:** signing in as student, worker and admin on the live site; the payment flow on production (no controlled test claim exists, so it must stay untested); a physical QR scan; screen readers (axe cannot judge wording or reading order); Safari and Firefox (Chromium only).
+- **Failed:** nothing outstanding.
+- **Open:** the red check from `smart-campus-unifix`; the old browser key; the dev-only audit findings.
