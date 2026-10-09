@@ -395,7 +395,7 @@ export default function AdminAnalyticsPage() {
                 <CardBody>
                   <div className="h-64" role="img" aria-label={`Issues over time: ${issues.length} reported, ${stats.status.Resolved} resolved`}>
                     <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
-                      <AreaChart data={stats.series} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <AreaChart accessibilityLayer={false} data={stats.series} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                         <CartesianGrid stroke={chart.grid} vertical={false} />
                         <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: chart.grid }} minTickGap={24} />
                         <YAxis allowDecimals={false} tick={axisTick} tickLine={false} axisLine={false} width={40} />
@@ -418,7 +418,7 @@ export default function AdminAnalyticsPage() {
                     ) : (
                       <div style={{ height: Math.max(160, stats.byCategory.length * 34) }} role="img" aria-label="Average resolution time by category">
                         <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
-                          <BarChart data={stats.byCategory} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                          <BarChart accessibilityLayer={false} data={stats.byCategory} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                             <CartesianGrid stroke={chart.grid} horizontal={false} />
                             <XAxis type="number" tick={axisTick} tickLine={false} axisLine={false} unit="h" />
                             <YAxis type="category" dataKey="name" width={96} tick={axisTick} tickLine={false} axisLine={false} />
@@ -436,7 +436,7 @@ export default function AdminAnalyticsPage() {
                   <CardBody>
                     <div style={{ height: Math.max(160, stats.categories.length * 34) }} role="img" aria-label="Issues by category">
                       <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
-                        <BarChart data={stats.categories} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                        <BarChart accessibilityLayer={false} data={stats.categories} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                           <CartesianGrid stroke={chart.grid} horizontal={false} />
                           <XAxis type="number" allowDecimals={false} tick={axisTick} tickLine={false} axisLine={false} />
                           <YAxis type="category" dataKey="name" width={96} tick={axisTick} tickLine={false} axisLine={false} />

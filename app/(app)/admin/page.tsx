@@ -240,7 +240,7 @@ export default function AdminOverviewPage() {
             ) : (
               <div className="h-56" role="img" aria-label={`Issue trend: ${trendTotal} reported in the last 30 days`}>
                 <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
-                  <AreaChart data={trend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <AreaChart accessibilityLayer={false} data={trend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                     <CartesianGrid stroke={chart.grid} vertical={false} />
                     <XAxis dataKey="label" tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={{ stroke: chart.grid }} interval="preserveStartEnd" minTickGap={24} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={false} width={40} />

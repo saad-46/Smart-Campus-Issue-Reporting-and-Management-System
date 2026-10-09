@@ -45,7 +45,7 @@ export function TrendChart({ data, caption, height = 224 }: { data: { label: str
       </figcaption>
       <div className="w-full" style={{ height }} aria-hidden="true">
         <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
-          <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+          <AreaChart accessibilityLayer={false} data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={chart.primary} stopOpacity={0.35} />
@@ -75,7 +75,7 @@ export function HorizontalBars({ data, caption, valueLabel, unit = "" }: { data:
       <figcaption className="sr-only">{caption}</figcaption>
       <div className="w-full" style={{ height: Math.max(140, data.length * 30 + 30) }} aria-hidden="true">
         <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
-          <BarChart data={data} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+          <BarChart accessibilityLayer={false} data={data} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid stroke={chart.grid} horizontal={false} />
             <XAxis type="number" tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={false} allowDecimals={false} unit={unit} />
             <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: chart.axis }} tickLine={false} axisLine={false} width={96} />
@@ -107,7 +107,7 @@ export function StackedBars({
       <figcaption className="sr-only">{caption}</figcaption>
       <div className="w-full" style={{ height }} aria-hidden="true">
         <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
-          <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+          <BarChart accessibilityLayer={false} data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <CartesianGrid stroke={chart.grid} vertical={false} />
             <XAxis dataKey="name" tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={{ stroke: chart.grid }} interval={0} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: chart.axis }} tickLine={false} axisLine={false} width={40} />
@@ -134,9 +134,9 @@ export function Donut({ data, caption, centerLabel, colors }: { data: { name: st
       <figcaption className="sr-only">{caption}</figcaption>
       <div className="relative h-44 w-44 shrink-0" aria-hidden="true">
         <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}>
-          <PieChart>
+          <PieChart accessibilityLayer={false}>
             <Tooltip contentStyle={chart.tooltip} labelStyle={chart.tooltipLabel} itemStyle={chart.tooltipItem} />
-            <Pie data={data} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={data.length > 1 ? 2 : 0} stroke="none">
+            <Pie rootTabIndex={-1} data={data} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={data.length > 1 ? 2 : 0} stroke="none">
               {data.map((d, i) => (
                 <Cell key={d.name} fill={palette[i % palette.length]} />
               ))}
@@ -169,7 +169,7 @@ export function Heatmap({ days, blocks, grid, max, caption }: { days: string[]; 
   return (
     <figure>
       <figcaption className="sr-only">{caption}</figcaption>
-      <div className="overflow-x-auto" role="region" aria-label={caption} tabIndex={0}>
+      <div className="relative overflow-x-auto" role="region" aria-label={caption} tabIndex={0}>
         <table className="w-full min-w-[22rem] border-separate border-spacing-1 text-center text-xs">
           <thead>
             <tr>

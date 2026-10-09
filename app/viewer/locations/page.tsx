@@ -154,7 +154,7 @@ function LocationsInner() {
             ) : (
               <ul data-tour="locations-list" aria-label="Locations" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {rows.map((l) => (
-                  <li key={l.id}>
+                  <li key={l.id} className="min-w-0">
                     <button
                       type="button"
                       onClick={() => router.replace(`/viewer/locations?location=${l.id}`)}

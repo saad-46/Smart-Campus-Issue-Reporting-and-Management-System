@@ -100,7 +100,7 @@ export default function ViewerHomePage() {
 
           <Card className="mt-8 flex flex-col gap-2 p-4 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
             <span>Ready to use it for real?</span>
-            <Link href="/login" className="font-medium text-brand-fg hover:underline">
+            <Link href="/login" prefetch={false} className="font-medium text-brand-fg hover:underline">
               Sign in
             </Link>
           </Card>

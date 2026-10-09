@@ -98,7 +98,7 @@ export function Segmented<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="group" aria-label={label} className={cn("inline-flex rounded-md border border-border bg-surface-2 p-0.5", className)}>
+    <div role="group" aria-label={label} className={cn("no-scrollbar inline-flex max-w-full overflow-x-auto rounded-md border border-border bg-surface-2 p-0.5", className)}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -108,7 +108,7 @@ export function Segmented<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-[5px] font-medium transition-[background-color,color,box-shadow] duration-150",
+              "inline-flex shrink-0 items-center gap-1.5 rounded-[5px] font-medium transition-[background-color,color,box-shadow] duration-150",
               size === "sm" ? "h-7 px-2.5 text-[13px]" : "h-8 px-3 text-sm",
               active ? "bg-surface text-fg shadow-xs" : "text-fg-subtle hover:text-fg"
             )}

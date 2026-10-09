@@ -52,7 +52,7 @@ export function StatStrip({ stats, className }: { stats: Stat[]; className?: str
 /** Table wrapper: horizontal scroll inside the card, never the page. */
 export function TableWrap({ children, className, label }: { children: React.ReactNode; className?: string; label?: string }) {
   return (
-    <div className={cn("overflow-x-auto", className)} role={label ? "region" : undefined} aria-label={label} tabIndex={label ? 0 : undefined}>
+    <div className={cn("relative overflow-x-auto", className)} role={label ? "region" : undefined} aria-label={label} tabIndex={label ? 0 : undefined}>
       <table className="w-full border-collapse text-sm">{children}</table>
     </div>
   );

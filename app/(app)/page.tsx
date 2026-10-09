@@ -61,7 +61,7 @@ function ProductPreview() {
   const bars = [38, 52, 44, 66, 58, 74, 62, 80, 70, 88, 76, 94];
   return (
     <figure className="stage-3d relative">
-      <div aria-hidden="true" className="pointer-events-none absolute -inset-6 -z-10 bg-[radial-gradient(closest-side,var(--glow),transparent)]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 lg:-inset-6 bg-[radial-gradient(closest-side,var(--glow),transparent)]" />
       <div aria-hidden="true" className="tilt-3d glass-blur depth-2 overflow-hidden rounded-2xl">
         <div className="flex items-center gap-1.5 border-b border-glass-border px-4 py-2.5">
           <span className="h-2.5 w-2.5 rounded-full bg-danger/70" />

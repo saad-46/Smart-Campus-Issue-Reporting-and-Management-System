@@ -159,13 +159,13 @@ export default function ViewerShell({ children }: { children: React.ReactNode })
       logoSubtitle="Demo workspace"
       sidebarFooter={({ collapsed, onNavigate }) =>
         collapsed ? (
-          <Link href="/login" aria-label="Sign in" title="Sign in" className={buttonClasses("secondary", "md", "w-full px-0")}>
+          <Link href="/login" prefetch={false} aria-label="Sign in" title="Sign in" className={buttonClasses("secondary", "md", "w-full px-0")}>
             <LogOut className="h-4 w-4 rotate-180" aria-hidden="true" />
           </Link>
         ) : (
           <p className="text-[13px] text-fg-subtle">
             Want to report a real issue?{" "}
-            <Link href="/login" onClick={onNavigate} className="font-medium text-brand-fg hover:underline">
+            <Link href="/login" prefetch={false} onClick={onNavigate} className="font-medium text-brand-fg hover:underline">
               Sign in
             </Link>
           </p>
@@ -201,7 +201,7 @@ export default function ViewerShell({ children }: { children: React.ReactNode })
           <span data-tour="theme-toggle" className="inline-flex">
             <ThemeToggle />
           </span>
-          <Link href="/" className={buttonClasses("secondary", "md", "px-2.5 sm:px-3.5")} aria-label="Exit Viewer">
+          <Link href="/" prefetch={false} className={buttonClasses("secondary", "md", "px-2.5 sm:px-3.5")} aria-label="Exit Viewer">
             <LogOut className="h-4 w-4" aria-hidden="true" />
             <span className="hidden sm:inline">Exit Viewer</span>
           </Link>
