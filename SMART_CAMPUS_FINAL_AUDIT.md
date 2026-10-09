@@ -1359,3 +1359,13 @@ Branch `feat/viewer-glass-ui`, built on the verified production release `9fb9989
 - Physical QR scan with a phone; screen readers; a Tab-key sweep of the tour; 1440×900.
 - Light-theme overflow at 375, 390, 412, 1024, 1280, 1920.
 - Live chart resizing (the pane does not paint while hidden).
+
+
+### Production verification (commit `688532c`, deployed to `https://smart-campus-issue-reporting-and-ma.vercel.app/`)
+
+- **Deployment:** GitHub reports the Vercel project `smart-campus-issue-reporting-and-management-system` as **success** for `688532c`. The second, empty Vercel project `smart-campus-unifix` is still connected to the same repository and its build **fails** on every push; it serves nothing, but it puts a red check on each commit. Delete or disconnect it in the Vercel dashboard.
+- **Routes:** all 17 Viewer routes, `/`, `/login`, `/register` and the protected routes return 200; an unknown path returns 404. Security headers (CSP with `frame-ancestors 'none'`, HSTS, `X-Frame-Options: DENY`, nosniff, referrer and permissions policies) are present.
+- **Viewer in a fresh browser tab:** the first visit to a deep link (`/viewer/admin`) opened the tour on top of that page; all 24 steps ran, every targeted step highlighted its anchor, Finish stored the "seen" flag. Role switching did not reload the page. A demo report was submitted: it showed the validation errors, the suggested category and priority, the demo toast, and raised the admin totals (129 to 130). **Requests to any Firebase, Google API or localhost host: 0** (79 resources, all from the site's own origin, none failed). **Console: empty.**
+- **Responsive on production:** no horizontal overflow on any Viewer route at 320 and 768 (dark) and 1366 (light).
+- **Signed out:** the 16 direct Firestore REST checks (reads and forged writes) were all denied again after the deploy; `firestore.rules` was not changed or redeployed.
+- **Requires manual production verification:** signing in as a student, worker and administrator on the live site, the signed-in flows, the payment flow and anything involving the one real pending claim. The signed-in app was exercised only on the local emulators (see above).
