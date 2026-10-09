@@ -7,7 +7,12 @@ test.describe("landing page", () => {
     await expect(page.locator("h1")).toHaveCount(1);
     expect(await page.locator('a[href="#"], a[href=""]').count()).toBe(0);
     const hrefs = await page.locator("a[href]").evaluateAll((els) => els.map((e) => e.getAttribute("href")!));
-    for (const h of hrefs) expect(h).toMatch(/^(#[a-z-]+|\/(viewer(\/[a-z-]+)?|login|register)?)$/);
+    // The only link that leaves the site is the map data attribution its licence requires.
+    const OSM = "https://www.openstreetmap.org/copyright";
+    expect(hrefs).toContain(OSM);
+    for (const h of hrefs.filter((x) => x !== OSM)) expect(h).toMatch(/^(#[a-z-]+|\/(viewer(\/[a-z-]+)?|login|register)?)$/);
+    await expect(page.locator("main")).toContainText("Sultan-ul-Uloom Education Society");
+    await expect(page.locator("main")).toContainText(/not an official product/i);
     // Every in-page anchor has a target.
     for (const h of hrefs.filter((x) => x.startsWith("#"))) expect(await page.locator(h).count(), h).toBe(1);
     await page.getByRole("main").getByRole("link", { name: "Explore the Platform" }).first().click();

@@ -29,7 +29,7 @@
 - 🔔 **Notification centre** — bell with unread count, All/Unread, mark read / all read, open the related issue. Notifications carry no free text.
 - 🕒 **Issue timeline** — real events written with each change (older issues show only their own timestamps, labelled).
 - ⭐ **Resolution feedback** — the reporter rates a resolved issue once (rules-enforced); admins see aggregated satisfaction.
-- 🗺️ **Campus map** — schematic heatmap of issues per building (layout grid, not GPS) with filters and a list view.
+- 🗺️ **Campus map** — the real SUES campus at Mount Pleasant, Banjara Hills, Hyderabad, drawn from OpenStreetMap geometry (no map tiles, no API key, no network requests). Places are positioned from official geotagged photographs and each carries a source and a confidence level; issues are counted per place, with layers, search, filters and a list view. See [docs/SUES_CAMPUS_RESEARCH.md](docs/SUES_CAMPUS_RESEARCH.md).
 - 📊 **Analytics** — ranges (Today, 7/30/90 days, semester, custom) and filters (category, building, status, priority, worker, department), charts, and CSV/JSON exports without reporter identities.
 - 🧭 **Campus Operations overview** — KPIs from real data, SLA alerts, confirmed and suggested incidents, maintenance risk indicator (rule-based, with "not enough data" states), worker workload and factual insights.
 - 🔎 **Search** — issue ID, title, location and category over a bounded projection of recent issues; also from anywhere with Ctrl/⌘K.
@@ -72,7 +72,7 @@ lib/
   firestore.ts, finance.ts, feedback.ts, locations.ts, notifications.ts, timeline.ts
   firestoreRest.ts      # bounded REST queries with field projection (analytics, map, search)
   intelligence/         # similarity, sla, analytics, maintenance, assignment, insights, ranges
-  campus.ts             # schematic campus layout (edit to match your campus)
+  campus.ts             # SUES campus model, read from data/campuses/sues-hyderabad/*.json
   viewer/               # Viewer Mode demo dataset, figures (computed with the real analytics), feed, navigation, tour steps, preferences
 scripts/seed-emulator.mjs  # demo data for the LOCAL emulator only
 tests/unit, tests/rules

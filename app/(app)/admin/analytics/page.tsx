@@ -58,8 +58,8 @@ function FilterFields({
 }) {
   return (
     <>
-      <Select size="sm" label="Building" value={filters.buildingId ?? ""} onChange={(e) => setFilter("buildingId", e.target.value)}>
-        <option value="">All buildings</option>
+      <Select size="sm" label="Campus place" value={filters.buildingId ?? ""} onChange={(e) => setFilter("buildingId", e.target.value)}>
+        <option value="">All places</option>
         {BUILDINGS.map((b) => (
           <option key={b.id} value={b.id}>
             {b.name}
@@ -455,12 +455,12 @@ export default function AdminAnalyticsPage() {
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <Card>
-                  <CardHeader title="Locations" description="Issues by building" />
+                  <CardHeader title="Locations" description="Issues by campus place" />
                   <div className="mt-3 border-t border-border">
-                    <TableWrap label="Issues by building">
+                    <TableWrap label="Issues by campus place">
                       <thead>
                         <tr>
-                          <th className={th}>Building</th>
+                          <th className={th}>Place</th>
                           <th className={`${th} text-right`}>Total</th>
                           <th className={`${th} text-right`}>Open</th>
                           <th className={`${th} text-right`}>Avg. time</th>

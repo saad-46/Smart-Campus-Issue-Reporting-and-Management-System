@@ -16,12 +16,23 @@ import { IssuePhoto } from "@/components/viewer/DemoImage";
 import { analyzeIssueDetails } from "@/services/aiService";
 import { findDuplicates } from "@/lib/intelligence/similarity";
 import { DEMO_LOCATIONS, DemoIssue, demoLocation } from "@/lib/viewer/demoData";
+import CampusMap from "@/components/admin/CampusMap";
+import { VERIFICATION_TONE } from "@/components/viewer/verification";
+import { VERIFICATION_LABELS, getBuilding, getCanonicalLocation, institutionName } from "@/lib/campus";
 import { ISSUE_CATEGORIES, LIMITS, PRIORITIES, departmentFor } from "@/lib/constants";
 import { Priority } from "@/types";
 
+const CAMPUS_NAME = "SUES campus, Mount Pleasant";
+
 function ReportForm({ viewer }: { viewer: ReadyViewer }) {
   const params = useSearchParams();
-  const initialLocation = demoLocation(params.get("location") ?? "") ? (params.get("location") as string) : "";
+  // A QR code carries only a stable location id; anything unknown or retired is refused, never guessed.
+  const requested = params.get("location") ?? "";
+  const known = getCanonicalLocation(requested);
+  const initialLocation = demoLocation(requested) && known?.isActive ? requested : "";
+  const unknownQr = requested !== "" && initialLocation === "";
+  const [landmark, setLandmark] = useState("");
+  const [mapOpen, setMapOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [locationId, setLocationId] = useState(initialLocation);
@@ -52,7 +63,8 @@ function ReportForm({ viewer }: { viewer: ReadyViewer }) {
     if (!locationId) next.location = "Choose where the problem is.";
     setErrors(next);
     if (Object.keys(next).length) return;
-    const issue = viewer.createIssue({ title, description, locationId, category: category || undefined, priority: (priority || undefined) as Priority | undefined, withPhoto: photo });
+    const detail = landmark.trim() ? `${description.trim()}\n\nWhere exactly: ${landmark.trim()}` : description;
+    const issue = viewer.createIssue({ title, description: detail, locationId, category: category || undefined, priority: (priority || undefined) as Priority | undefined, withPhoto: photo });
     if (issue) setCreated(issue);
   };
 
@@ -108,7 +120,12 @@ function ReportForm({ viewer }: { viewer: ReadyViewer }) {
           </Notice>
           <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} error={errors.title} maxLength={LIMITS.title} placeholder="e.g. Projector not turning on" required />
           <Textarea label="What is wrong?" value={description} onChange={(e) => setDescription(e.target.value)} error={errors.description} rows={4} maxLength={LIMITS.description} placeholder="What you saw, since when, and how it affects people." required />
-          <Select label="Location" value={locationId} onChange={(e) => setLocationId(e.target.value)} error={errors.location} required hint="Scanning a location's QR code fills this in.">
+          {unknownQr && (
+            <Notice tone="warning" title="That QR code isn't recognised">
+              The link points to a location that isn&apos;t in the campus list (or has been retired). Choose the place below instead.
+            </Notice>
+          )}
+          <Select label="Location" value={locationId} onChange={(e) => setLocationId(e.target.value)} error={errors.location} required hint="Scanning a location's QR code fills this in. You can also pick the place on the map.">
             <option value="">Choose a place…</option>
             {DEMO_LOCATIONS.map((l) => (
               <option key={l.id} value={l.id}>
@@ -116,6 +133,47 @@ function ReportForm({ viewer }: { viewer: ReadyViewer }) {
               </option>
             ))}
           </Select>
+          {place && (
+            <div className="rounded-lg border border-border bg-surface-2/60 p-3 text-[13px] text-fg-muted" data-testid="location-detail">
+              <p className="flex flex-wrap items-center gap-1.5">
+                <span className="font-medium text-fg">{place.name}</span>
+                <Badge tone={VERIFICATION_TONE[place.verificationStatus]}>{VERIFICATION_LABELS[place.verificationStatus]}</Badge>
+              </p>
+              <p className="mt-1">
+                {CAMPUS_NAME} · {institutionName(place.institutionId) ?? "Campus"}
+                {getBuilding(place.buildingId)
+                  ? ` · on the map at ${getBuilding(place.buildingId)!.name} (about ${getBuilding(place.buildingId)!.latitude.toFixed(4)}, ${getBuilding(place.buildingId)!.longitude.toFixed(4)})`
+                  : " · its position on campus isn't known, so it won't appear on the map"}
+              </p>
+            </div>
+          )}
+          <div>
+            <Button variant="secondary" size="sm" aria-expanded={mapOpen} onClick={() => setMapOpen((o) => !o)}>
+              {mapOpen ? "Hide the map" : "Pick on the map"}
+            </Button>
+            {mapOpen && (
+              <div className="mt-3">
+                <CampusMap
+                  hotspots={viewer.stats.map.buildings}
+                  unplaced={0}
+                  selectedId={place?.buildingId || null}
+                  onSelect={(id) => {
+                    const first = DEMO_LOCATIONS.find((l) => l.buildingId === id);
+                    if (first) setLocationId(first.id);
+                  }}
+                />
+                <p className="mt-1 text-xs text-fg-subtle">Selecting a marker chooses the first location at that place; refine it in the list above.</p>
+              </div>
+            )}
+          </div>
+          <Input
+            label="Where exactly? (optional)"
+            value={landmark}
+            onChange={(e) => setLandmark(e.target.value)}
+            maxLength={120}
+            placeholder="e.g. second floor, near the staircase"
+            hint="Your own description. Floors and rooms aren't listed because no public source documents them."
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Select label="Category" value={category} onChange={(e) => setCategory(e.target.value)} hint={analysis ? `Suggested: ${analysis.category}` : "Suggested as you type"}>
               <option value="">Use the suggestion</option>

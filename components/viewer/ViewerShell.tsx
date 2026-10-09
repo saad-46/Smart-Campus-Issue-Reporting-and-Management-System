@@ -116,7 +116,7 @@ function DemoStrip() {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-brand-subtle-border bg-brand-subtle/60 px-3 py-1.5 text-[13px] text-fg-muted sm:px-4 lg:px-6">
       <ViewerBadge />
-      <span>A safe demo: no real campus data is read or changed, and nothing you do is saved.</span>
+      <span>A safe demo on the real SUES campus map: the issues are samples, no real campus data is read or changed, and nothing you do is saved.</span>
     </div>
   );
 }

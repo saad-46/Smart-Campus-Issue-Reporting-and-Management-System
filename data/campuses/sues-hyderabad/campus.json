@@ -1,0 +1,27 @@
+{
+  "id": "sues-mount-pleasant-hyderabad",
+  "societyName": "Sultan-ul-Uloom Education Society",
+  "societyShortName": "SUES",
+  "displayName": "SUES campus, Mount Pleasant",
+  "address": "\"Mount Pleasant\", 8-2-249 to 267, Road No. 3, Banjara Hills",
+  "city": "Hyderabad",
+  "state": "Telangana",
+  "country": "India",
+  "postalCode": "500034",
+  "addressStatus": "verified",
+  "addressSourceIds": ["mjcet-home", "naac-411-index", "cbse-saras"],
+  "center": { "latitude": 17.42794, "longitude": 78.44343 },
+  "centerStatus": "corroborated",
+  "centerProvenance": "Centroid of the area OpenStreetMap maps as 'Muffakham Jah College Of Engineering And Technology' (way 737548446). The official geotagged photographs of the college blocks, auditorium and courts fall inside or within about 150 m of it.",
+  "viewport": { "south": 17.4265, "west": 78.4405, "north": 17.4296, "east": 78.4458 },
+  "viewportProvenance": "Chosen to contain the OpenStreetMap college outline, every official geotag found (17.4270 to 17.4290 N, 78.4416 to 78.4451 E) and Road No. 3 to the south. It is a drawing extent, not a property boundary.",
+  "boundary": null,
+  "boundaryStatus": "unverified",
+  "boundaryNote": "No reliable campus boundary was found. OpenStreetMap's college outline covers about 2.2 ha (5.4 acres), while the college website states 25 acres and Wikipedia 22 acres, and official photographs are geotagged outside the outline. The outline is therefore drawn as 'mapped college outline (incomplete)' and never used as a geofence.",
+  "statedArea": [
+    { "value": "25 acres", "sourceId": "mjcet-home" },
+    { "value": "22 acres", "sourceId": "wikipedia-sues" }
+  ],
+  "researchedAt": "2026-10-09",
+  "disclaimer": "A student-built project designed around the SUES campus. It is not an official product of, or endorsed by, the Sultan-ul-Uloom Education Society or its institutions."
+}

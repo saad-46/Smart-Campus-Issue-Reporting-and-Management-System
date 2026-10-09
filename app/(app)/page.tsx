@@ -48,9 +48,9 @@ const FEATURES = [
   {
     id: "map",
     eyebrow: "Campus map and QR reporting",
-    title: "Know where problems cluster.",
-    text: "A schematic campus map shades each building by open issues, linked incidents, maintenance risk or overdue work. Every location can have a printable QR code that opens the report form with the place filled in.",
-    points: ["Four map layers and a building detail panel", "Recurring-fault indicator per place", "QR codes per location"],
+    title: "The real campus, mapped honestly.",
+    text: "The map is drawn from OpenStreetMap geometry of the Mount Pleasant campus: real footprints, roads and gates. Blocks 1 to 5, Ghulam Ahmed Hall, the sports grounds and other places are positioned from the college's own geotagged photographs, and each shows how certain its position is. Nothing is labelled beyond what a public source supports.",
+    points: ["Issue density, incidents, risk and deadline layers", "Every place carries a source and a confidence level", "QR codes carry a stable location id"],
     visual: <MapPanel />,
   },
   {
@@ -95,15 +95,15 @@ export default function LandingPage() {
             <div>
               <p className="inline-flex items-center gap-2 rounded-full border border-brand-subtle-border bg-brand-subtle px-3 py-1 text-xs font-medium text-brand-fg">
                 <span className="h-1.5 w-1.5 rounded-full bg-brand-fg" aria-hidden="true" />
-                Campus issue reporting and operations
+                Built around the SUES campus, Hyderabad
               </p>
               <h1 className="mt-5 text-[2.5rem] font-semibold leading-[1.06] tracking-[-0.03em] text-fg sm:text-5xl lg:text-[3.4rem]">
                 <span className="block">Every campus issue.</span>
                 <span className="text-gradient block">One connected system.</span>
               </h1>
               <p className="mt-5 max-w-xl text-[1.0625rem] leading-relaxed text-fg-muted sm:text-lg">
-                UniFix connects reporting, assignment, resolution and analytics for students, maintenance teams and administrators, so every problem has an owner, a
-                deadline and a record.
+                UniFix is a campus operations system designed around the Sultan-ul-Uloom Education Society campus at Mount Pleasant, Banjara Hills. It connects reporting,
+                assignment, resolution and analytics, so every problem has a place, an owner, a deadline and a record.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Link href="/viewer" className={buttonClasses("primary", "lg", "glow-brand")}>
@@ -258,6 +258,8 @@ export default function LandingPage() {
               <li>Receipts are visible only to the worker who filed them and to administrators.</li>
               <li>Each payment settles exactly one claim, and a settled claim can&apos;t be rewritten.</li>
               <li>The public demo uses a separate generated dataset and never loads the sign-in system or reads campus records.</li>
+              <li>A student-built project for the SUES campus context. It is not an official product of, or endorsed by, the Sultan-ul-Uloom Education Society.</li>
+              <li>Issues shown in the demo are samples. Only the campus geography is real, and it is labelled where it is approximate.</li>
             </ul>
           </div>
         </section>
@@ -284,7 +286,7 @@ export default function LandingPage() {
           <div className="grid gap-10 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
               <Logo href="/" />
-              <p className="mt-3 max-w-xs text-sm text-fg-muted">Campus issue reporting, assignment and analytics in one connected system.</p>
+              <p className="mt-3 max-w-xs text-sm text-fg-muted">Campus issue reporting, assignment and analytics, designed around the SUES campus in Hyderabad. An independent student project.</p>
             </div>
             <nav aria-label="Product">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">Product</p>

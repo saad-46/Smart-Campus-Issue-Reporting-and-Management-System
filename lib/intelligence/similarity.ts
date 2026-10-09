@@ -55,7 +55,7 @@ export function jaccard(a: Set<string>, b: Set<string>): number {
 
 /** Room-like numbers in a location ("Lab 204", "Room 12B" → "204", "12b"). */
 function roomNumbers(location: string): Set<string> {
-  return new Set((location.toLowerCase().match(/\b\d{1,4}[a-z]?\b/g) ?? []).map((n) => n));
+  return new Set((location.toLowerCase().replace(/\bblocks?\s*\d+\b/g, " ").match(/\b\d{1,4}[a-z]?\b/g) ?? []).map((n) => n));
 }
 
 /**

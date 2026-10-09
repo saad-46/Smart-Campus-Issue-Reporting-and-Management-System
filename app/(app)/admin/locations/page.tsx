@@ -212,7 +212,7 @@ export default function AdminLocationsPage() {
                   <p className="truncate text-sm font-medium text-fg">{loc.name}</p>
                   <p className="flex items-center gap-1 truncate text-[13px] text-fg-subtle">
                     <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    {[getBuilding(loc.buildingId)?.name ?? "Not on the map", loc.floor && `Floor ${loc.floor}`, loc.room && `Room ${loc.room}`].filter(Boolean).join(" · ")}
+                    {[getBuilding(loc.buildingId)?.name ?? "Not placed on the map", loc.floor && `Floor ${loc.floor}`, loc.room && `Room ${loc.room}`].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -266,7 +266,7 @@ export default function AdminLocationsPage() {
             ref={nameInputRef}
             required
           />
-          <Select label="Building" hint="Places the location on the campus map." value={form.buildingId} onChange={(e) => setForm({ ...form, buildingId: e.target.value })}>
+          <Select label="Map place" hint="Places the location on the campus map. Leave empty when its position isn't known." value={form.buildingId} onChange={(e) => setForm({ ...form, buildingId: e.target.value })}>
             <option value="">Not on the map</option>
             {BUILDINGS.map((b) => (
               <option key={b.id} value={b.id}>

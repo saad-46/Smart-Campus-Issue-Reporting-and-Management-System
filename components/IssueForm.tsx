@@ -8,11 +8,11 @@ import { createIssue } from "@/lib/firestore";
 import { analyzeIssueDetails, IssueIntelligence } from "@/services/aiService";
 import { CampusLocation } from "@/types";
 import { DEFAULT_CATEGORY, DEFAULT_PRIORITY, LIMITS, departmentFor } from "@/lib/constants";
-import { describeLocation } from "@/lib/campus";
+import { CAMPUS_LOCATIONS, VERIFICATION_LABELS, describeLocation, getCanonicalLocation, institutionName } from "@/lib/campus";
 import { getFriendlyErrorMessage, logError } from "@/lib/errors";
 import { compressDataUrl, fileToCompressedDataUrl, makeThumbnail } from "@/lib/image";
 import { cleanText } from "@/lib/validation";
-import { Input, Textarea } from "@/components/ui/Field";
+import { Input, Select, Textarea } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import { Notice } from "@/components/ui/States";
 import { useToast } from "@/components/ui/Toast";
@@ -197,7 +197,7 @@ export default function IssueForm({ onIssueCreated, locationPreset = null }: Iss
             />
           </Section>
 
-          <Section step={2} title="Where?" description="Building, floor and room if you know them.">
+          <Section step={2} title="Where?" description="Pick a campus place, then add the floor, room or a landmark if you know it.">
             {locationId ? (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-brand-subtle-border bg-brand-subtle px-3 py-2.5">
                 <div className="flex min-w-0 items-center gap-2.5">
@@ -212,9 +212,32 @@ export default function IssueForm({ onIssueCreated, locationPreset = null }: Iss
                 </Button>
               </div>
             ) : (
+              <>
+              <Select
+                label="Campus place (optional)"
+                value={CAMPUS_LOCATIONS.find((l) => location.startsWith(l.name))?.id ?? ""}
+                onChange={(e) => {
+                  const chosen = getCanonicalLocation(e.target.value);
+                  if (chosen) setLocation(chosen.name);
+                }}
+                hint={(() => {
+                  const chosen = CAMPUS_LOCATIONS.find((l) => location.startsWith(l.name));
+                  return chosen
+                    ? `${institutionName(chosen.institutionId, true) ?? "SUES campus"} · ${VERIFICATION_LABELS[chosen.verificationStatus]}${chosen.placeId ? "" : " (not shown on the map)"}. Add the floor, room or a landmark below.`
+                    : "Pick a known place, then add the floor, room or a landmark below. Or just type the location.";
+                })()}
+                wrapperClassName="mb-4"
+              >
+                <option value="">Choose a place…</option>
+                {CAMPUS_LOCATIONS.filter((l) => l.isActive).map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </Select>
               <Input
                 label="Location"
-                placeholder="e.g. Block B, 2nd floor, Lab 204"
+                placeholder="e.g. Block 4, 2nd floor, near the staircase"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 onBlur={blur("location")}
@@ -223,6 +246,7 @@ export default function IssueForm({ onIssueCreated, locationPreset = null }: Iss
                 icon={<MapPin aria-hidden="true" />}
                 required
               />
+              </>
             )}
           </Section>
 

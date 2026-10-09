@@ -13,7 +13,9 @@ import { Select } from "@/components/ui/Field";
 import { FilterBar, FilterChip } from "@/components/ui/Filters";
 import { EmptyState, Skeleton } from "@/components/ui/States";
 import { ViewerGate, ViewerLoading } from "@/components/viewer/parts";
-import { BUILDINGS, getBuilding } from "@/lib/campus";
+import { BUILDINGS, VERIFICATION_LABELS, getBuilding, institutionName } from "@/lib/campus";
+import Badge from "@/components/ui/Badge";
+import { VERIFICATION_TONE } from "@/components/viewer/verification";
 import { DEMO_LOCATIONS, DemoLocation } from "@/lib/viewer/demoData";
 import { cn } from "@/lib/cn";
 
@@ -133,11 +135,11 @@ function LocationsInner() {
         const chips: FilterChip[] = building ? [{ key: "b", label: getBuilding(building)?.name ?? building, onRemove: () => setBuilding("") }] : [];
         return (
           <>
-            <PageHeader title="Locations and QR codes" description="Every reportable place has a QR code. Scanning it opens the report form with the location filled in." />
+            <PageHeader title="Locations and QR codes" description="Researched SUES campus locations. Each has a QR code that carries only its stable id; scanning it opens the report form with the place filled in." />
             <Card className="mb-4 p-3 sm:p-4">
               <FilterBar search={q} onSearch={setQ} searchLabel="Search locations" placeholder="Search locations" chips={chips} onClear={() => setBuilding("")}>
-                <Select size="sm" aria-label="Building" value={building} onChange={(e) => setBuilding(e.target.value)} wrapperClassName="w-auto">
-                  <option value="">All buildings</option>
+                <Select size="sm" aria-label="Map place" value={building} onChange={(e) => setBuilding(e.target.value)} wrapperClassName="w-auto">
+                  <option value="">All map places</option>
                   {BUILDINGS.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
@@ -149,7 +151,7 @@ function LocationsInner() {
 
             {rows.length === 0 ? (
               <Card>
-                <EmptyState title="No locations match" description="Try a different search or building." />
+                <EmptyState title="No locations match" description="Try a different search or map place." />
               </Card>
             ) : (
               <ul data-tour="locations-list" aria-label="Locations" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -165,9 +167,11 @@ function LocationsInner() {
                         <span className="block truncate text-sm font-medium text-fg">{l.name}</span>
                         <span className="mt-0.5 flex items-center gap-1 text-[13px] text-fg-subtle">
                           <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
-                          {getBuilding(l.buildingId)?.name}
-                          {l.floor ? ` · Floor ${l.floor}` : ""}
+                          <span className="truncate">{institutionName(l.institutionId, true) ?? "Campus"} · {getBuilding(l.buildingId)?.name ?? "not on the map"}</span>
                         </span>
+                        <Badge tone={VERIFICATION_TONE[l.verificationStatus]} className="mt-1.5">
+                          {VERIFICATION_LABELS[l.verificationStatus]}
+                        </Badge>
                       </span>
                     </button>
                   </li>

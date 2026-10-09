@@ -95,7 +95,7 @@ export function AnalyticsPanel() {
   );
 }
 
-const SAMPLE_OPEN: Record<string, number> = { "block-a": 2, "block-b": 3, "block-d": 1, library: 2, labs: 5, admin: 1, auditorium: 2, canteen: 2, hostel: 3, sports: 1, parking: 1 };
+const SAMPLE_OPEN: Record<string, number> = { "blocks-1-2-5": 5, "blocks-3-4": 3, "ghulam-ahmed-hall": 1, "college-of-pharmacy": 2, "sports-grounds": 2, garden: 1 };
 
 export function MapPanel() {
   const hotspots: Hotspot[] = BUILDINGS.map((b) => ({
@@ -109,8 +109,8 @@ export function MapPanel() {
   }));
   return (
     <figure className="glass depth-1 rounded-2xl p-4 sm:p-5">
-      <CampusMap hotspots={hotspots} unplaced={0} />
-      <figcaption className="mt-3 text-center text-xs text-fg-subtle">Schematic campus layout with sample counts</figcaption>
+      <CampusMap hotspots={hotspots} unplaced={0} compact />
+      <figcaption className="mt-3 text-center text-xs text-fg-subtle">The SUES campus at Mount Pleasant, drawn from OpenStreetMap, with sample counts</figcaption>
     </figure>
   );
 }

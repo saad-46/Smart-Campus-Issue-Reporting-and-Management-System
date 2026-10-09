@@ -1,0 +1,513 @@
+{
+  "campusId": "sues-mount-pleasant-hyderabad",
+  "lastVerifiedAt": "2026-10-09",
+  "statusMeanings": {
+    "verified": "An official source or strong independent evidence establishes both what the place is and where it is.",
+    "corroborated": "Several credible public sources agree, but the precise position inside the campus is not confirmed.",
+    "approximate": "The general area is supported (for example by one official geotagged photograph), but the exact position or building is uncertain.",
+    "conflicting": "Sources disagree about the position.",
+    "unverified": "The position, or whether the place belongs to the campus, is not established."
+  },
+  "places": [
+    {
+      "id": "blocks-1-2-5",
+      "name": "Blocks 1, 2 and 5 area",
+      "short": "Blocks 1 · 2 · 5",
+      "type": "academic",
+      "institutionId": "mjcet",
+      "latitude": 17.4285,
+      "longitude": 78.4439,
+      "precisionMeters": 30,
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-f"
+      ],
+      "notes": "Official photographs captioned Block 1, Block 2 and Block 5 all carry this geotag (a camera position printed to four decimals). Which mapped footprint is which block is not established.",
+      "patterns": [
+        "\\bblock[\\s-]*(1|2|5|i|ii|v|one|two|five)\\b"
+      ]
+    },
+    {
+      "id": "blocks-3-4",
+      "name": "Blocks 3 and 4 area",
+      "short": "Blocks 3 · 4",
+      "type": "academic",
+      "institutionId": "mjcet",
+      "latitude": 17.4277,
+      "longitude": 78.442,
+      "precisionMeters": 60,
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-f",
+        "naac-411-e"
+      ],
+      "notes": "Official photographs captioned Block 3 and Block 4, and the seminar hall (a banner reads 'Seminar Hall, Block-4'), carry this geotag. The longitude is printed to three decimals only.",
+      "patterns": [
+        "\\bblock[\\s-]*(3|4|iii|iv|three|four)\\b",
+        "\\bseminar hall\\b"
+      ]
+    },
+    {
+      "id": "ghulam-ahmed-hall",
+      "name": "Ghulam Ahmed Hall",
+      "short": "Ghulam Ahmed Hall",
+      "type": "hall",
+      "institutionId": "mjcet",
+      "latitude": 17.4282,
+      "longitude": 78.4435,
+      "precisionMeters": 60,
+      "verificationStatus": "conflicting",
+      "sourceIds": [
+        "naac-411-c",
+        "mjcet-home"
+      ],
+      "notes": "The auditorium. Two official photographs (2018, 2022) are geotagged here; a third (2023) is geotagged about 240 m to the south-west at 17.427 N 78.4416 E. The position shown is the one two photographs agree on.",
+      "patterns": [
+        "\\bghulam ahmed hall\\b",
+        "\\bauditorium\\b"
+      ]
+    },
+    {
+      "id": "college-of-pharmacy",
+      "name": "Sultan-ul-Uloom College of Pharmacy",
+      "short": "College of Pharmacy",
+      "type": "institution",
+      "institutionId": "sucp",
+      "latitude": 17.427733,
+      "longitude": 78.443553,
+      "precisionMeters": 40,
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "osm",
+        "mjcet-other-institutions"
+      ],
+      "notes": "Centre of the outline OpenStreetMap labels 'Sultan Ul Uloom College of Pharmacy' (way 737603230). One map source; not confirmed by an official document.",
+      "patterns": [
+        "\\bpharmacy\\b",
+        "\\bsucp\\b"
+      ]
+    },
+    {
+      "id": "sports-grounds",
+      "name": "Sports grounds",
+      "short": "Sports grounds",
+      "type": "sports",
+      "institutionId": "mjcet",
+      "latitude": 17.429,
+      "longitude": 78.4451,
+      "precisionMeters": 60,
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-d",
+        "mjcet-sports",
+        "osm"
+      ],
+      "notes": "Official basketball, volleyball and football photographs carry this geotag (latitude printed to three decimals). OpenStreetMap maps a large grass area beside it. The table-tennis, chess and carrom photographs carry the same geotag.",
+      "patterns": [
+        "\\b(sports?|play|foot\\s?ball|cricket)\\s*grounds?\\b",
+        "\\bfoot\\s?ball\\b",
+        "\\bbasket\\s?ball\\b",
+        "\\bvolley\\s?ball\\b",
+        "\\bcricket\\b"
+      ]
+    },
+    {
+      "id": "physical-education",
+      "name": "Shuttle court (Physical Education)",
+      "short": "Shuttle court",
+      "type": "sports",
+      "institutionId": "mjcet",
+      "latitude": 17.4283,
+      "longitude": 78.4429,
+      "precisionMeters": 30,
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-d"
+      ],
+      "notes": "Official photograph of the shuttle court beside a 'Physical Education' sign.",
+      "patterns": [
+        "\\bshuttle\\b",
+        "\\bbadminton\\b",
+        "\\bphysical education\\b"
+      ]
+    },
+    {
+      "id": "gymnasium",
+      "name": "Gymnasium",
+      "short": "Gymnasium",
+      "type": "sports",
+      "institutionId": "mjcet",
+      "latitude": 17.427,
+      "longitude": 78.4416,
+      "precisionMeters": 80,
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-d"
+      ],
+      "notes": "One official photograph; the latitude is printed to three decimals, so the true position may be tens of metres away.",
+      "patterns": [
+        "\\bgym(nasium)?\\b"
+      ]
+    },
+    {
+      "id": "garden",
+      "name": "Garden",
+      "short": "Garden",
+      "type": "grounds",
+      "institutionId": "mjcet",
+      "latitude": 17.427552,
+      "longitude": 78.441702,
+      "precisionMeters": 20,
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "osm"
+      ],
+      "notes": "Mapped in OpenStreetMap as a park named 'Garden' with operator MJCET (way 737554364). One map source.",
+      "patterns": [
+        "\\bgarden\\b",
+        "\\blawn\\b"
+      ]
+    },
+    {
+      "id": "sbi",
+      "name": "State Bank of India (as mapped)",
+      "short": "SBI",
+      "type": "bank",
+      "institutionId": null,
+      "latitude": 17.4275672,
+      "longitude": 78.4422612,
+      "precisionMeters": 20,
+      "verificationStatus": "unverified",
+      "sourceIds": [
+        "osm"
+      ],
+      "notes": "A bank node in OpenStreetMap next to the Blocks 3 and 4 photographs. Whether it is inside the campus, and whether it is open to students, is not established.",
+      "patterns": [
+        "\\bsbi\\b",
+        "\\bstate bank\\b"
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "mjcet-block-1",
+      "name": "Block 1",
+      "aliases": [
+        "Block I",
+        "B1"
+      ],
+      "type": "academic",
+      "institutionId": "mjcet",
+      "placeId": "blocks-1-2-5",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-f"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-block-2",
+      "name": "Block 2",
+      "aliases": [
+        "Block II",
+        "B2"
+      ],
+      "type": "academic",
+      "institutionId": "mjcet",
+      "placeId": "blocks-1-2-5",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-f"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-block-3",
+      "name": "Block 3",
+      "aliases": [
+        "Block III",
+        "B3"
+      ],
+      "type": "academic",
+      "institutionId": "mjcet",
+      "placeId": "blocks-3-4",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-f"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-block-4",
+      "name": "Block 4",
+      "aliases": [
+        "Block IV",
+        "B4"
+      ],
+      "type": "academic",
+      "institutionId": "mjcet",
+      "placeId": "blocks-3-4",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-f"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-block-5",
+      "name": "Block 5",
+      "aliases": [
+        "Block V",
+        "B5"
+      ],
+      "type": "academic",
+      "institutionId": "mjcet",
+      "placeId": "blocks-1-2-5",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-f"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-seminar-hall",
+      "name": "Seminar Hall, Block 4",
+      "aliases": [
+        "Main seminar hall"
+      ],
+      "type": "hall",
+      "institutionId": "mjcet",
+      "placeId": "blocks-3-4",
+      "description": "Main seminar hall, 150 seats.",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-e",
+        "mjcet-home"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-ghulam-ahmed-hall",
+      "name": "Ghulam Ahmed Hall",
+      "aliases": [
+        "Auditorium",
+        "GA Hall"
+      ],
+      "type": "hall",
+      "institutionId": "mjcet",
+      "placeId": "ghulam-ahmed-hall",
+      "description": "Auditorium for cultural and extra-curricular events.",
+      "verificationStatus": "conflicting",
+      "sourceIds": [
+        "naac-411-c"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-central-library",
+      "name": "S.M. Nizamuddin Central Library",
+      "aliases": [
+        "Central Library",
+        "Library"
+      ],
+      "type": "library",
+      "institutionId": "mjcet",
+      "placeId": null,
+      "description": "Named on the college website. Its position on the campus was not found in any public source.",
+      "verificationStatus": "unverified",
+      "sourceIds": [
+        "mjcet-home"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-sports-grounds",
+      "name": "Sports grounds",
+      "aliases": [
+        "Football ground",
+        "Basketball court",
+        "Volleyball court",
+        "Cricket ground"
+      ],
+      "type": "sports",
+      "institutionId": "mjcet",
+      "placeId": "sports-grounds",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-d",
+        "mjcet-sports"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-shuttle-court",
+      "name": "Shuttle court (Physical Education)",
+      "aliases": [
+        "Badminton court",
+        "Physical Education department"
+      ],
+      "type": "sports",
+      "institutionId": "mjcet",
+      "placeId": "physical-education",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-d"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-gymnasium",
+      "name": "Gymnasium",
+      "aliases": [
+        "Gym"
+      ],
+      "type": "sports",
+      "institutionId": "mjcet",
+      "placeId": "gymnasium",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "naac-411-d",
+        "mjcet-sports"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-garden",
+      "name": "Garden",
+      "aliases": [
+        "Lawn"
+      ],
+      "type": "grounds",
+      "institutionId": "mjcet",
+      "placeId": "garden",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "osm"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "sucp-college",
+      "name": "Sultan-ul-Uloom College of Pharmacy",
+      "aliases": [
+        "Pharmacy college",
+        "SUCP"
+      ],
+      "type": "institution",
+      "institutionId": "sucp",
+      "placeId": "college-of-pharmacy",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "osm",
+        "sucp"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "law-college",
+      "name": "Sultan-Ul-Uloom College of Law",
+      "aliases": [
+        "Law college"
+      ],
+      "type": "institution",
+      "institutionId": "law",
+      "placeId": null,
+      "description": "On the society campus; its building was not identified in any public source.",
+      "verificationStatus": "unverified",
+      "sourceIds": [
+        "law",
+        "mjcet-other-institutions"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "aakcba-college",
+      "name": "Amjad Ali Khan College of Business Administration",
+      "aliases": [
+        "Business Administration college",
+        "AAKCBA",
+        "MBA college"
+      ],
+      "type": "institution",
+      "institutionId": "aakcba",
+      "placeId": null,
+      "description": "On the society campus; its building was not identified in any public source.",
+      "verificationStatus": "unverified",
+      "sourceIds": [
+        "aakcba",
+        "mjcet-other-institutions"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "gacoe-college",
+      "name": "Ghulam Ahmed College of Education",
+      "aliases": [
+        "College of Education",
+        "B.Ed college"
+      ],
+      "type": "institution",
+      "institutionId": "gacoe",
+      "placeId": null,
+      "description": "On the society campus; its building was not identified in any public source.",
+      "verificationStatus": "unverified",
+      "sourceIds": [
+        "gacoe",
+        "mjcet-other-institutions"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "sujc-college",
+      "name": "Sultan-Ul-Uloom Junior College",
+      "aliases": [
+        "Junior college"
+      ],
+      "type": "institution",
+      "institutionId": "sujc",
+      "placeId": null,
+      "description": "In Banjara Hills according to its website; its building was not identified in any public source.",
+      "verificationStatus": "unverified",
+      "sourceIds": [
+        "sujc",
+        "mjcet-other-institutions"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "sups-bh-school",
+      "name": "Sultan-ul-Uloom Public School, Banjara Hills",
+      "aliases": [
+        "Public school",
+        "SUPS"
+      ],
+      "type": "institution",
+      "institutionId": "sups-bh",
+      "placeId": null,
+      "description": "Shares the Mount Pleasant address; its building was not identified in any public source.",
+      "verificationStatus": "unverified",
+      "sourceIds": [
+        "cbse-saras",
+        "mjcet-other-institutions"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "sbi-as-mapped",
+      "name": "State Bank of India (as mapped)",
+      "aliases": [
+        "SBI",
+        "Bank"
+      ],
+      "type": "bank",
+      "institutionId": null,
+      "placeId": "sbi",
+      "description": "Mapped in OpenStreetMap beside the campus; not confirmed as a campus facility.",
+      "verificationStatus": "unverified",
+      "sourceIds": [
+        "osm"
+      ],
+      "isActive": true
+    }
+  ]
+}

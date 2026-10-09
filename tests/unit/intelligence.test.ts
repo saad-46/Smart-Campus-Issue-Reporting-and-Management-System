@@ -42,7 +42,7 @@ function issue(overrides: Partial<IssueSummary> = {}): IssueSummary {
     category: "Electrical",
     priority: "Medium",
     status: "Open",
-    location: "Block A, Room 101",
+    location: "Block 1, Room 101",
     locationId: "",
     assignedTo: "",
     duplicateOf: "",
@@ -116,29 +116,38 @@ describe("AI issue intelligence", () => {
 // ------------------------------------------------------------------
 describe("campus layout", () => {
   it("matches buildings from free text", () => {
-    expect(matchBuilding("Block B, Room 204")?.id).toBe("block-b");
-    expect(matchBuilding("near the B block stairs")?.id).toBe("block-b");
-    expect(matchBuilding("Lab 204")?.id).toBe("labs");
-    expect(matchBuilding("Central library 2nd floor")?.id).toBe("library");
-    expect(matchBuilding("Boys hostel")?.id).toBe("hostel");
+    expect(matchBuilding("Block 2, Room 204")?.id).toBe("blocks-1-2-5");
+    expect(matchBuilding("block-4 near the stairs")?.id).toBe("blocks-3-4");
+    expect(matchBuilding("Seminar Hall")?.id).toBe("blocks-3-4");
+    expect(matchBuilding("Ghulam Ahmed Hall, back row")?.id).toBe("ghulam-ahmed-hall");
+    expect(matchBuilding("Sultan-ul-Uloom College of Pharmacy, lab")?.id).toBe("college-of-pharmacy");
+    expect(matchBuilding("football ground")?.id).toBe("sports-grounds");
   });
 
   it("does not invent a building for unknown places", () => {
     expect(matchBuilding("Unknown")).toBeUndefined();
     expect(matchBuilding("")).toBeUndefined();
     expect(matchBuilding("somewhere near the big tree")).toBeUndefined();
+    // Places from the earlier fictional layout, and a real library whose position isn't public, stay unplaced.
+    expect(matchBuilding("Block B, Room 204")).toBeUndefined();
+    expect(matchBuilding("Boys hostel")).toBeUndefined();
+    expect(matchBuilding("S.M. Nizamuddin Central Library, 2nd floor")).toBeUndefined();
+    expect(matchBuilding("ground floor corridor")).toBeUndefined();
   });
 
   it("prefers the QR location's building over the text", () => {
-    const map = new Map([["lib-101", "library"]]);
-    expect(buildingForIssue({ location: "Block A", locationId: "lib-101" }, map)?.id).toBe("library");
-    expect(buildingForIssue({ location: "Block A", locationId: "unknown-id" }, map)?.id).toBe("block-a");
+    const map = new Map([["qr-101", "garden"]]);
+    expect(buildingForIssue({ location: "Block 1", locationId: "qr-101" }, map)?.id).toBe("garden");
+    expect(buildingForIssue({ location: "Block 1", locationId: "unknown-id" }, map)?.id).toBe("blocks-1-2-5");
+    // Canonical location ids resolve without a map; a known location with no known position is never guessed.
+    expect(buildingForIssue({ location: "anything", locationId: "mjcet-block-4" })?.id).toBe("blocks-3-4");
+    expect(buildingForIssue({ location: "Block 1", locationId: "mjcet-central-library" })).toBeUndefined();
   });
 
   it("slugifies and describes locations", () => {
     expect(slugifyLocation("Block B — Room 204!")).toBe("block-b-room-204");
-    expect(describeLocation({ name: "Physics Lab", buildingId: "labs", floor: "2", room: "204" })).toBe(
-      "Physics Lab, Laboratory Complex, Floor 2, Room 204"
+    expect(describeLocation({ name: "Physics Lab", buildingId: "blocks-3-4", floor: "2", room: "204" })).toBe(
+      "Physics Lab, Blocks 3 and 4 area, Floor 2, Room 204"
     );
   });
 });
@@ -256,9 +265,9 @@ describe("SLA engine", () => {
 // ------------------------------------------------------------------
 describe("analytics", () => {
   const list = [
-    issue({ category: "Electrical", status: "Resolved", priority: "High", createdAt: new Date(NOW.getTime() - 10 * H), resolvedAt: new Date(NOW.getTime() - 8 * H), assignedTo: "w1", location: "Block A" }),
-    issue({ category: "Electrical", status: "Resolved", createdAt: new Date(NOW.getTime() - 10 * H), resolvedAt: new Date(NOW.getTime() - 4 * H), assignedTo: "w1", location: "Block A" }),
-    issue({ category: "Plumbing", status: "In Progress", assignedTo: "w2", location: "Hostel" }),
+    issue({ category: "Electrical", status: "Resolved", priority: "High", createdAt: new Date(NOW.getTime() - 10 * H), resolvedAt: new Date(NOW.getTime() - 8 * H), assignedTo: "w1", location: "Block 1" }),
+    issue({ category: "Electrical", status: "Resolved", createdAt: new Date(NOW.getTime() - 10 * H), resolvedAt: new Date(NOW.getTime() - 4 * H), assignedTo: "w1", location: "Block 1" }),
+    issue({ category: "Plumbing", status: "In Progress", assignedTo: "w2", location: "Gymnasium" }),
     issue({ category: "Plumbing", status: "Open", location: "Unknown" }),
   ];
 
@@ -277,7 +286,7 @@ describe("analytics", () => {
     expect(applyFilters(list, { category: "Plumbing" })).toHaveLength(2);
     expect(applyFilters(list, { status: "Resolved", priority: "High" })).toHaveLength(1);
     expect(applyFilters(list, { workerId: "w1" })).toHaveLength(2);
-    expect(applyFilters(list, { buildingId: "hostel" })).toHaveLength(1);
+    expect(applyFilters(list, { buildingId: "gymnasium" })).toHaveLength(1);
     expect(applyFilters(list, { department: "Plumbing & Water" })).toHaveLength(2);
   });
 
@@ -291,8 +300,8 @@ describe("analytics", () => {
   it("aggregates hotspots and counts unplaced issues separately", () => {
     const { buildings, unplaced } = hotspots(list);
     expect(unplaced).toBe(1);
-    expect(buildings.find((b) => b.buildingId === "block-a")).toMatchObject({ total: 2, open: 0, resolved: 2, topCategory: "Electrical" });
-    expect(buildings.find((b) => b.buildingId === "library")).toMatchObject({ total: 0, topCategory: null, averageResolutionHours: null });
+    expect(buildings.find((b) => b.buildingId === "blocks-1-2-5")).toMatchObject({ total: 2, open: 0, resolved: 2, topCategory: "Electrical" });
+    expect(buildings.find((b) => b.buildingId === "garden")).toMatchObject({ total: 0, topCategory: null, averageResolutionHours: null });
   });
 
   it("computes worker workload", () => {
@@ -327,17 +336,17 @@ describe("maintenance risk indicator", () => {
 
   it("ranks a place with frequent, recurring, recent, severe issues as High", () => {
     const hot = Array.from({ length: 8 }, (_, k) =>
-      issue({ title: "Leak", category: "Plumbing", priority: k < 4 ? "High" : "Medium", location: "Block B Restroom 2", createdAt: new Date(NOW.getTime() - (k * 3 + 1) * D) })
+      issue({ title: "Leak", category: "Plumbing", priority: k < 4 ? "High" : "Medium", location: "Block 4 Restroom 2", createdAt: new Date(NOW.getTime() - (k * 3 + 1) * D) })
     );
     const calm = Array.from({ length: 3 }, (_, k) =>
-      issue({ category: k === 0 ? "Electrical" : k === 1 ? "Furniture" : "IT", priority: "Low", location: "Library", createdAt: new Date(NOW.getTime() - (60 + k) * D) })
+      issue({ category: k === 0 ? "Electrical" : k === 1 ? "Furniture" : "IT", priority: "Low", location: "Garden", createdAt: new Date(NOW.getTime() - (60 + k) * D) })
     );
     const r = maintenanceRisk([...hot, ...calm], NOW);
     expect(r.sufficient).toBe(true);
     if (!r.sufficient) return;
-    expect(r.indicators[0]).toMatchObject({ level: "High", repeatedCategory: "Plumbing", issuesLast30Days: 8, buildingId: "block-b" });
-    expect(r.indicators[0].label).toBe("Block B — 2");
-    const library = r.indicators.find((i) => i.buildingId === "library");
+    expect(r.indicators[0]).toMatchObject({ level: "High", repeatedCategory: "Plumbing", issuesLast30Days: 8, buildingId: "blocks-3-4" });
+    expect(r.indicators[0].label).toBe("Blocks 3 and 4 area — 2"); // the block number is not taken for the room
+    const library = r.indicators.find((i) => i.buildingId === "garden");
     expect(library?.level).toBe("Low");
     expect(library?.repeatedCategory).toBeNull();
   });
@@ -401,8 +410,8 @@ describe("factual insights", () => {
   });
 
   it("names the building with the most unresolved issues", () => {
-    const list = Array.from({ length: 3 }, () => issue({ location: "Block B" }));
-    expect(generateInsights(list, 30, DEFAULT_SLA_CONFIG, NOW).find((i) => i.id === "building")?.text).toBe("Block B has the most unresolved issues (3).");
+    const list = Array.from({ length: 3 }, () => issue({ location: "Block 4" }));
+    expect(generateInsights(list, 30, DEFAULT_SLA_CONFIG, NOW).find((i) => i.id === "building")?.text).toBe("Blocks 3 and 4 area has the most unresolved issues (3).");
   });
 });
 

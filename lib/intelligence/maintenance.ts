@@ -39,8 +39,9 @@ export type RiskResult =
   | { sufficient: true; indicators: RiskIndicator[] }
   | { sufficient: false; reason: string };
 
+/** Room-like number in a location. The number of a block ("Block 4") is not a room. */
 function roomOf(location: string): string | null {
-  return location.toLowerCase().match(/\b(?:room|lab|hall|restroom|washroom)?\s*(\d{1,4}[a-z]?)\b/)?.[1] ?? null;
+  return location.toLowerCase().replace(/\bblocks?\s*\d+\b/g, " ").match(/\b(?:room|lab|hall|restroom|washroom)?\s*(\d{1,4}[a-z]?)\b/)?.[1] ?? null;
 }
 
 /** Group key + label for a place: a QR location, else building + room, else the text itself. */

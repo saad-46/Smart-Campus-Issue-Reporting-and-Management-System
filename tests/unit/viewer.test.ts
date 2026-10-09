@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { ISSUE_CATEGORIES, PRIORITIES } from "@/lib/constants";
-import { matchBuilding } from "@/lib/campus";
+import { getCanonicalLocation, matchBuilding } from "@/lib/campus";
 import { buildDemoData, DEMO_BUDGET_TOTAL, DEMO_LOCATIONS, DEMO_STUDENTS, DEMO_WORKERS, demoLocation, demoTimeline, DEMO_WINDOW_DAYS } from "@/lib/viewer/demoData";
 import { demoStats, openPool, studentIssues, workerTasks } from "@/lib/viewer/demoStats";
 import { demoActivity, seedNotifications } from "@/lib/viewer/demoFeed";
@@ -34,7 +34,7 @@ const blocked = {
 describe("the demo dataset is large enough and believable", () => {
   it("has enough records for tables, pagination, filters and charts", () => {
     expect(data.issues.length).toBeGreaterThanOrEqual(100);
-    expect(DEMO_LOCATIONS.length).toBeGreaterThanOrEqual(20);
+    expect(DEMO_LOCATIONS.length).toBeGreaterThanOrEqual(15);
     expect(DEMO_WORKERS.length).toBeGreaterThanOrEqual(10);
     expect(DEMO_STUDENTS.length).toBeGreaterThanOrEqual(30);
     expect(new Set(data.issues.map((i) => i.category)).size).toBeGreaterThanOrEqual(8);
@@ -67,12 +67,16 @@ describe("the demo dataset is large enough and believable", () => {
     const ids = new Set(data.issues.map((i) => i.id));
     expect(ids.size).toBe(data.issues.length);
     expect(new Set(DEMO_LOCATIONS.map((l) => l.id)).size).toBe(DEMO_LOCATIONS.length);
-    for (const l of DEMO_LOCATIONS) expect(matchBuilding(l.name)?.id).toBe(l.buildingId);
+    for (const l of DEMO_LOCATIONS) {
+      // Every Viewer location is a canonical SUES location, and its name resolves to the same map place (or to none).
+      expect(getCanonicalLocation(l.id)?.name).toBe(l.name);
+      expect(matchBuilding(l.name)?.id ?? "").toBe(l.buildingId);
+    }
     for (const i of data.issues) {
       expect(ISSUE_CATEGORIES).toContain(i.category);
       expect(PRIORITIES).toContain(i.priority);
       expect(demoLocation(i.locationId)?.name).toBe(i.location);
-      expect(matchBuilding(i.location)).toBeDefined(); // every issue is on the map
+      expect(getCanonicalLocation(i.locationId)?.isActive).toBe(true); // every sample issue is at a real, active campus location
       expect(i.createdAt.getTime()).toBeLessThanOrEqual(NOW.getTime());
       expect(i.createdAt.getTime()).toBeGreaterThan(NOW.getTime() - DEMO_WINDOW_DAYS * 86_400_000);
       if (i.startedAt) expect(i.startedAt.getTime()).toBeGreaterThanOrEqual(i.createdAt.getTime());
@@ -114,7 +118,11 @@ describe("viewer figures are computed from the dataset", () => {
     expect(sum(stats.priority)).toBe(data.issues.length);
     expect(stats.categories.reduce((a, c) => a + c.value, 0)).toBe(data.issues.length);
     expect(stats.trend.reduce((a, d) => a + d.reported, 0)).toBe(data.issues.length);
-    expect(stats.map.unplaced).toBe(0);
+    // Issues at locations whose position on campus isn't known are counted, not guessed onto the map.
+    const unplaced = data.issues.filter((i) => !getCanonicalLocation(i.locationId)?.placeId).length;
+    expect(unplaced).toBeGreaterThan(0);
+    expect(stats.map.unplaced).toBe(unplaced);
+    expect(stats.map.buildings.reduce((a, b) => a + b.total, 0)).toBe(data.issues.length - unplaced);
     expect(stats.heatmap.grid.flat().reduce((a, b) => a + b, 0)).toBe(data.issues.length);
     expect(stats.workload.reduce((a, w) => a + w.active + w.resolved, 0)).toBe(data.issues.filter((i) => i.assignedTo).length);
   });

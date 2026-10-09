@@ -108,10 +108,11 @@ const TEMPLATES = {
   General: ["Notice board damaged", "Lost and found request", "Signboard missing", "Water dispenser empty", "Clock not working"],
 };
 const PLACES = [
-  "Block A, Room 101", "Block A, Room 204", "Block B, Room 12", "Block B corridor", "Block C, Room 305", "Block D washroom",
-  "Block E, Room 2", "Central library reading room", "Library 2nd floor", "Lab 204", "Physics lab", "Computer lab 3",
-  "Canteen", "Cafeteria seating area", "Boys hostel room 118", "Girls hostel common room", "Sports complex gym",
-  "Main gate", "Parking area", "Auditorium stage", "Seminar hall", "Admin office", "Near the big tree",
+  // SUES campus places (data/campuses/sues-hyderabad). Rooms and floors are a reporter's own words, as in real use.
+  "Block 1, ground floor corridor", "Block 1, near the staircase", "Block 2, classroom at the end", "Block 2 corridor", "Block 3, first floor", "Block 3 washroom",
+  "Block 4, second floor", "Block 4, near the lift", "Block 5, lab on the first floor", "Block 5 entrance", "Seminar Hall, Block 4", "Ghulam Ahmed Hall, stage",
+  "Ghulam Ahmed Hall, back rows", "S.M. Nizamuddin Central Library, reading area", "Sports grounds, basketball court", "Shuttle court (Physical Education)", "Gymnasium",
+  "Garden", "Sultan-ul-Uloom College of Pharmacy, corridor", "Amjad Ali Khan College of Business Administration", "Sultan-Ul-Uloom College of Law", "Near the big tree", "Parking area",
 ];
 const CATEGORIES = Object.keys(TEMPLATES);
 
@@ -148,9 +149,10 @@ async function main() {
   }
   put("finance/budget", { totalAvailable: 500000, totalSpent: 0, updatedAt: new Date(now) });
   const locations = [
-    { id: "labs-physics-lab-204", name: "Physics Lab", buildingId: "labs", floor: "2", room: "204" },
-    { id: "library-reading-room", name: "Reading Room", buildingId: "library", floor: "1", room: "" },
-    { id: "canteen-main-hall", name: "Main Hall", buildingId: "canteen", floor: "", room: "" },
+    // Stable ids from the SUES dataset. The library has no known position, so it has no map place.
+    { id: "mjcet-seminar-hall", name: "Seminar Hall, Block 4", buildingId: "blocks-3-4", floor: "", room: "" },
+    { id: "mjcet-central-library", name: "S.M. Nizamuddin Central Library", buildingId: "", floor: "", room: "" },
+    { id: "mjcet-ghulam-ahmed-hall", name: "Ghulam Ahmed Hall", buildingId: "ghulam-ahmed-hall", floor: "", room: "" },
   ];
   for (const l of locations) put(`campusLocations/${l.id}`, { name: l.name, buildingId: l.buildingId, floor: l.floor, room: l.room, createdAt: created });
 
@@ -162,7 +164,7 @@ async function main() {
     const title = pick(TEMPLATES[category]);
     const useQr = rand() < 0.12;
     const loc = useQr ? pick(locations) : null;
-    const location = loc ? `${loc.name}, ${loc.room ? `Room ${loc.room}` : loc.buildingId}` : pick(PLACES);
+    const location = loc ? loc.name : pick(PLACES);
     const ageDays = Math.pow(rand(), 1.6) * 120;
     const createdAt = new Date(now - ageDays * D - rand() * D);
     const priority = category === "Safety" || rand() < 0.15 ? "High" : rand() < 0.5 ? "Medium" : "Low";

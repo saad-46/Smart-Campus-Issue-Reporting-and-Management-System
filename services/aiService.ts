@@ -12,7 +12,7 @@
 import { AIAnalysisResult, Priority } from "@/types";
 import { DEFAULT_CATEGORY, DEFAULT_PRIORITY, LIMITS, departmentFor } from "@/lib/constants";
 import { cleanText } from "@/lib/validation";
-import { matchBuilding } from "@/lib/campus";
+import { findCanonicalLocation, matchBuilding } from "@/lib/campus";
 
 /**
  * Keyword-to-category mapping.
@@ -264,16 +264,16 @@ export async function analyzeIssue(description: string): Promise<AIAnalysisResul
 
 /**
  * Best-effort location from free text: a room/lab/hall number or a block
- * letter ("room 12", "Block A"), combined with a known campus building
- * when one is mentioned ("library reading room" → "Central Library").
+ * or number ("room 12", "Block 4"), combined with a known SUES campus location
+ * when one is mentioned ("library reading room" → "S.M. Nizamuddin Central Library").
  * Words that merely follow "room" ("room since …") are not taken as ids.
  */
 export function extractLocation(text: string): string {
   const id = text.match(/\b(block\s+(?:[a-z]|\d{1,3})|(?:room|lab|hall)\s+[a-z]?\d{1,4}[a-z]?)\b/i)?.[0];
-  const building = matchBuilding(text);
   if (id && /^block/i.test(id)) return id;
-  if (id && building) return `${building.name}, ${id}`;
-  return id ?? building?.name ?? "Unknown";
+  const known = findCanonicalLocation(text);
+  if (known) return id ? `${known.name}, ${id}` : known.name;
+  return id ?? matchBuilding(text)?.name ?? "Unknown";
 }
 
 /**

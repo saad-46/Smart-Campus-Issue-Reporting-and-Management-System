@@ -209,9 +209,11 @@ test.describe("issues", () => {
     await page.goto("/viewer/report");
     await page.getByRole("button", { name: "Submit report (demo)" }).click();
     await expect(page.getByText(/at least 5 characters/)).toBeVisible();
-    await page.getByLabel("Title").fill("Water leaking near the Physics Lab");
+    await page.getByLabel("Title").fill("Water leaking near the staircase");
     await page.getByLabel("What is wrong?").fill("Water is dripping from a ceiling pipe and the corridor is slippery.");
-    await page.getByLabel("Location").selectOption({ label: "Laboratory Complex, Physics Lab" });
+    await page.getByLabel("Location", { exact: true }).selectOption({ label: "Block 4" });
+    await expect(page.getByTestId("location-detail")).toContainText("Blocks 3 and 4 area");
+    await page.getByLabel("Where exactly? (optional)").fill("second floor, near the staircase");
     await expect(page.getByLabel("aside, Suggestions").or(page.locator("[data-tour=report-ai]"))).toContainText("Plumbing");
     await page.getByRole("button", { name: "Submit report (demo)" }).click();
     await expect(page.getByRole("heading", { name: "Demo report submitted" })).toBeVisible();
@@ -219,7 +221,7 @@ test.describe("issues", () => {
     await roleButton(page, "Admin").click();
     await expect(page.locator("[data-tour=admin-kpis]")).toContainText("130");
     await page.locator("aside nav").getByRole("link", { name: "Issues" }).click();
-    await expect(page.locator("tbody tr").first()).toContainText("Water leaking near the Physics Lab");
+    await expect(page.locator("tbody tr").first()).toContainText("Water leaking near the staircase");
   });
 
   test("assign a worker as admin, then start and resolve as the worker", async ({ page }) => {
@@ -236,7 +238,7 @@ test.describe("issues", () => {
 
     await roleButton(page, "Worker").click();
     await page.locator("aside nav").getByRole("link", { name: "My work" }).click();
-    const task = page.getByRole("link", { name: "Flickering tube light in the second-floor corridor" }).first();
+    const task = page.getByRole("link", { name: /^Flickering tube light in Block 3/ }).first();
     await expect(task).toBeVisible();
     const row = page.locator("li", { has: task });
     await row.getByRole("button", { name: "Start work" }).click();
@@ -336,15 +338,81 @@ test.describe("analytics, theme and interface", () => {
     expect(await html.evaluate((el) => el.classList.contains("dark"))).toBe(!wasDark);
   });
 
-  test("the map layer switcher and building detail respond", async ({ page }) => {
+  test("the SUES map draws real geometry, and the issue layer and place detail respond", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/viewer/map");
+    const map = page.getByRole("group", { name: /^SUES campus map/ });
+    await expect(map).toBeVisible();
+    await expect(page.getByText("© OpenStreetMap contributors").first()).toBeVisible();
+    await expect(page.locator("main")).toContainText("none of these issues happened");
+    // Real footprints, never a guessed building name.
+    expect(await map.locator("[data-layer=footprints] path, [data-layer=footprints] polygon").count()).toBe(6);
+    expect(await map.locator("[data-place]").count()).toBe(9);
+    await expect(map).not.toContainText(/Computer Science|Block A|Hostel|Canteen/);
+
     await page.getByRole("radio", { name: /SLA hotspots/ }).check();
-    await expect(page.getByRole("group", { name: /Campus map/ })).toContainText("deadline alert");
-    const library = page.getByRole("button", { name: /^Central Library/ });
-    await library.press("Enter");
-    await expect(page.getByRole("heading", { name: "Central Library" })).toBeVisible();
-    await expect(library).toHaveAttribute("aria-pressed", "true");
+    await expect(map).toHaveAttribute("aria-label", /deadline alert/);
+    const blocks = map.getByRole("button", { name: /^Blocks 3 and 4 area/ });
+    await blocks.press("Enter");
+    await expect(blocks).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("heading", { name: "Blocks 3 and 4 area" })).toBeVisible();
+    const detail = page.locator(".glass", { has: page.getByRole("heading", { name: "Blocks 3 and 4 area" }) }).first();
+    await expect(detail).toContainText("Approximate position");
+    await expect(detail).toContainText("17.4277, 78.4420");
+    await expect(detail.getByRole("link", { name: "Seminar Hall, Block 4" })).toHaveAttribute("href", "/viewer/report?location=mjcet-seminar-hall");
+  });
+
+  test("map feature layers, search and filters change what is drawn", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/viewer/map");
+    const map = page.getByRole("group", { name: /^SUES campus map/ });
+    await expect(map.locator("[data-layer=roads]")).toHaveCount(1);
+    await page.getByRole("checkbox", { name: "Roads and paths" }).uncheck();
+    await expect(map.locator("[data-layer=roads]")).toHaveCount(0);
+    await page.getByRole("checkbox", { name: "Building footprints" }).uncheck();
+    await expect(map.locator("[data-layer=footprints]")).toHaveCount(0);
+    await page.getByRole("checkbox", { name: "Campus places" }).uncheck();
+    await expect(map.locator("[data-place]")).toHaveCount(0);
+    await page.getByRole("checkbox", { name: "Campus places" }).check();
+    await expect(map.locator("[data-place]")).toHaveCount(9);
+
+    const search = page.getByRole("searchbox", { name: "Search the map" }).or(page.getByLabel("Search the map"));
+    await search.fill("seminar");
+    await expect(page.locator("main")).toContainText("1 place highlighted.");
+    await search.fill("library");
+    await expect(page.locator("main")).toContainText("S.M. Nizamuddin Central Library: on campus, but its position isn't known");
+    await search.fill("12 jubilee hills road");
+    await expect(page.locator("main")).toContainText("No mapped place matches");
+    await search.fill("");
+    await page.getByLabel("Verification", { exact: true }).selectOption({ label: "Sources disagree" });
+    await expect(page.locator("main")).toContainText("1 place highlighted.");
+    await expect(page.getByRole("button", { name: /Remove filter: Sources disagree/ })).toBeVisible();
+  });
+
+  test("a QR link fills the location, and an unknown or malformed id is refused", async ({ page }) => {
+    await page.goto("/viewer/report?location=mjcet-seminar-hall");
+    await expect(page.getByLabel("Location", { exact: true })).toHaveValue("mjcet-seminar-hall");
+    await expect(page.getByTestId("location-detail")).toContainText("Seminar Hall, Block 4");
+    await expect(page.getByText("That QR code isn't recognised")).toHaveCount(0);
+
+    // A real location whose position isn't known says so instead of borrowing a marker.
+    await page.goto("/viewer/report?location=mjcet-central-library");
+    await expect(page.getByTestId("location-detail")).toContainText("won't appear on the map");
+
+    for (const bad of ["block-a", "mjcet-block-99", "%3Cscript%3Ealert(1)%3C%2Fscript%3E"]) {
+      await page.goto(`/viewer/report?location=${bad}`);
+      await expect(page.getByText("That QR code isn't recognised")).toBeVisible();
+      await expect(page.getByLabel("Location", { exact: true })).toHaveValue("");
+    }
+  });
+
+  test("a place can be chosen on the map in the report form", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/viewer/report");
+    await page.getByRole("button", { name: "Pick on the map" }).click();
+    await page.getByRole("button", { name: /^Ghulam Ahmed Hall/ }).press("Enter");
+    await expect(page.getByLabel("Location", { exact: true })).toHaveValue("mjcet-ghulam-ahmed-hall");
+    await expect(page.getByTestId("location-detail")).toContainText("Sources disagree");
   });
 
   test("search palette (Ctrl K), notifications and toasts", async ({ page }) => {
@@ -370,7 +438,7 @@ test.describe("analytics, theme and interface", () => {
 
   test("the location QR dialog draws a code and focus returns when it closes", async ({ page }) => {
     await page.goto("/viewer/locations");
-    const opener = page.getByRole("button", { name: /Block A, Room 104/ });
+    const opener = page.getByRole("button", { name: /Seminar Hall, Block 4/ });
     await opener.click();
     const dialog = page.getByRole("dialog", { name: "Location QR code" });
     await expect(dialog.getByRole("img", { name: /QR code for reporting an issue/ })).toBeVisible();

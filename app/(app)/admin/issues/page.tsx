@@ -58,7 +58,7 @@ function FilterFields({ filters, setFilters }: { filters: Filters; setFilters: R
           <option key={c}>{c}</option>
         ))}
       </Select>
-      <Select size="sm" label="Building" value={filters.building} onChange={set("building")}>
+      <Select size="sm" label="Campus place" value={filters.building} onChange={set("building")}>
         <option value="">All</option>
         {BUILDINGS.map((b) => (
           <option key={b.id} value={b.id}>

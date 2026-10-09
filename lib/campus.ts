@@ -1,42 +1,130 @@
 // ============================================
-// Campus layout
+// SUES campus model (Mount Pleasant, Banjara Hills, Hyderabad)
 // ============================================
-// A schematic of the campus used by the map, the maintenance risk
-// indicators and QR locations. Positions are layout coordinates on a
-// 100 × 64 grid — NOT GPS. Edit this list to match your campus; nothing
-// else in the app needs to change.
+// Everything here comes from data/campuses/sues-hyderabad/*.json, a researched
+// dataset with a source and a confidence level on every record (see
+// docs/SUES_CAMPUS_RESEARCH.md). Nothing is geocoded or fetched at run time.
+//
+// Two levels:
+//   places     map anchors with coordinates (e.g. "Blocks 3 and 4"). Issues are
+//              counted per place for the map, hotspots and risk indicators.
+//   locations  things a person can pick when reporting (e.g. "Block 4",
+//              "Seminar Hall, Block 4"). A location may have no place when its
+//              position inside the campus is not publicly known; such issues
+//              are reported as "not placed on the map" instead of being guessed.
+//
+// `Building` keeps its name for the many callers written before the campus
+// was real: a Building is a place.
+
+import campusJson from "@/data/campuses/sues-hyderabad/campus.json";
+import institutionsJson from "@/data/campuses/sues-hyderabad/institutions.json";
+import locationsJson from "@/data/campuses/sues-hyderabad/locations.json";
+
+export type VerificationStatus = "verified" | "corroborated" | "approximate" | "conflicting" | "unverified";
+
+export const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
+  verified: "Verified",
+  corroborated: "Corroborated",
+  approximate: "Approximate position",
+  conflicting: "Sources disagree",
+  unverified: "Unverified",
+};
+
+export const VERIFICATION_MEANINGS = locationsJson.statusMeanings as Record<VerificationStatus, string>;
+
+export type PlaceType = "academic" | "hall" | "institution" | "sports" | "grounds" | "bank" | "library";
+
+export const PLACE_TYPE_LABELS: Record<PlaceType, string> = {
+  academic: "Academic block",
+  hall: "Hall",
+  institution: "Institution",
+  sports: "Sports",
+  grounds: "Grounds",
+  bank: "Bank",
+  library: "Library",
+};
+
+export const CAMPUS = campusJson;
+export const INSTITUTIONS = institutionsJson.institutions;
+export const INSTITUTIONS_ELSEWHERE = institutionsJson.elsewhere;
+
+export function institutionName(id: string | null | undefined, short = false): string | undefined {
+  const i = INSTITUTIONS.find((x) => x.id === id);
+  return i ? (short ? i.shortName : i.name) : undefined;
+}
+
+// ---------- Projection ----------
+// A flat local projection of the documented viewport, in metres from its
+// north-west corner. Accurate to well under a metre over a 600 m wide area.
+
+const VIEW = campusJson.viewport;
+const METRES_PER_DEG_LAT = 110_700;
+const METRES_PER_DEG_LON = 111_320 * Math.cos((((VIEW.south + VIEW.north) / 2) * Math.PI) / 180);
+
+/** Size of the drawn area in metres (the SVG viewBox of the map). */
+export const CAMPUS_GRID = {
+  width: Math.round((VIEW.east - VIEW.west) * METRES_PER_DEG_LON),
+  height: Math.round((VIEW.north - VIEW.south) * METRES_PER_DEG_LAT),
+} as const;
+
+/** WGS84 longitude/latitude → map metres [x, y] (y grows southwards). */
+export function project(longitude: number, latitude: number): [number, number] {
+  return [(longitude - VIEW.west) * METRES_PER_DEG_LON, (VIEW.north - latitude) * METRES_PER_DEG_LAT];
+}
+
+export function isValidCoordinate(latitude: unknown, longitude: unknown): boolean {
+  return (
+    typeof latitude === "number" && typeof longitude === "number" && Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
+  );
+}
+
+/** Whether a point lies in the drawn campus area (a drawing extent, not a geofence). */
+export function isInCampusView(latitude: number, longitude: number): boolean {
+  return latitude >= VIEW.south && latitude <= VIEW.north && longitude >= VIEW.west && longitude <= VIEW.east;
+}
+
+// ---------- Places ----------
 
 export interface Building {
   id: string;
   name: string;
   /** Short label drawn on the map. */
   short: string;
-  /** Layout rectangle on the 100 × 64 grid. */
+  type: PlaceType;
+  institutionId: string | null;
+  latitude: number;
+  longitude: number;
+  /** Position on the map, in metres from the north-west corner of the view. */
   x: number;
   y: number;
-  w: number;
-  h: number;
-  /** Lower-case patterns that identify this building in free-text locations. */
+  /** How far the true position may be from the marker. */
+  precisionMeters: number;
+  verificationStatus: VerificationStatus;
+  sourceIds: string[];
+  notes: string;
+  /** Lower-case patterns that identify this place in free-text locations. */
   patterns: RegExp[];
 }
 
-export const CAMPUS_GRID = { width: 100, height: 64 } as const;
-
-export const BUILDINGS: Building[] = [
-  { id: "block-a", name: "Block A", short: "A", x: 4, y: 4, w: 16, h: 12, patterns: [/\bblock[\s-]*a\b/, /\ba[\s-]*block\b/] },
-  { id: "block-b", name: "Block B", short: "B", x: 24, y: 4, w: 16, h: 12, patterns: [/\bblock[\s-]*b\b/, /\bb[\s-]*block\b/] },
-  { id: "block-c", name: "Block C", short: "C", x: 44, y: 4, w: 16, h: 12, patterns: [/\bblock[\s-]*c\b/, /\bc[\s-]*block\b/] },
-  { id: "block-d", name: "Block D", short: "D", x: 64, y: 4, w: 16, h: 12, patterns: [/\bblock[\s-]*d\b/, /\bd[\s-]*block\b/] },
-  { id: "block-e", name: "Block E", short: "E", x: 84, y: 4, w: 12, h: 12, patterns: [/\bblock[\s-]*e\b/, /\be[\s-]*block\b/] },
-  { id: "library", name: "Central Library", short: "Library", x: 4, y: 22, w: 20, h: 14, patterns: [/\blibrar/, /\breading room\b/] },
-  { id: "labs", name: "Laboratory Complex", short: "Labs", x: 28, y: 22, w: 22, h: 14, patterns: [/\blabs?\b/, /\blaborator/, /\bworkshop\b/] },
-  { id: "admin", name: "Administration", short: "Admin", x: 54, y: 22, w: 18, h: 14, patterns: [/\badmin(istration)?\s*(block|building|office)\b/, /\bprincipal\b/, /\baccounts? office\b/] },
-  { id: "auditorium", name: "Auditorium", short: "Auditorium", x: 76, y: 22, w: 20, h: 14, patterns: [/\bauditorium\b/, /\bseminar hall\b/] },
-  { id: "canteen", name: "Canteen", short: "Canteen", x: 4, y: 42, w: 18, h: 12, patterns: [/\bcanteen\b/, /\bcafeteria\b/, /\bcafe\b/, /\bmess\b/, /\bfood court\b/] },
-  { id: "hostel", name: "Hostels", short: "Hostel", x: 26, y: 42, w: 24, h: 18, patterns: [/\bhostel/, /\bdorm/, /\bresidence\b/] },
-  { id: "sports", name: "Sports Complex", short: "Sports", x: 54, y: 42, w: 22, h: 18, patterns: [/\bsports?\b/, /\bgym\b/, /\bground\b/, /\bcourt\b/, /\bstadium\b/] },
-  { id: "parking", name: "Parking & Gates", short: "Parking", x: 80, y: 42, w: 16, h: 18, patterns: [/\bparking\b/, /\bgate\b/, /\bentrance\b/] },
-];
+export const BUILDINGS: Building[] = locationsJson.places.map((p) => {
+  const [x, y] = project(p.longitude, p.latitude);
+  return {
+    id: p.id,
+    name: p.name,
+    short: p.short,
+    type: p.type as PlaceType,
+    institutionId: p.institutionId,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    x,
+    y,
+    precisionMeters: p.precisionMeters,
+    verificationStatus: p.verificationStatus as VerificationStatus,
+    sourceIds: p.sourceIds,
+    notes: p.notes,
+    patterns: p.patterns.map((source) => new RegExp(source)),
+  };
+});
 
 const BY_ID = new Map(BUILDINGS.map((b) => [b.id, b]));
 
@@ -44,30 +132,93 @@ export function getBuilding(id: string | undefined | null): Building | undefined
   return id ? BY_ID.get(id) : undefined;
 }
 
+// ---------- Reportable locations ----------
+
+export interface CampusPlace {
+  id: string;
+  name: string;
+  aliases: string[];
+  type: PlaceType;
+  institutionId: string | null;
+  /** Map anchor, or null when the position inside the campus is not known. */
+  placeId: string | null;
+  description?: string;
+  verificationStatus: VerificationStatus;
+  sourceIds: string[];
+  isActive: boolean;
+}
+
+export const CAMPUS_LOCATIONS: CampusPlace[] = locationsJson.locations.map((l) => ({
+  id: l.id,
+  name: l.name,
+  aliases: l.aliases,
+  type: l.type as PlaceType,
+  institutionId: l.institutionId,
+  placeId: l.placeId,
+  description: "description" in l ? (l.description as string) : undefined,
+  verificationStatus: l.verificationStatus as VerificationStatus,
+  sourceIds: l.sourceIds,
+  isActive: l.isActive,
+}));
+
+const LOCATION_BY_ID = new Map(CAMPUS_LOCATIONS.map((l) => [l.id, l]));
+
+/** A canonical campus location by its stable id (used by QR codes and forms). */
+export function getCanonicalLocation(id: string | undefined | null): CampusPlace | undefined {
+  return id ? LOCATION_BY_ID.get(id) : undefined;
+}
+
+/** Canonical locations whose name or an alias contains the query (case-insensitive). */
+export function searchCampusLocations(query: string, includeInactive = false): CampusPlace[] {
+  const q = query.trim().toLowerCase();
+  const pool = CAMPUS_LOCATIONS.filter((l) => includeInactive || l.isActive);
+  if (!q) return pool;
+  return pool.filter((l) => [l.name, ...l.aliases, institutionName(l.institutionId) ?? ""].some((text) => text.toLowerCase().includes(q)));
+}
+
 /**
- * Best-effort building for a free-text location ("Block B, Room 204").
- * Returns undefined when nothing matches — callers show such issues as
- * "unplaced" rather than guessing.
+ * A canonical location mentioned in free text, by name or alias (whole words).
+ * Used to suggest a location in the chat reporter; the person can change it.
+ */
+export function findCanonicalLocation(text: string): CampusPlace | undefined {
+  const haystack = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+  const has = (phrase: string) => haystack.includes(` ${phrase.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `);
+  return CAMPUS_LOCATIONS.find((l) => l.isActive && has(l.name)) ?? CAMPUS_LOCATIONS.find((l) => l.isActive && l.aliases.some((a) => a.length >= 3 && has(a)));
+}
+
+/**
+ * Best-effort place for a free-text location ("Block 4, room near the stairs").
+ * Canonical names win, then the place patterns. Returns undefined when nothing
+ * matches: callers show such issues as "not placed" rather than guessing, which
+ * is also how reports written before this dataset existed are handled.
  */
 export function matchBuilding(location: string | undefined | null): Building | undefined {
   const text = (location ?? "").toLowerCase();
   if (!text.trim()) return undefined;
+  const named = CAMPUS_LOCATIONS.find((l) => text.includes(l.name.toLowerCase()));
+  if (named) return getBuilding(named.placeId);
   return BUILDINGS.find((b) => b.patterns.some((p) => p.test(text)));
 }
 
 /**
- * Building for an issue: an exact QR location wins, otherwise the text.
- * `locationBuildings` maps campusLocations ids to building ids.
+ * Place for an issue: an exact QR / canonical location wins, otherwise the text.
+ * `locationBuildings` maps campusLocations ids to place ids.
  */
 export function buildingForIssue(
   issue: { location: string; locationId?: string },
   locationBuildings: Map<string, string> = new Map()
 ): Building | undefined {
-  const fromQr = issue.locationId ? getBuilding(locationBuildings.get(issue.locationId)) : undefined;
-  return fromQr ?? matchBuilding(issue.location);
+  if (issue.locationId) {
+    const fromQr = getBuilding(locationBuildings.get(issue.locationId));
+    if (fromQr) return fromQr;
+    const canonical = getCanonicalLocation(issue.locationId);
+    // A known location with no known position stays unplaced; don't fall back to guessing from its name.
+    if (canonical) return getBuilding(canonical.placeId);
+  }
+  return matchBuilding(issue.location);
 }
 
-/** URL-safe id for a new campus location ("Block B Room 204" → "block-b-room-204"). */
+/** URL-safe id for a new campus location ("Block 2 Room 204" → "block-2-room-204"). */
 export function slugifyLocation(text: string): string {
   return text
     .toLowerCase()

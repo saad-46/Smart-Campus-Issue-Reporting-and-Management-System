@@ -106,10 +106,13 @@ describe("parseChatMessage", () => {
   });
 
   it("doesn't take the word after 'room' as a room id, and recognises buildings", async () => {
-    expect((await parseChatMessage("The WiFi is not working in the library reading room since morning")).location).toBe("Central Library");
-    expect(extractLocation("projector broken in lab 204")).toBe("Laboratory Complex, lab 204");
+    expect((await parseChatMessage("The WiFi is not working in the library reading room since morning")).location).toBe("S.M. Nizamuddin Central Library");
+    expect(extractLocation("projector broken in lab 204")).toBe("lab 204");
+    expect(extractLocation("mic not working in the auditorium")).toBe("Ghulam Ahmed Hall");
+    expect(extractLocation("net is torn at the badminton court")).toBe("Shuttle court (Physical Education)");
     expect(extractLocation("leak near block the stairs")).toBe("Unknown");
     expect(extractLocation("Block B toilet")).toBe("Block B");
+    expect(extractLocation("Block 4 toilet")).toBe("Block 4");
   });
 
   it("caps the title length", async () => {

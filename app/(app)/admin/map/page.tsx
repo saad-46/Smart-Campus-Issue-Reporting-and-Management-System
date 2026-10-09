@@ -6,7 +6,7 @@ import { ArrowRight, Building2, Search as SearchIcon, X } from "lucide-react";
 import { IssueStatus, IssueSummary, Priority } from "@/types";
 import { fetchIssueSummaries } from "@/lib/firestore";
 import { ISSUE_CATEGORIES, ISSUE_STATUSES, PRIORITIES } from "@/lib/constants";
-import { BUILDINGS, buildingForIssue, getBuilding } from "@/lib/campus";
+import { BUILDINGS, VERIFICATION_LABELS, buildingForIssue, getBuilding } from "@/lib/campus";
 import { applyFilters, categoryDistribution, hotspots, resolutionStats, slaSummary } from "@/lib/intelligence/analytics";
 import { formatRelative } from "@/lib/dates";
 import { getFriendlyErrorMessage, logError } from "@/lib/errors";
@@ -51,11 +51,11 @@ function BuildingPanel({
     <div>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-fg-subtle">Building</p>
+          <p className="text-xs text-fg-subtle">Campus place · {building ? VERIFICATION_LABELS[building.verificationStatus] : ""}</p>
           <h2 className="text-base font-semibold text-fg">{building?.name}</h2>
         </div>
         {showClose && (
-          <IconButton label="Close building details" size="sm" onClick={onClose}>
+          <IconButton label="Close place details" size="sm" onClick={onClose}>
             <X className="h-4 w-4" aria-hidden="true" />
           </IconButton>
         )}
@@ -79,7 +79,7 @@ function BuildingPanel({
         </p>
       )}
       {issues.length === 0 ? (
-        <p className="mt-4 text-[13px] text-fg-subtle">No matching issues in this building for this period.</p>
+        <p className="mt-4 text-[13px] text-fg-subtle">No matching issues at this place for this period.</p>
       ) : (
         <ul className="mt-4 divide-y divide-border border-y border-border">
           {list.slice(0, 6).map((i) => (
@@ -159,7 +159,7 @@ export default function AdminMapPage() {
     <>
       <PageHeader
         title="Campus map"
-        description="Where issues are concentrated. Issues are placed by their QR location or by matching the typed location to a building."
+        description="Where issues are concentrated. Issues are placed by their QR location or by matching the typed location to a researched SUES campus place. Positions are approximate."
         actions={
           <>
             <Select aria-label="Period" value={days} onChange={(e) => setDays(Number(e.target.value) as (typeof RANGES)[number])} wrapperClassName="w-36">
@@ -183,7 +183,7 @@ export default function AdminMapPage() {
       />
 
       <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-center">
-        <Input type="search" aria-label="Find a building" placeholder="Find a building" icon={<SearchIcon aria-hidden="true" />} value={query} onChange={(e) => setQuery(e.target.value)} wrapperClassName="lg:max-w-xs" />
+        <Input type="search" aria-label="Find a campus place" placeholder="Find a campus place" icon={<SearchIcon aria-hidden="true" />} value={query} onChange={(e) => setQuery(e.target.value)} wrapperClassName="lg:max-w-xs" />
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0">
           <Select size="sm" aria-label="Category" value={category} onChange={(e) => setCategory(e.target.value)} wrapperClassName="w-auto shrink-0">
             <option value="">All categories</option>
@@ -230,7 +230,7 @@ export default function AdminMapPage() {
               </CardBody>
             ) : (
               <>
-                <CardHeader title="Buildings" description="Select a building for details" />
+                <CardHeader title="Campus places" description="Select a place for details" />
                 <div className="mt-3 border-t border-border">
                   {data === null ? (
                     <div className="space-y-2 p-4">
@@ -239,7 +239,7 @@ export default function AdminMapPage() {
                       ))}
                     </div>
                   ) : ranked.length === 0 ? (
-                    <EmptyState compact icon={<Building2 />} title="No buildings match" />
+                    <EmptyState compact icon={<Building2 />} title="No places match" />
                   ) : (
                     <ul className="max-h-[28rem] overflow-y-auto py-1">
                       {ranked.map((b) => {

@@ -1,9 +1,10 @@
 // ============================================
 // Viewer Mode demo dataset
 // ============================================
-// A synthetic campus for the public Viewer. Nothing here comes from or goes
-// to Firestore: every person, issue, claim and payment is invented, and the
-// names are fictional. Buildings are the schematic layout in lib/campus.ts.
+// Sample operations data for the public Viewer. Nothing here comes from or
+// goes to Firestore: every person, issue, claim and payment is invented and
+// the names are fictional. The places are real: they are the researched SUES
+// campus locations in lib/campus.ts. No issue here ever happened at SUES.
 //
 // The dataset is generated from the templates below with a fixed-seed
 // random generator, so it is identical on every visit. Times are offsets
@@ -13,6 +14,7 @@
 
 import { IssueEventType, IssueStatus, IssueSummary, Priority } from "@/types";
 import { DEFAULT_SLA_HOURS, departmentFor } from "@/lib/constants";
+import { CAMPUS_LOCATIONS, VerificationStatus } from "@/lib/campus";
 
 const HOUR = 3_600_000;
 
@@ -83,49 +85,60 @@ export const DEMO_WORKER_REQUESTS = [
 ];
 
 // ---------- Places ----------
+// The Viewer's locations are the researched SUES campus locations
+// (data/campuses/sues-hyderabad/locations.json). Only the issues are invented.
 
-type Zone = "class" | "lab" | "wash" | "hall" | "outdoor" | "office" | "hostel" | "canteen" | "library" | "sports" | "gate";
+type Zone = "class" | "lab" | "wash" | "hall" | "outdoor" | "office" | "library" | "sports";
 
 export interface DemoLocation {
+  /** Stable canonical location id (the same id a QR code carries). */
   id: string;
-  /** Full location text (matches a building in lib/campus.ts). */
   name: string;
+  /** Map place the location belongs to, or "" when its position on campus is not known. */
   buildingId: string;
   floor: string;
   room: string;
-  /** How the place reads inside a sentence ("Room 104", "the reading room"). */
+  /** How the place reads inside a sentence ("Block 4", "the Seminar Hall"). */
   spot: string;
   zones: Zone[];
+  verificationStatus: VerificationStatus;
+  institutionId: string | null;
 }
 
-export const DEMO_LOCATIONS: DemoLocation[] = [
-  { id: "a-104", name: "Block A, Room 104", buildingId: "block-a", floor: "1", room: "104", spot: "Room 104", zones: ["class"] },
-  { id: "a-201", name: "Block A, Room 201", buildingId: "block-a", floor: "2", room: "201", spot: "Room 201", zones: ["class"] },
-  { id: "b-105", name: "Block B, Room 105", buildingId: "block-b", floor: "1", room: "105", spot: "Room 105", zones: ["class"] },
-  { id: "b-wash", name: "Block B, ground-floor washroom", buildingId: "block-b", floor: "G", room: "", spot: "the ground-floor washroom", zones: ["wash"] },
-  { id: "c-corr", name: "Block C, second-floor corridor", buildingId: "block-c", floor: "2", room: "", spot: "the second-floor corridor", zones: ["hall"] },
-  { id: "c-staff", name: "Block C, staff room", buildingId: "block-c", floor: "1", room: "", spot: "the staff room", zones: ["office"] },
-  { id: "d-210", name: "Block D, Room 210", buildingId: "block-d", floor: "2", room: "210", spot: "Room 210", zones: ["class"] },
-  { id: "d-301", name: "Block D, Room 301", buildingId: "block-d", floor: "3", room: "301", spot: "Room 301", zones: ["class"] },
-  { id: "e-12", name: "Block E, Room 12", buildingId: "block-e", floor: "G", room: "12", spot: "Room 12", zones: ["class"] },
-  { id: "lib-read", name: "Central Library, reading room", buildingId: "library", floor: "1", room: "", spot: "the reading room", zones: ["library"] },
-  { id: "lib-desk", name: "Central Library, help desk", buildingId: "library", floor: "G", room: "", spot: "the library help desk", zones: ["library", "office"] },
-  { id: "lab-cs3", name: "Laboratory Complex, Computer Lab 3", buildingId: "labs", floor: "1", room: "3", spot: "Computer Lab 3", zones: ["lab"] },
-  { id: "lab-phy", name: "Laboratory Complex, Physics Lab", buildingId: "labs", floor: "G", room: "", spot: "the Physics Lab", zones: ["lab"] },
-  { id: "lab-mech", name: "Laboratory Complex, Mechanical Workshop", buildingId: "labs", floor: "G", room: "", spot: "the Mechanical Workshop", zones: ["lab"] },
-  { id: "adm-lift", name: "Administration block, lift lobby", buildingId: "admin", floor: "G", room: "", spot: "the lift lobby", zones: ["hall"] },
-  { id: "adm-acc", name: "Administration block, accounts office", buildingId: "admin", floor: "1", room: "", spot: "the accounts office", zones: ["office"] },
-  { id: "aud-hall", name: "Auditorium, seminar hall", buildingId: "auditorium", floor: "G", room: "", spot: "the seminar hall", zones: ["hall", "class"] },
-  { id: "aud-exit", name: "Auditorium, rear exit", buildingId: "auditorium", floor: "G", room: "", spot: "the rear exit", zones: ["hall"] },
-  { id: "can-kit", name: "Canteen, kitchen", buildingId: "canteen", floor: "G", room: "", spot: "the canteen kitchen", zones: ["canteen", "wash"] },
-  { id: "can-out", name: "Canteen, outdoor seating", buildingId: "canteen", floor: "G", room: "", spot: "the canteen seating area", zones: ["canteen", "outdoor"] },
-  { id: "hos-1", name: "Hostel Block 1, main staircase", buildingId: "hostel", floor: "1", room: "", spot: "the Hostel 1 staircase", zones: ["hostel", "hall"] },
-  { id: "hos-2", name: "Hostel Block 2, first-floor washroom", buildingId: "hostel", floor: "1", room: "", spot: "the Hostel 2 washroom", zones: ["hostel", "wash"] },
-  { id: "spo-ground", name: "Sports Complex, main ground", buildingId: "sports", floor: "G", room: "", spot: "the main ground", zones: ["sports", "outdoor"] },
-  { id: "spo-change", name: "Sports Complex, changing rooms", buildingId: "sports", floor: "G", room: "", spot: "the changing rooms", zones: ["sports", "wash"] },
-  { id: "gate-main", name: "Main gate parking", buildingId: "parking", floor: "G", room: "", spot: "the main gate", zones: ["gate", "outdoor"] },
-  { id: "gate-north", name: "North gate, security cabin", buildingId: "parking", floor: "G", room: "", spot: "the north gate", zones: ["gate", "outdoor"] },
-];
+const BLOCK: Zone[] = ["class", "lab", "wash", "hall", "office"];
+const ZONES: Record<string, { spot?: string; zones: Zone[] }> = {
+  "mjcet-block-1": { zones: BLOCK },
+  "mjcet-block-2": { zones: BLOCK },
+  "mjcet-block-3": { zones: BLOCK },
+  "mjcet-block-4": { zones: BLOCK },
+  "mjcet-block-5": { zones: BLOCK },
+  "mjcet-seminar-hall": { spot: "the Seminar Hall", zones: ["hall", "class"] },
+  "mjcet-ghulam-ahmed-hall": { zones: ["hall"] },
+  "mjcet-central-library": { spot: "the Central Library", zones: ["library", "office"] },
+  "mjcet-sports-grounds": { spot: "the sports grounds", zones: ["sports", "outdoor"] },
+  "mjcet-shuttle-court": { spot: "the shuttle court", zones: ["sports", "outdoor"] },
+  "mjcet-gymnasium": { spot: "the gymnasium", zones: ["sports"] },
+  "mjcet-garden": { spot: "the garden", zones: ["outdoor"] },
+  "sucp-college": { spot: "the College of Pharmacy", zones: ["class", "lab", "office"] },
+  "law-college": { spot: "the College of Law", zones: ["class", "office"] },
+  "aakcba-college": { spot: "the College of Business Administration", zones: ["class", "office"] },
+  "gacoe-college": { spot: "the College of Education", zones: ["class", "office"] },
+  "sujc-college": { spot: "the Junior College", zones: ["class", "office"] },
+  "sups-bh-school": { spot: "the Public School", zones: ["class", "office"] },
+};
+
+// Places whose link to the campus is unverified (the mapped bank) get no sample issues.
+export const DEMO_LOCATIONS: DemoLocation[] = CAMPUS_LOCATIONS.filter((l) => l.isActive && ZONES[l.id]).map((l) => ({
+  id: l.id,
+  name: l.name,
+  buildingId: l.placeId ?? "",
+  floor: "",
+  room: "",
+  spot: ZONES[l.id].spot ?? l.name,
+  zones: ZONES[l.id].zones,
+  verificationStatus: l.verificationStatus,
+  institutionId: l.institutionId,
+}));
 
 export function demoLocation(id: string): DemoLocation | undefined {
   return DEMO_LOCATIONS.find((l) => l.id === id);
@@ -159,41 +172,41 @@ const TEMPLATES: Template[] = [
   T("Electrical", "Projector not turning on in {p}", "The ceiling projector shows no power light. Classes are running on the whiteboard only.", "High", ["class", "lab"], "Replaced the blown power supply board and tested with a laptop.", ["Projector power board", 2400]),
   T("Electrical", "Flickering tube light in {p}", "One of the tube lights flickers constantly and gives people a headache during long sessions.", "Low", ["class", "library", "office", "hall"], "Replaced the tube with an LED fitting.", ["LED tube light", 320]),
   T("Electrical", "AC not cooling in {p}", "The air conditioner runs but the room stays warm, especially in the afternoon.", "Medium", ["class", "lab", "office", "library"], "Cleaned the filters and topped up the refrigerant gas.", ["Refrigerant gas refill", 1800]),
-  T("Electrical", "Power socket sparking in {p}", "A wall socket sparks when a charger is plugged in. It has been taped over for now.", "High", ["class", "lab", "hostel", "library"], "Isolated the circuit and replaced the socket and faceplate.", ["Socket and faceplate", 260]),
-  T("Electrical", "Ceiling fan making noise in {p}", "The ceiling fan makes a loud grinding noise at every speed.", "Low", ["class", "hostel", "canteen"], "Lubricated the bearing and balanced the blades."),
-  T("Electrical", "Pathway lights not working near {p}", "Several pathway lights stay off after dark, so the walk back is very dim.", "Medium", ["outdoor", "gate", "sports"], "Replaced the faulty photo sensor and two lamps.", ["Photo sensor and lamps", 950]),
-  T("Plumbing", "Water leaking in {p}", "Water is pooling on the floor from a pipe joint. The floor is slippery.", "High", ["wash", "lab", "canteen"], "Tightened the joint and replaced the worn washer.", ["Pipe washers and sealant", 180]),
-  T("Plumbing", "Tap dripping in {p}", "A tap keeps dripping after it is closed fully.", "Low", ["wash", "canteen", "hostel"], "Replaced the worn tap cartridge and checked for leaks.", ["Tap cartridge", 450]),
-  T("Plumbing", "Water dispenser not working at {p}", "The drinking water dispenser gives no water even though the tank is full.", "Medium", ["hall", "canteen", "library", "sports"], "Replaced the inlet valve and flushed the line.", ["Dispenser inlet valve", 700]),
-  T("Plumbing", "Blocked drain in {p}", "The floor drain is blocked and dirty water is backing up.", "High", ["wash", "canteen"], "Cleared the drain line and flushed the trap.", ["Drain cleaning rods", 900]),
-  T("Plumbing", "Flush not working in {p}", "The flush handle moves freely but nothing happens.", "Medium", ["wash", "hostel"], "Replaced the flush valve assembly.", ["Flush valve kit", 520]),
-  T("IT", "Wi-Fi keeps dropping in {p}", "The wireless connection drops every few minutes and interrupts online work.", "High", ["lab", "library", "class", "hostel"], "Moved the access point to a clear channel and updated its firmware."),
+  T("Electrical", "Power socket sparking in {p}", "A wall socket sparks when a charger is plugged in. It has been taped over for now.", "High", ["class", "lab", "library"], "Isolated the circuit and replaced the socket and faceplate.", ["Socket and faceplate", 260]),
+  T("Electrical", "Ceiling fan making noise in {p}", "The ceiling fan makes a loud grinding noise at every speed.", "Low", ["class", "hall"], "Lubricated the bearing and balanced the blades."),
+  T("Electrical", "Pathway lights not working near {p}", "Several pathway lights stay off after dark, so the walk back is very dim.", "Medium", ["outdoor", "sports"], "Replaced the faulty photo sensor and two lamps.", ["Photo sensor and lamps", 950]),
+  T("Plumbing", "Water leaking in {p}", "Water is pooling on the floor from a pipe joint. The floor is slippery.", "High", ["wash", "lab", "hall"], "Tightened the joint and replaced the worn washer.", ["Pipe washers and sealant", 180]),
+  T("Plumbing", "Tap dripping in {p}", "A tap keeps dripping after it is closed fully.", "Low", ["wash", "hall", "class"], "Replaced the worn tap cartridge and checked for leaks.", ["Tap cartridge", 450]),
+  T("Plumbing", "Water dispenser not working at {p}", "The drinking water dispenser gives no water even though the tank is full.", "Medium", ["hall", "library", "sports"], "Replaced the inlet valve and flushed the line.", ["Dispenser inlet valve", 700]),
+  T("Plumbing", "Blocked drain in {p}", "The floor drain is blocked and dirty water is backing up.", "High", ["wash", "hall"], "Cleared the drain line and flushed the trap.", ["Drain cleaning rods", 900]),
+  T("Plumbing", "Flush not working in {p}", "The flush handle moves freely but nothing happens.", "Medium", ["wash", "class"], "Replaced the flush valve assembly.", ["Flush valve kit", 520]),
+  T("IT", "Wi-Fi keeps dropping in {p}", "The wireless connection drops every few minutes and interrupts online work.", "High", ["lab", "library", "class"], "Moved the access point to a clear channel and updated its firmware."),
   T("IT", "Smart board not responding in {p}", "The smart board does not react to touch or the pen.", "Medium", ["class", "hall"], "Recalibrated the touch panel and reinstalled the driver."),
   T("IT", "Lab computers will not boot in {p}", "Four machines in the back row stop at a black screen on start-up.", "Medium", ["lab"], "Reseated the memory and re-imaged two machines.", ["Replacement RAM module", 1650]),
   T("IT", "Printer jamming at {p}", "The shared printer jams on almost every job.", "Low", ["library", "office"], "Removed a torn sheet and replaced the pickup roller.", ["Pickup roller", 380]),
   T("IT", "Network port dead in {p}", "The wired network port on the wall gives no link light.", "Low", ["office", "lab"], "Re-terminated the cable at the patch panel."),
-  T("Infrastructure", "Broken window latch in {p}", "The window latch is broken, so the window will not stay closed in the wind.", "Medium", ["class", "hostel", "office"], "Fitted a new latch and adjusted the hinge.", ["Window latch set", 240]),
-  T("Infrastructure", "Door will not close properly in {p}", "The door scrapes the floor and does not lock.", "Low", ["class", "office", "hostel", "lab"], "Planed the door edge and re-hung the hinges."),
-  T("Infrastructure", "Ceiling plaster falling in {p}", "Pieces of ceiling plaster are falling near the back wall after the rain.", "High", ["class", "hall", "hostel"], "Removed the loose plaster, sealed the seepage and re-plastered the patch.", ["Plaster and sealant", 1350]),
+  T("Infrastructure", "Broken window latch in {p}", "The window latch is broken, so the window will not stay closed in the wind.", "Medium", ["class", "office"], "Fitted a new latch and adjusted the hinge.", ["Window latch set", 240]),
+  T("Infrastructure", "Door will not close properly in {p}", "The door scrapes the floor and does not lock.", "Low", ["class", "office", "lab"], "Planed the door edge and re-hung the hinges."),
+  T("Infrastructure", "Ceiling plaster falling in {p}", "Pieces of ceiling plaster are falling near the back wall after the rain.", "High", ["class", "hall"], "Removed the loose plaster, sealed the seepage and re-plastered the patch.", ["Plaster and sealant", 1350]),
   T("Infrastructure", "Lift call button not responding at {p}", "The lift call button does not light up or call the lift.", "High", ["hall"], "Replaced the faulty call button unit.", ["Lift call button unit", 1900]),
-  T("Infrastructure", "Barrier stuck at {p}", "The entry barrier stays down and vehicles are queuing onto the road.", "High", ["gate"], "Reset the barrier controller and replaced the relay.", ["Barrier motor relay", 2500]),
-  T("Cleanliness", "Overflowing bins near {p}", "The bins are full and litter is spreading around them.", "Medium", ["outdoor", "canteen", "hall"], "Emptied the bins and added one more collection round."),
+  T("Infrastructure", "Loose paving slabs near {p}", "Several paving slabs rock underfoot and one has a raised edge that people trip on.", "High", ["outdoor"], "Lifted and re-bedded the slabs on fresh mortar.", ["Mortar and sand", 650]),
+  T("Cleanliness", "Overflowing bins near {p}", "The bins are full and litter is spreading around them.", "Medium", ["outdoor", "hall"], "Emptied the bins and added one more collection round."),
   T("Cleanliness", "Washroom needs cleaning at {p}", "The washroom has not been cleaned today and there is no soap.", "Medium", ["wash"], "Deep-cleaned the washroom and restocked soap."),
   T("Cleanliness", "Dust after repair work in {p}", "Repair dust covers the floor and the desks.", "Low", ["class", "hall", "lab"], "Area swept, mopped and wiped down."),
-  T("Cleanliness", "Stagnant water near {p}", "Water has collected for days and mosquitoes are breeding.", "Medium", ["outdoor", "hostel", "sports"], "Drained the water and levelled the low patch."),
+  T("Cleanliness", "Stagnant water near {p}", "Water has collected for days and mosquitoes are breeding.", "Medium", ["outdoor", "class", "sports"], "Drained the water and levelled the low patch."),
   T("Safety", "Exit sign not lit at {p}", "The emergency exit sign is not illuminated.", "Medium", ["hall"], "Replaced the sign battery pack and tested it.", ["Exit sign battery pack", 640]),
-  T("Safety", "Loose handrail at {p}", "The handrail moves when you hold it.", "High", ["hall", "hostel"], "Re-fixed the handrail with new wall brackets.", ["Wall brackets and fixings", 1200]),
-  T("Safety", "Fire extinguisher expired in {p}", "The extinguisher tag shows that the service date has passed.", "Medium", ["lab", "hall", "canteen", "library"], "Swapped in a serviced extinguisher and updated the tag.", ["Extinguisher refill", 850]),
-  T("Safety", "CCTV camera offline at {p}", "The camera shows no feed on the security monitor.", "Medium", ["gate", "hall", "outdoor"], "Replaced the damaged cable and realigned the camera."),
-  T("Furniture", "Broken chair in {p}", "A chair has a cracked leg and wobbles.", "Low", ["class", "library", "canteen", "lab"], "Replaced the cracked leg and tightened the frame."),
+  T("Safety", "Loose handrail at {p}", "The handrail moves when you hold it.", "High", ["hall", "class"], "Re-fixed the handrail with new wall brackets.", ["Wall brackets and fixings", 1200]),
+  T("Safety", "Fire extinguisher expired in {p}", "The extinguisher tag shows that the service date has passed.", "Medium", ["lab", "hall", "library"], "Swapped in a serviced extinguisher and updated the tag.", ["Extinguisher refill", 850]),
+  T("Safety", "CCTV camera offline at {p}", "The camera shows no feed on the security monitor.", "Medium", ["outdoor", "hall"], "Replaced the damaged cable and realigned the camera."),
+  T("Furniture", "Broken chair in {p}", "A chair has a cracked leg and wobbles.", "Low", ["class", "library", "hall", "lab"], "Replaced the cracked leg and tightened the frame."),
   T("Furniture", "Desk drawers jammed in {p}", "Two desk drawers are jammed shut and cannot be used.", "Low", ["office", "library"], "Realigned the runners and waxed the slides."),
   T("Furniture", "Whiteboard coming off the wall in {p}", "The whiteboard has come loose at one corner and leans forward.", "Medium", ["class", "lab"], "Re-mounted the board with new anchor bolts.", ["Anchor bolts", 150]),
-  T("Furniture", "Cupboard lock broken in {p}", "The cupboard lock turns but does not catch.", "Low", ["office", "hostel", "lab"], "Fitted a new cam lock with two keys.", ["Cam lock", 210]),
-  T("Landscaping", "Overgrown hedge near {p}", "The hedge has grown over the path and narrows it.", "Low", ["outdoor", "hostel", "gate"], "Hedge trimmed back from the walkway."),
+  T("Furniture", "Cupboard lock broken in {p}", "The cupboard lock turns but does not catch.", "Low", ["office", "class", "lab"], "Fitted a new cam lock with two keys.", ["Cam lock", 210]),
+  T("Landscaping", "Overgrown hedge near {p}", "The hedge has grown over the path and narrows it.", "Low", ["outdoor", "class"], "Hedge trimmed back from the walkway."),
   T("Landscaping", "Sprinkler broken at {p}", "A sprinkler head is broken and leaves a dry patch.", "Low", ["sports", "outdoor"], "Replaced the sprinkler head and reset the timer.", ["Sprinkler head", 340]),
-  T("Landscaping", "Fallen branch near {p}", "A large branch has fallen across the path after the storm.", "Medium", ["outdoor", "gate", "sports"], "Cut and cleared the branch and checked the tree."),
-  T("General", "Notice board glass cracked at {p}", "The glass on the notice board is cracked along one side.", "Low", ["hall", "library"], "Replaced the glass pane.", ["Glass pane", 780]),
-  T("General", "Lost and found locker jammed at {p}", "The lost-and-found locker will not open with its key.", "Low", ["office", "gate"], "Freed the lock and issued a new key."),
+  T("Landscaping", "Fallen branch near {p}", "A large branch has fallen across the path after the storm.", "Medium", ["outdoor", "sports"], "Cut and cleared the branch and checked the tree."),
+  T("General", "Notice board glass cracked in {p}", "The glass on the notice board is cracked along one side.", "Low", ["hall", "library"], "Replaced the glass pane.", ["Glass pane", 780]),
+  T("General", "Lost and found locker jammed in {p}", "The lost-and-found locker will not open with its key.", "Low", ["office", "outdoor"], "Freed the lock and issued a new key."),
 ];
 
 // ---------- Issues ----------
@@ -285,32 +298,32 @@ const ME = DEMO_PERSONA.student.id;
  * every deadline state, an incident and each role's queue are always present.
  */
 const LIVE: Spec[] = [
-  { id: "SC-1140", template: 0, location: "a-104", status: "In Progress", ago: 4.5, start: 1, assignee: "w01", reporter: ME, upvotes: 7 },
-  { id: "SC-1141", template: 0, location: "a-104", status: "Open", ago: 3, duplicateOf: "SC-1140", upvotes: 2 },
-  { id: "SC-1139", template: 6, location: "b-wash", status: "Open", ago: 9, assignee: "w03", escalated: true, upvotes: 9 },
-  { id: "SC-1136", template: 2, location: "aud-hall", status: "In Progress", ago: 20, start: 6, assignee: "w01", upvotes: 5 },
-  { id: "SC-1137", template: 1, location: "c-corr", status: "Open", ago: 10, assignee: "w01", reporter: ME, upvotes: 1 },
-  { id: "SC-1142", template: 11, location: "lab-cs3", status: "Open", ago: 2, assignee: "w07", upvotes: 11 },
-  { id: "SC-1143", template: 11, location: "lab-cs3", status: "Open", ago: 1, duplicateOf: "SC-1142", reporter: ME, upvotes: 3 },
-  { id: "SC-1144", template: 11, location: "lab-cs3", status: "Open", ago: 0.6, duplicateOf: "SC-1142", upvotes: 1 },
-  { id: "SC-1128", template: 29, location: "lib-read", status: "In Progress", ago: 60, start: 30, assignee: "w09", upvotes: 0 },
-  { id: "SC-1133", template: 21, location: "can-out", status: "Open", ago: 30, upvotes: 6 },
-  { id: "SC-1119", template: 34, location: "spo-ground", status: "Open", ago: 100, assignee: "w11", upvotes: 2 },
-  { id: "SC-1138", template: 25, location: "aud-exit", status: "Open", ago: 4, upvotes: 4 },
-  { id: "SC-1135", template: 3, location: "lab-phy", status: "In Progress", ago: 5.2, start: 0.5, assignee: "w02", upvotes: 8 },
-  { id: "SC-1134", template: 8, location: "lib-desk", status: "Open", ago: 19, assignee: "w04", upvotes: 3 },
-  { id: "SC-1132", template: 18, location: "hos-1", status: "In Progress", ago: 7, start: 2, assignee: "w12", escalated: true, upvotes: 12 },
-  { id: "SC-1131", template: 13, location: "lab-cs3", status: "Open", ago: 26, assignee: "w08", upvotes: 4 },
-  { id: "SC-1130", template: 22, location: "hos-2", status: "Open", ago: 15, reporter: ME, upvotes: 5 },
-  { id: "SC-1129", template: 5, location: "gate-north", status: "Open", ago: 44, assignee: "w02", upvotes: 6 },
-  { id: "SC-1145", template: 16, location: "b-105", status: "Open", ago: 0.3, upvotes: 0 },
-  { id: "SC-1127", template: 27, location: "can-kit", status: "Open", ago: 22, upvotes: 2 },
+  { id: "SC-1140", template: 0, location: "mjcet-block-1", status: "In Progress", ago: 4.5, start: 1, assignee: "w01", reporter: ME, upvotes: 7 },
+  { id: "SC-1141", template: 0, location: "mjcet-block-1", status: "Open", ago: 3, duplicateOf: "SC-1140", upvotes: 2 },
+  { id: "SC-1139", template: 6, location: "mjcet-block-2", status: "Open", ago: 9, assignee: "w03", escalated: true, upvotes: 9 },
+  { id: "SC-1136", template: 2, location: "mjcet-seminar-hall", status: "In Progress", ago: 20, start: 6, assignee: "w01", upvotes: 5 },
+  { id: "SC-1137", template: 1, location: "mjcet-block-3", status: "Open", ago: 10, assignee: "w01", reporter: ME, upvotes: 1 },
+  { id: "SC-1142", template: 11, location: "mjcet-block-5", status: "Open", ago: 2, assignee: "w07", upvotes: 11 },
+  { id: "SC-1143", template: 11, location: "mjcet-block-5", status: "Open", ago: 1, duplicateOf: "SC-1142", reporter: ME, upvotes: 3 },
+  { id: "SC-1144", template: 11, location: "mjcet-block-5", status: "Open", ago: 0.6, duplicateOf: "SC-1142", upvotes: 1 },
+  { id: "SC-1128", template: 29, location: "mjcet-central-library", status: "In Progress", ago: 60, start: 30, assignee: "w09", upvotes: 0 },
+  { id: "SC-1133", template: 21, location: "mjcet-garden", status: "Open", ago: 30, upvotes: 6 },
+  { id: "SC-1119", template: 34, location: "mjcet-sports-grounds", status: "Open", ago: 100, assignee: "w11", upvotes: 2 },
+  { id: "SC-1138", template: 25, location: "mjcet-ghulam-ahmed-hall", status: "Open", ago: 4, upvotes: 4 },
+  { id: "SC-1135", template: 3, location: "sucp-college", status: "In Progress", ago: 5.2, start: 0.5, assignee: "w02", upvotes: 8 },
+  { id: "SC-1134", template: 8, location: "mjcet-central-library", status: "Open", ago: 19, assignee: "w04", upvotes: 3 },
+  { id: "SC-1132", template: 18, location: "mjcet-block-4", status: "In Progress", ago: 7, start: 2, assignee: "w12", escalated: true, upvotes: 12 },
+  { id: "SC-1131", template: 13, location: "mjcet-block-5", status: "Open", ago: 26, assignee: "w08", upvotes: 4 },
+  { id: "SC-1130", template: 22, location: "mjcet-block-4", status: "Open", ago: 15, reporter: ME, upvotes: 5 },
+  { id: "SC-1129", template: 5, location: "mjcet-sports-grounds", status: "Open", ago: 44, assignee: "w02", upvotes: 6 },
+  { id: "SC-1145", template: 16, location: "mjcet-block-2", status: "Open", ago: 0.3, upvotes: 0 },
+  { id: "SC-1127", template: 27, location: "aakcba-college", status: "Open", ago: 22, upvotes: 2 },
   // Recently resolved work for the personas, so "rate a fix" and claims are always visible.
-  { id: "SC-1121", template: 7, location: "hos-2", status: "Resolved", ago: 70, start: 4, resolve: 18, assignee: "w03", reporter: ME, feedback: { rating: 5, comment: "Fixed the same day, thank you." }, claim: "approved", upvotes: 2 },
-  { id: "SC-1124", template: 26, location: "hos-1", status: "Resolved", ago: 50, start: 1, resolve: 5, assignee: "w01", claim: "pending", upvotes: 10 },
-  { id: "SC-1126", template: 19, location: "adm-lift", status: "Resolved", ago: 28, start: 1, resolve: 5, assignee: "w01", claim: "pending", upvotes: 14 },
-  { id: "SC-1123", template: 16, location: "b-105", status: "Resolved", ago: 54, start: 8, resolve: 22, assignee: "w12", reporter: ME, upvotes: 1 },
-  { id: "SC-1125", template: 3, location: "a-201", status: "Resolved", ago: 36, start: 1, resolve: 4, assignee: "w01", claim: "approved", feedback: { rating: 4, comment: "Sorted. Thanks!" }, upvotes: 3 },
+  { id: "SC-1121", template: 7, location: "mjcet-block-2", status: "Resolved", ago: 70, start: 4, resolve: 18, assignee: "w03", reporter: ME, feedback: { rating: 5, comment: "Fixed the same day, thank you." }, claim: "approved", upvotes: 2 },
+  { id: "SC-1124", template: 26, location: "mjcet-block-3", status: "Resolved", ago: 50, start: 1, resolve: 5, assignee: "w01", claim: "pending", upvotes: 10 },
+  { id: "SC-1126", template: 19, location: "mjcet-block-1", status: "Resolved", ago: 28, start: 1, resolve: 5, assignee: "w01", claim: "pending", upvotes: 14 },
+  { id: "SC-1123", template: 16, location: "mjcet-block-2", status: "Resolved", ago: 54, start: 8, resolve: 22, assignee: "w12", reporter: ME, upvotes: 1 },
+  { id: "SC-1125", template: 3, location: "mjcet-block-1", status: "Resolved", ago: 36, start: 1, resolve: 4, assignee: "w01", claim: "approved", feedback: { rating: 4, comment: "Sorted. Thanks!" }, upvotes: 3 },
 ];
 
 const HISTORY_COUNT = 104;

@@ -1,0 +1,16 @@
+{
+  "campusId": "sues-mount-pleasant-hyderabad",
+  "institutions": [
+    { "id": "mjcet", "name": "Muffakham Jah College of Engineering and Technology", "shortName": "MJCET", "established": 1980, "website": "https://www.mjcollege.ac.in/", "onMainCampus": true, "onMainCampusStatus": "verified", "sourceIds": ["mjcet-home", "naac-411-index", "osm"] },
+    { "id": "sucp", "name": "Sultan-ul-Uloom College of Pharmacy", "shortName": "College of Pharmacy", "established": null, "website": "https://www.sucp.ac.in/", "onMainCampus": true, "onMainCampusStatus": "corroborated", "sourceIds": ["mjcet-other-institutions", "sucp", "osm", "wikipedia-sues"] },
+    { "id": "law", "name": "Sultan-Ul-Uloom College of Law", "shortName": "College of Law", "established": 1989, "website": "https://sulawcollege.edu.in/", "onMainCampus": true, "onMainCampusStatus": "corroborated", "sourceIds": ["mjcet-other-institutions", "law", "wikipedia-sues"] },
+    { "id": "aakcba", "name": "Amjad Ali Khan College of Business Administration", "shortName": "College of Business Administration", "established": 1991, "website": "https://amjadalikhancollege.edu.in/", "onMainCampus": true, "onMainCampusStatus": "corroborated", "sourceIds": ["mjcet-other-institutions", "aakcba", "wikipedia-sues"] },
+    { "id": "gacoe", "name": "Ghulam Ahmed College of Education", "shortName": "College of Education", "established": 1985, "website": "http://gacoe.ac.in/", "onMainCampus": true, "onMainCampusStatus": "corroborated", "sourceIds": ["mjcet-other-institutions", "gacoe", "wikipedia-sues"] },
+    { "id": "sujc", "name": "Sultan-Ul-Uloom Junior College", "shortName": "Junior College", "established": 1994, "website": "https://sujc.ac.in/", "onMainCampus": true, "onMainCampusStatus": "approximate", "sourceIds": ["mjcet-other-institutions", "sujc"] },
+    { "id": "sups-bh", "name": "Sultan-ul-Uloom Public School, Banjara Hills", "shortName": "Public School", "established": null, "website": "https://sups-bh.ac.in/", "onMainCampus": true, "onMainCampusStatus": "corroborated", "sourceIds": ["mjcet-other-institutions", "cbse-saras", "wikipedia-sues"] }
+  ],
+  "elsewhere": [
+    { "id": "sups-old-city", "name": "Sultan-Ul-Uloom Public Schools, Old City", "branches": ["Syed Ali Chabutra", "Golconda", "Khazipura", "Hafiz Baba Nagar"], "note": "Separate sites elsewhere in Hyderabad. No street addresses were published on the page, so they are listed here and never drawn on the campus map.", "sourceIds": ["mjcet-old-city"] },
+    { "id": "su-knowledge-hub", "name": "SU Knowledge Hub Foundation", "note": "Listed by the society; its physical location was not researched and it is not part of the map.", "sourceIds": ["mjcet-other-institutions"] }
+  ]
+}
