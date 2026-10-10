@@ -1589,3 +1589,12 @@ The live key was not changed. Restricting it by website and API needs the Google
 - The six unplaced campus locations and the block-to-footprint mapping still need an on-site check.
 - The duplicate Vercel project and the key restriction are pending manual tasks.
 - The existing pending expense claim was not read, changed or used.
+
+### Production smoke test (read-only, after deployment)
+
+- `9961e8d` was fast-forwarded to `main` and deployed by Vercel to the production project. The commit status turned green from the branch preview first, so the live site was polled until it actually served the new build before testing.
+- Browser tests against the live URL: 115 / 115. They read only public pages and Explore Mode; this includes the signed-out redirect away from `/dashboard`, `/worker`, `/admin`, `/admin/finance` and an issue page.
+- Signed-out Firestore reads of `issues`, `users`, `expenseClaims`, `campusLocations`, `finance`, `notifications`, `admins` and a write to `campusLocations`: all 403.
+- Nothing was created, changed or deleted in production, and no account was signed in. The pending expense claim was not touched.
+- The duplicate project `smart-campus-unifix` failed its build again, as on every push.
+- **Final status: PASS WITH MANUAL VERIFICATION REQUIRED.** Remaining: signed-in flows in production, a QR scan on a phone, disconnecting the duplicate Vercel project, restricting the live browser key (docs/MANUAL_VERIFICATION.md).
