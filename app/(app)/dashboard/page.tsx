@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ClipboardList, Globe2, Plus, SearchX } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
 import IssueRow from "@/components/IssueCard";
+import { useUnreadChats } from "@/hooks/useUnreadChats";
 import AccountNotices from "@/components/AccountNotices";
 import FeedbackRequests from "@/components/FeedbackRequests";
 import PageHeader from "@/components/ui/PageHeader";
@@ -28,6 +29,7 @@ const LOAD_ERROR = "We couldn't load issues right now. Please check your connect
 
 function DashboardContent() {
   const { userProfile } = useAuthContext();
+  const unreadChats = useUnreadChats(userProfile?.id);
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -197,7 +199,7 @@ function DashboardContent() {
               <ul className="divide-y divide-border">
                 {filtered.map((issue) => (
                   <li key={issue.id}>
-                    <IssueRow issue={issue} viewContext={exploring ? "explore" : "my-issues"} showSla={!exploring} />
+                    <IssueRow issue={issue} viewContext={exploring ? "explore" : "my-issues"} showSla={!exploring} unreadChat={unreadChats.has(issue.id)} />
                   </li>
                 ))}
               </ul>

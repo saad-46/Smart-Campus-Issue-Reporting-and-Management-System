@@ -1660,3 +1660,41 @@ Pending-worker, self-approval, double payment, receipt privacy, invalid transiti
 ### Update after the release verification: Vercel migration (2026-10-10)
 
 The "canonical" and "duplicate" Vercel projects named above have since swapped roles. The app was redeployed to `smart-campus-unifix` (<https://smart-campus-unifix.vercel.app>, commit `4de4e74`, `READY`; its earlier build failures were a missing `NEXT_PUBLIC_FIREBASE_API_KEY`). The browser suite passed against it: 121 passed, 8 emulator-only skipped. The legacy project and its address are **still serving** and have **not** been paused or deleted. Sign-in and signed-in workflows on the new address are **not verified**, and the new hostname has not been checked in Firebase Authentication's authorized domains. Steps: docs/MANUAL_VERIFICATION.md, section C.
+
+---
+
+## Issue chat, quick-report assistant and finance records (2026-10-11)
+
+Details and definitions: [docs/CHAT_AI_FINANCE.md](docs/CHAT_AI_FINANCE.md). Uncommitted, undeployed. Firestore rules changed; they must be deployed together with the app.
+
+### Found on audit
+- **Chat:** a private thread existed (`issues/{id}/messages`) but any worker could read and post in every issue's thread (`isStaff()`), the history was unbounded, and there was no unread state.
+- **Quick report:** deterministic keyword parsing only; no follow-up questions, no hazard warning, no model.
+- **Finance:** claims, approval and a ledger entry existed. Adding funds left no record of who, why or from what; "Pay" wrote an entry that looked like a payment although UniFix moves no money; there was no reconciliation.
+- **Existing and reused:** the claim, receipt and one-time payment rules, the Explore isolation, the notification centre.
+
+### Implemented
+- **Chat:** access narrowed to the reporter, the current assignee and administrators; reassignment removes the previous worker; bounded history with "Load earlier"; a `conversations/{issueId}` summary (participants copied from the issue, preview, read markers) written in the same transaction as each message; "Chat with worker/student"; "New message" badge on both dashboards.
+- **Assistant:** a conversation that asks only what is missing, warns about hazards, drafts an editable report, and submits only on the student's press. Server route `POST /api/report-assist` (Firebase ID token verified against Firebase Auth, per-user rate limit, size limits); model layer optional via a server-only key; rules fallback; every model answer validated.
+- **Finance:** immutable `ledger` entries tied to the budget change in one commit, and to exactly one entry per budget increase (a pre-commit review found two entries could otherwise share one increase; closed with a `lastLedgerEntryId` pointer and tests); payment records state method, date and reference and are stamped `manual`; a summary with defined figures and a reconciliation check; CSV export; worker view of how each payment was recorded.
+
+### Verification (executed 2026-10-11)
+| Suite | Result |
+| --- | --- |
+| Unit | 399 / 399 (335 before; +64: assistant 31, route 9, finance 24) |
+| Firestore rules | 225 / 225 (181 before; +44 covering chat access, conversation summaries, the funds ledger and payment details) |
+| Typecheck, lint, production build | clean |
+| Browser, local build | 121 passed, 11 skipped (the emulator-only spec) |
+| Signed-in emulator spec | 11 / 11 |
+| Provider key in browser output | 0 occurrences of a canary key in `.next/static` after a build with the key set |
+
+The emulator spec covers: report, protected pages, discussion privacy for another student and for an unassigned worker, assign and escalate with persistence, worker chat and the student's unread badge clearing, resolve with claim, validated payment recording (a bank transfer without a reference is refused), one-time payment, ledger and reconciliation, QR validation, offline failure and retry, Explore isolation while signed in, and the assistant's ask-where, draft, edit and submit flow.
+
+### Not verified or not done
+- **A live model.** No provider key was available, so every automated run used the rules path or a mocked provider. The model layer is exercised only against a fake; its real answers, latency and cost are unmeasured.
+- **Production.** Nothing was deployed, no production data was read or written, and the pending expense claim was not touched. The new rules are untested against production data.
+- **Real payments.** There is no payment gateway or bank connection to integrate; no payment can be "confirmed". Recorded payments are administrators' statements.
+- **Push notifications** for chat; photos in Quick report; per-message read receipts.
+- **Explore Mode** does not mirror the new payment fields, ledger, unread badges or the assistant's follow-ups (listed in docs/EXPLORE_PARITY.md).
+- **Rate limit** is per server instance. Set a spend limit on the provider key.
+- **Deploying the rules is a precondition** for the app changes: with the old rules, the first message sent after assignment fails to write its conversation summary, and Add funds fails to write its ledger entry.

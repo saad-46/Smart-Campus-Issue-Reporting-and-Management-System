@@ -15,15 +15,18 @@ import {
   onSnapshot,
   serverTimestamp,
   increment,
+  limit as limitTo,
+  orderBy,
   runTransaction,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { Budget, Transaction, User } from "@/types";
+import { Budget, LedgerEntry, Transaction, User } from "@/types";
+import { FundDetails, PaymentDetails } from "./financeRules";
 import { LIMITS } from "./constants";
 import { ValidationError } from "./errors";
 import { ListenerErrorHandler } from "./firestore";
 import { track } from "./listeners";
-import { normalizeBudget, normalizeIssue, normalizeTransaction, normalizeUser } from "./models";
+import { normalizeBudget, normalizeIssue, normalizeLedgerEntry, normalizeTransaction, normalizeUser } from "./models";
 import { queueNotification } from "./notifications";
 import { queueEvent } from "./timeline";
 import { parseAmount } from "./validation";
@@ -33,6 +36,7 @@ import { assertRealId } from "./sharedRules";
 const BUDGET_ID = "budget";
 const FINANCE_COLLECTION = "finance";
 const TRANSACTIONS_COLLECTION = "transactions";
+const LEDGER_COLLECTION = "ledger";
 const USERS_COLLECTION = "users";
 const ISSUES_COLLECTION = "issues";
 
@@ -146,16 +150,21 @@ export async function setWorkerAccess(
 }
 
 /**
- * Admin approves a worker's expense claim and pays it out.
+ * Admin records the payment of a worker's expense claim.
  * One atomic transaction: deducts from the budget, credits the worker,
- * records the payment and marks the claim approved.
+ * records the payment (with how and when the administrator says it was made)
+ * and marks the claim approved.
+ *
+ * UniFix does not move money. This writes the administrator's statement that
+ * an external payment was made, flagged `verification: "manual"`; nothing here
+ * confirms it with a bank or gateway.
  *
  * The amount and payee are read from the issue inside the transaction —
  * not taken from what the browser happens to be showing — and the claim
  * must still be pending, so a double click or two admins acting at once
  * can't pay the same claim twice.
  */
-export async function approveClaim(issueId: string, workerName: string, adminId: string): Promise<void> {
+export async function approveClaim(issueId: string, workerName: string, adminId: string, payment: PaymentDetails): Promise<void> {
   assertRealId(issueId, "issue");
   const budgetRef = doc(db, FINANCE_COLLECTION, BUDGET_ID);
   const issueRef = doc(db, ISSUES_COLLECTION, issueId);
@@ -211,6 +220,11 @@ export async function approveClaim(issueId: string, workerName: string, adminId:
       issueId,
       receiptUrl: "", // the receipt stays on the issue; don't duplicate the image
       status: "approved",
+      method: payment.method,
+      ...(payment.reference ? { reference: payment.reference } : {}),
+      paidOn: payment.paidOn,
+      verification: "manual",
+      recordedBy: adminId,
       createdAt: serverTimestamp(),
     });
 
@@ -263,24 +277,50 @@ export async function rejectReceipt(issueId: string, adminId: string): Promise<v
   });
 }
 
-/** Add funds to global budget */
-export async function addFundsToBudget(amount: number): Promise<void> {
+/**
+ * Records funds made available to the budget. One atomic commit raises the
+ * budget and writes an immutable ledger entry naming who recorded it, why, from
+ * what source and on which date; the rules accept the entry only together with
+ * a budget change of exactly its amount.
+ *
+ * This is the administrator's record of an allocation, not proof of a deposit.
+ */
+export async function addFundsToBudget(amount: number, details: FundDetails, adminId: string): Promise<void> {
   const funds = parseAmount(amount, LIMITS.maxFundsAmount);
   const budgetRef = doc(db, FINANCE_COLLECTION, BUDGET_ID);
+  const entryRef = doc(collection(db, LEDGER_COLLECTION));
 
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(budgetRef);
-    if (snap.exists()) {
-      transaction.update(budgetRef, {
-        totalAvailable: increment(funds),
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      transaction.set(budgetRef, {
-        totalAvailable: funds,
-        totalSpent: 0,
-        updatedAt: serverTimestamp(),
-      });
-    }
+    if (!snap.exists()) throw new ValidationError("The budget hasn't been set up yet. Reload the page and try again.");
+    transaction.update(budgetRef, {
+      totalAvailable: increment(funds),
+      // Points at the entry written below; the rules accept an entry only if
+      // the budget names it, so one budget change can't back two entries.
+      lastLedgerEntryId: entryRef.id,
+      updatedAt: serverTimestamp(),
+    });
+    transaction.set(entryRef, {
+      type: "funds_added",
+      amount: funds,
+      source: details.source,
+      ...(details.reference ? { reference: details.reference } : {}),
+      description: details.description,
+      receivedOn: details.receivedOn,
+      createdBy: adminId,
+      createdAt: serverTimestamp(),
+    });
   });
+}
+
+/** The funds ledger, newest first (bounded). Admin only. */
+export function subscribeToLedger(callback: (entries: LedgerEntry[]) => void, onError?: ListenerErrorHandler) {
+  const q = query(collection(db, LEDGER_COLLECTION), orderBy("createdAt", "desc"), limitTo(200));
+  return track(
+    onSnapshot(
+      q,
+      (snapshot) => callback(snapshot.docs.map((d) => normalizeLedgerEntry(d.id, d.data({ serverTimestamps: "estimate" })))),
+      (error) => onError?.(error)
+    )
+  );
 }

@@ -149,6 +149,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 **Run:** `npm install`, then `npm run dev` (needs `.env.local`; see `.env.local.example`).
 **Check:** `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:rules` (needs Java 21+), `npm run build`, `npm run test:e2e` (after a build).
 **Deploy:** Vercel builds every push to `main` from the Git integration. It needs the six `NEXT_PUBLIC_FIREBASE_*` variables listed in `.env.local.example`; there is no `vercel.json`.
+**Chat, assistant and finance:** [docs/CHAT_AI_FINANCE.md](docs/CHAT_AI_FINANCE.md) (who can read an issue chat, how the quick-report assistant works and what it cannot do, what the finance figures mean and why a "recorded payment" is not a verified one).
 **Documentation:** [docs/](docs/): campus research and on-site checklist, Explore parity, manual verification, Firestore rules notes, and [archived setup notes](docs/archive/).
 
 ---

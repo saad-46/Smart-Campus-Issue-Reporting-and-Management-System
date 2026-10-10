@@ -109,6 +109,16 @@ test("another student cannot read the discussion of that issue", async ({ page }
   await expect(page.getByRole("log", { name: "Messages" })).toHaveCount(0);
 });
 
+test("a worker who has not taken the issue cannot open its discussion", async ({ page }) => {
+  test.skip(!issuePath, "needs the issue from the first test");
+  await signIn(page, "worker2@unifix.test");
+  await page.goto(issuePath);
+  const discussion = page.getByRole("region", { name: "Discussion" });
+  await expect(discussion).toContainText("private to the person who reported");
+  await expect(discussion.getByRole("textbox")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Chat with/ })).toHaveCount(0);
+});
+
 test("admin: assigns a worker, escalates, and both persist across a reload", async ({ page }) => {
   test.skip(!issuePath, "needs the issue from the first test");
   const errors = hasConsoleErrors(page);
@@ -140,6 +150,14 @@ test("worker: starts, resolves with an expense claim; a second action on the fin
   const start = page.getByRole("button", { name: new RegExp(`Start.*${STAMP}`) });
   await expect(start).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Suggested checks").first()).toBeVisible();
+
+  // The worker now has the private conversation with the reporter.
+  await page.goto(issuePath);
+  await expect(page.getByRole("button", { name: "Chat with student" })).toBeVisible();
+  await page.getByPlaceholder("Write a message…").fill("TEST worker: I will check it this afternoon");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("log", { name: "Messages" })).toContainText("I will check it this afternoon");
+  await page.goto("/worker");
   await start.click();
   const resolve = page.getByRole("button", { name: new RegExp(`Resolve.*${STAMP}`) });
   await expect(resolve).toBeVisible();
@@ -164,10 +182,17 @@ test("admin: pays the claim exactly once; a worker cannot reach finance; the stu
   const review = page.getByRole("button", { name: new RegExp(`Review claim for.*${STAMP}`) });
   await expect(review).toBeVisible({ timeout: 30_000 });
   await review.click();
-  await page.getByRole("button", { name: /^Pay ₹/ }).click();
-  await page.getByRole("button", { name: "Confirm payment" }).click();
+  const dialog = page.getByRole("dialog", { name: "Review expense claim" });
+  // A bank transfer needs a reference; the dialog refuses to continue without one.
+  await dialog.getByRole("button", { name: /^Record payment of ₹/ }).click();
+  await expect(dialog).toContainText("reference number");
+  await dialog.getByLabel("Method").selectOption({ label: "Cash" });
+  await dialog.getByRole("button", { name: /^Record payment of ₹/ }).click();
+  await page.getByRole("button", { name: "Record payment", exact: true }).click();
   await expect(review).toHaveCount(0, { timeout: 30_000 });
-  await expect(page.locator("main")).toContainText(/Recent payouts/);
+  await expect(page.locator("main")).toContainText(/Recent payments/);
+  await expect(page.getByRole("region", { name: "Payouts" })).toContainText("Cash");
+  await expect(page.locator("main")).toContainText("Consistent"); // ledger check: budget spent equals recorded payments
   // Paid once: the claim no longer offers a review, even after a reload.
   await page.reload();
   await expect(page.getByRole("button", { name: new RegExp(`Review claim for.*${STAMP}`) })).toHaveCount(0);
@@ -179,6 +204,15 @@ test("admin: pays the claim exactly once; a worker cannot reach finance; the stu
   await signOut(page);
 
   await signIn(page, "student1@unifix.test");
+  // The worker's message is unread until the student opens the conversation.
+  await page.goto("/dashboard");
+  const row = page.locator("article", { hasText: TITLE });
+  await expect(row.getByText("New message")).toBeVisible({ timeout: 30_000 });
+  await page.goto(issuePath);
+  await expect(page.getByRole("button", { name: "Chat with worker" })).toBeVisible();
+  await expect(page.getByRole("log", { name: "Messages" })).toContainText("I will check it this afternoon");
+  await page.goto("/dashboard");
+  await expect(page.locator("article", { hasText: TITLE }).getByText("New message")).toHaveCount(0, { timeout: 30_000 });
   await page.goto(issuePath);
   await expect(page.locator("main")).toContainText("Resolved", { timeout: 30_000 });
   await page.getByRole("button", { name: /^Notifications/ }).click();
@@ -275,4 +309,46 @@ test("Explore while signed in: only demo data, no Firebase request, and nothing 
   await fresh.goto("/viewer/map", { waitUntil: "load" });
   await fresh.waitForTimeout(2000);
   expect(all.filter((u) => /:(8080|9099)|googleapis|firebase|identitytoolkit|securetoken/i.test(u))).toEqual([]);
+});
+
+test("admin: funds are recorded with a source and reason, appear in the ledger, and raise the budget", async ({ page }) => {
+  await signIn(page, "admin@unifix.test");
+  await page.goto("/admin/finance");
+  await page.getByRole("button", { name: "Add funds" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Add funds" });
+  await dialog.getByLabel("Amount").fill("2500");
+  await dialog.getByRole("button", { name: "Add funds" }).click();
+  await expect(dialog).toContainText("why the funds");
+  await dialog.getByLabel("Reason").fill(`TEST allocation ${STAMP}`);
+  await dialog.getByRole("button", { name: "Add funds" }).click();
+  await expect(dialog).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByRole("region", { name: "Funds ledger" })).toContainText(`TEST allocation ${STAMP}`);
+  await expect(page.locator("main")).toContainText("Consistent");
+});
+
+test("quick report: the assistant asks where, drafts, lets the student edit, and submits only when told", async ({ page }) => {
+  await signIn(page, "student4@unifix.test");
+  await page.goto("/dashboard/report");
+  await page.getByRole("group", { name: "Report mode" }).getByRole("button", { name: "Quick report" }).click();
+  const log = page.getByRole("log", { name: /Conversation with the report assistant/ });
+  await expect(log).toContainText("What problem are you experiencing");
+  await page.getByLabel("Your message").fill(`TEST assistant ${STAMP}: the ceiling fan is not working`);
+  await page.getByRole("button", { name: "Send" }).click();
+  // No place was given, so it asks, rather than guessing one.
+  await expect(log).toContainText(/Where is it/i, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/dashboard\/report/);
+  await page.getByLabel("Where is it?").fill("Block 3, second floor");
+  await page.getByRole("button", { name: "Send" }).click();
+  const review = page.getByTestId("quick-review");
+  await expect(review).toBeVisible({ timeout: 30_000 });
+  await expect(review.getByLabel("Location")).toHaveValue("Block 3, second floor");
+  await expect(review.getByLabel("Category")).toHaveValue("Electrical");
+  // Nothing exists until the student presses submit: nothing in the list yet.
+  await page.getByLabel("Category").selectOption("Infrastructure");
+  await page.getByLabel("Title").fill(`TEST assistant ${STAMP}: ceiling fan stopped`);
+  await page.getByRole("button", { name: "Submit issue" }).click();
+  await page.waitForURL(/\/issues\/[A-Za-z0-9]+$/, { timeout: 60_000 });
+  await expect(page.locator("h1")).toContainText("ceiling fan stopped");
+  await expect(page.locator("main")).toContainText("Infrastructure");
+  await expect(page.locator("main")).toContainText("Block 3, second floor");
 });

@@ -821,7 +821,7 @@ describe("issue discussion thread", () => {
   });
 
   beforeEach(async () => {
-    await seedIssue("i1", { createdBy: ALICE });
+    await seedIssue("i1", { createdBy: ALICE, assignedTo: WENDY, status: "In Progress" });
     await seed(async (db) => {
       await setDoc(doc(db, "issues", "i1", "messages", "m1"), {
         text: "hello",
@@ -833,11 +833,41 @@ describe("issue discussion thread", () => {
     });
   });
 
-  it("the author, workers and admins can read and post", async () => {
+  it("the reporter, the assigned worker and admins can read and post", async () => {
     for (const [uid, role] of [[ALICE, "user"], [WENDY, "worker"], [ADMIN, "admin"]] as const) {
       await assertSucceeds(getDocs(collection(dbAs(uid), "issues", "i1", "messages")));
       await assertSucceeds(addDoc(collection(dbAs(uid), "issues", "i1", "messages"), message(uid, role)));
     }
+  });
+
+  it("a worker who is not assigned to the issue cannot read or post", async () => {
+    await assertFails(getDocs(collection(dbAs(WALT), "issues", "i1", "messages")));
+    await assertFails(getDoc(doc(dbAs(WALT), "issues", "i1", "messages", "m1")));
+    await assertFails(addDoc(collection(dbAs(WALT), "issues", "i1", "messages"), message(WALT, "worker")));
+  });
+
+  it("before anyone takes the issue only the reporter and admins have the thread", async () => {
+    await seedIssue("open1", { createdBy: ALICE, assignedTo: "", status: "Open" });
+    await assertSucceeds(addDoc(collection(dbAs(ALICE), "issues", "open1", "messages"), message(ALICE, "user")));
+    await assertFails(getDocs(collection(dbAs(WENDY), "issues", "open1", "messages")));
+    await assertFails(addDoc(collection(dbAs(WENDY), "issues", "open1", "messages"), message(WENDY, "worker")));
+    await assertFails(getDocs(collection(dbAs(BOB), "issues", "open1", "messages")));
+  });
+
+  it("a reassigned issue thread follows the new worker, and the previous worker loses access", async () => {
+    await assertSucceeds(addDoc(collection(dbAs(WENDY), "issues", "i1", "messages"), message(WENDY, "worker")));
+    await seedIssue("i1", { createdBy: ALICE, assignedTo: WALT, status: "In Progress" });
+    await assertFails(getDocs(collection(dbAs(WENDY), "issues", "i1", "messages")));
+    await assertFails(addDoc(collection(dbAs(WENDY), "issues", "i1", "messages"), message(WENDY, "worker")));
+    await assertSucceeds(getDocs(collection(dbAs(WALT), "issues", "i1", "messages")));
+    await assertSucceeds(addDoc(collection(dbAs(WALT), "issues", "i1", "messages"), message(WALT, "worker")));
+    // The reporter keeps the whole history.
+    await assertSucceeds(getDocs(collection(dbAs(ALICE), "issues", "i1", "messages")));
+  });
+
+  it("a worker cannot post as the reporter, and a user cannot use a worker badge", async () => {
+    await assertFails(addDoc(collection(dbAs(WENDY), "issues", "i1", "messages"), message(ALICE, "user")));
+    await assertFails(addDoc(collection(dbAs(ALICE), "issues", "i1", "messages"), message(ALICE, "worker")));
   });
 
   it("an unrelated user cannot read or post", async () => {
@@ -866,6 +896,131 @@ describe("issue discussion thread", () => {
     await assertFails(updateDoc(doc(dbAs(ALICE), "issues", "i1", "messages", "m1"), { text: "edited" }));
     await assertFails(deleteDoc(doc(dbAs(ALICE), "issues", "i1", "messages", "m1")));
     await assertFails(deleteDoc(doc(dbAs(ADMIN), "issues", "i1", "messages", "m1")));
+  });
+});
+
+// ------------------------------------------------------------------
+describe("conversation summaries (conversations/{issueId})", () => {
+  const first = (uid: string, overrides: Record<string, unknown> = {}) => ({
+    issueId: "c1",
+    studentId: ALICE,
+    workerId: WENDY,
+    participants: [ALICE, WENDY],
+    createdAt: serverTimestamp(),
+    lastMessageAt: serverTimestamp(),
+    lastSenderId: uid,
+    lastPreview: "On my way",
+    readAt: { [uid]: serverTimestamp() },
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    await seedIssue("c1", { createdBy: ALICE, assignedTo: WENDY, status: "In Progress" });
+    await seedIssue("c0", { createdBy: ALICE, assignedTo: "", status: "Open" });
+  });
+
+  const stored = async (extra: Record<string, unknown> = {}) =>
+    seed(async (db) => {
+      await setDoc(doc(db, "conversations", "c1"), {
+        issueId: "c1",
+        studentId: ALICE,
+        workerId: WENDY,
+        participants: [ALICE, WENDY],
+        createdAt: new Date(),
+        lastMessageAt: new Date(Date.now() - 60_000),
+        lastSenderId: ALICE,
+        lastPreview: "hello",
+        readAt: { [ALICE]: new Date(Date.now() - 60_000) },
+        ...extra,
+      });
+    });
+
+  it("the assigned worker creates it with the first message; participants come from the issue", async () => {
+    await assertSucceeds(setDoc(doc(dbAs(WENDY), "conversations", "c1"), first(WENDY)));
+  });
+
+  it("the reporter can create it too", async () => {
+    await assertSucceeds(setDoc(doc(dbAs(ALICE), "conversations", "c1"), first(ALICE)));
+  });
+
+  it("nobody else can create it, and it cannot name other participants", async () => {
+    await assertFails(setDoc(doc(dbAs(BOB), "conversations", "c1"), first(BOB)));
+    await assertFails(setDoc(doc(dbAs(WALT), "conversations", "c1"), first(WALT, { workerId: WALT, participants: [ALICE, WALT] })));
+    await assertFails(setDoc(doc(dbAs(WENDY), "conversations", "c1"), first(WENDY, { studentId: BOB, participants: [BOB, WENDY] })));
+    await assertFails(setDoc(doc(dbAs(WENDY), "conversations", "c1"), first(ALICE)));
+  });
+
+  it("cannot exist for an issue nobody has taken", async () => {
+    await assertFails(setDoc(doc(dbAs(ALICE), "conversations", "c0"), first(ALICE, { issueId: "c0", workerId: "", participants: [ALICE, ""] })));
+  });
+
+  it("participants and admins read it; others do not", async () => {
+    await stored();
+    for (const uid of [ALICE, WENDY, ADMIN]) await assertSucceeds(getDoc(doc(dbAs(uid), "conversations", "c1")));
+    for (const uid of [BOB, WALT]) await assertFails(getDoc(doc(dbAs(uid), "conversations", "c1")));
+  });
+
+  it("a participant can ask for the summary before it exists; others cannot", async () => {
+    await assertSucceeds(getDoc(doc(dbAs(ALICE), "conversations", "c1")));
+    await assertSucceeds(getDoc(doc(dbAs(WENDY), "conversations", "c1")));
+    await assertFails(getDoc(doc(dbAs(BOB), "conversations", "c1")));
+    await assertFails(getDoc(doc(dbAs(WALT), "conversations", "c1")));
+    await assertFails(getDoc(doc(dbAs(BOB), "conversations", "does-not-exist")));
+  });
+
+  it("each user can list only their own conversations", async () => {
+    await stored();
+    const mine = query(collection(dbAs(ALICE), "conversations"), where("participants", "array-contains", ALICE));
+    await assertSucceeds(getDocs(mine));
+    const theirs = query(collection(dbAs(BOB), "conversations"), where("participants", "array-contains", ALICE));
+    await assertFails(getDocs(theirs));
+  });
+
+  it("sending updates the summary; a participant marks only their own read marker", async () => {
+    await stored();
+    await assertSucceeds(
+      updateDoc(doc(dbAs(WENDY), "conversations", "c1"), {
+        lastMessageAt: serverTimestamp(),
+        lastSenderId: WENDY,
+        lastPreview: "Arriving now",
+        workerId: WENDY,
+        participants: [ALICE, WENDY],
+        readAt: { [ALICE]: new Date(Date.now() - 60_000), [WENDY]: serverTimestamp() },
+      })
+    );
+    await assertSucceeds(updateDoc(doc(dbAs(ALICE), "conversations", "c1"), { [`readAt.${ALICE}`]: serverTimestamp() }));
+  });
+
+  it("a participant cannot mark the other person read marker, backdate, or rewrite the summary", async () => {
+    await stored();
+    await assertFails(updateDoc(doc(dbAs(WENDY), "conversations", "c1"), { [`readAt.${ALICE}`]: serverTimestamp() }));
+    await assertFails(updateDoc(doc(dbAs(ALICE), "conversations", "c1"), { [`readAt.${ALICE}`]: new Date("2020-01-01") }));
+    await assertFails(updateDoc(doc(dbAs(ALICE), "conversations", "c1"), { lastPreview: "forged", lastSenderId: WENDY }));
+    await assertFails(updateDoc(doc(dbAs(ALICE), "conversations", "c1"), { studentId: BOB }));
+  });
+
+  it("a worker who is not assigned cannot update it, and it cannot be deleted", async () => {
+    await stored();
+    await assertFails(updateDoc(doc(dbAs(WALT), "conversations", "c1"), { [`readAt.${WALT}`]: serverTimestamp() }));
+    await assertFails(deleteDoc(doc(dbAs(ALICE), "conversations", "c1")));
+    await assertFails(deleteDoc(doc(dbAs(ADMIN), "conversations", "c1")));
+  });
+
+  it("after reassignment the new worker first message replaces the previous worker in the summary", async () => {
+    await stored();
+    await seedIssue("c1", { createdBy: ALICE, assignedTo: WALT, status: "In Progress" });
+    await assertFails(updateDoc(doc(dbAs(WENDY), "conversations", "c1"), { [`readAt.${WENDY}`]: serverTimestamp() }));
+    await assertSucceeds(
+      updateDoc(doc(dbAs(WALT), "conversations", "c1"), {
+        lastMessageAt: serverTimestamp(),
+        lastSenderId: WALT,
+        lastPreview: "I have taken over",
+        workerId: WALT,
+        participants: [ALICE, WALT],
+        readAt: { [ALICE]: new Date(Date.now() - 60_000), [WALT]: serverTimestamp() },
+      })
+    );
+    await assertFails(getDoc(doc(dbAs(WENDY), "conversations", "c1")));
   });
 });
 
@@ -978,6 +1133,41 @@ describe("finance", () => {
     await assertFails(pay());
   });
 
+  describe("how a payment was made (recorded by the administrator)", () => {
+    const details = { method: "bank_transfer", reference: "UTR123456", paidOn: "2026-10-10", verification: "manual", recordedBy: ADMIN };
+    const claim = () => seedIssue("claim", { createdBy: ALICE, assignedTo: WENDY, status: "Resolved", claimAmount: 450, claimStatus: "pending" });
+
+    it("accepts a complete record, and still accepts entries without these fields", async () => {
+      await claim();
+      await assertSucceeds(pay(details));
+    });
+
+    it("accepts cash with no reference", async () => {
+      await claim();
+      await assertSucceeds(pay({ method: "cash", paidOn: "2026-10-10", verification: "manual", recordedBy: ADMIN }));
+    });
+
+    it.each([
+      ["an unknown method", { method: "bitcoin" }],
+      ["a bank transfer with no reference", { reference: "" }],
+      ["a malformed date", { paidOn: "10/10/2026" }],
+      ["a claim of external verification", { verification: "bank-confirmed" }],
+      ["a different administrator named as the recorder", { recordedBy: WENDY }],
+      ["an over-long reference", { reference: "x".repeat(61) }],
+      ["a partial record", { reference: undefined, paidOn: undefined }],
+    ])("rejects %s", async (_name, overrides) => {
+      await claim();
+      const merged: Record<string, unknown> = { ...details, ...overrides };
+      for (const k of Object.keys(merged)) if (merged[k] === undefined) delete merged[k];
+      await assertFails(pay(merged));
+    });
+
+    it("rejects fields the payment record does not define", async () => {
+      await claim();
+      await assertFails(pay({ ...details, bankConfirmed: true }));
+    });
+  });
+
   it.each([
     ["a different amount", { amount: 4500 }],
     ["a different payee", { workerId: WALT }],
@@ -986,6 +1176,117 @@ describe("finance", () => {
   ])("a payment for %s than the claim is rejected", async (_name, overrides) => {
     await seedIssue("claim", { createdBy: ALICE, assignedTo: WENDY, status: "Resolved", claimAmount: 450, claimStatus: "pending" });
     await assertFails(pay(overrides));
+  });
+});
+
+// ------------------------------------------------------------------
+describe("funds ledger (ledger/{id})", () => {
+  const entry = (overrides: Record<string, unknown> = {}) => ({
+    type: "funds_added",
+    amount: 5000,
+    source: "management_allocation",
+    reference: "Sanction 14",
+    description: "Q3 maintenance allocation",
+    receivedOn: "2026-10-01",
+    createdBy: ADMIN,
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  /** The app's addFundsToBudget commit: raise the budget and write the entry together. */
+  const add = (overrides: Record<string, unknown> = {}, raiseBy = 5000, uid = ADMIN) => {
+    const db = dbAs(uid);
+    const batch = writeBatch(db);
+    const ref = doc(collection(db, "ledger"));
+    batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(raiseBy), lastLedgerEntryId: ref.id, updatedAt: serverTimestamp() });
+    batch.set(ref, entry(overrides));
+    return batch.commit();
+  };
+
+  it("an admin records funds: the entry and the budget change together", async () => {
+    await assertSucceeds(add());
+    const snap = await assertSucceeds(getDocs(collection(dbAs(ADMIN), "ledger")));
+    expect(snap.size).toBe(1);
+  });
+
+  it("an entry on its own, or a budget change that does not match it, is rejected", async () => {
+    await assertFails(addDoc(collection(dbAs(ADMIN), "ledger"), entry()));
+    await assertFails(add({}, 4000)); // budget raised by less than the entry says
+    await assertFails(add({}, 6000)); // ...or more
+    await assertFails(add({ amount: 5000 }, 0));
+  });
+
+  it("an addition cannot also move the spent total (an entry cannot launder a payment)", async () => {
+    const db = dbAs(ADMIN);
+    const batch = writeBatch(db);
+    const ref = doc(collection(db, "ledger"));
+    batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), totalSpent: increment(100), lastLedgerEntryId: ref.id, updatedAt: serverTimestamp() });
+    batch.set(ref, entry());
+    await assertFails(batch.commit());
+  });
+
+  it("one budget increase cannot back two ledger entries", async () => {
+    const db = dbAs(ADMIN);
+    const first = doc(collection(db, "ledger"));
+    const second = doc(collection(db, "ledger"));
+    const batch = writeBatch(db);
+    batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), lastLedgerEntryId: first.id, updatedAt: serverTimestamp() });
+    batch.set(first, entry());
+    batch.set(second, entry({ reference: "duplicate" }));
+    await assertFails(batch.commit());
+  });
+
+  it("an entry the budget does not point at is rejected", async () => {
+    const db = dbAs(ADMIN);
+    const batch = writeBatch(db);
+    batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), updatedAt: serverTimestamp() });
+    batch.set(doc(collection(db, "ledger")), entry());
+    await assertFails(batch.commit());
+    const stale = writeBatch(db);
+    stale.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), lastLedgerEntryId: "someone-elses-entry", updatedAt: serverTimestamp() });
+    stale.set(doc(collection(db, "ledger")), entry());
+    await assertFails(stale.commit());
+  });
+
+  it.each([
+    ["a zero amount", { amount: 0 }],
+    ["a negative amount", { amount: -5 }],
+    ["a non-numeric amount", { amount: "5000" }],
+    ["an absurd amount", { amount: 1_000_000_000 }],
+    ["an unknown source", { source: "found on the road" }],
+    ["no reason", { description: "" }],
+    ["a malformed date", { receivedOn: "yesterday" }],
+    ["another administrator named as the recorder", { createdBy: WENDY }],
+    ["a backdated timestamp", { createdAt: new Date("2020-01-01") }],
+    ["an entry of another type", { type: "payment" }],
+    ["an extra field", { verified: true }],
+  ] as [string, Record<string, unknown>][])("rejects %s", async (_name, overrides) => {
+    // The budget is raised by exactly the amount the entry states, so the
+    // budget match is not what makes it fail: the field under test is.
+    await assertFails(add(overrides, typeof overrides.amount === "number" ? overrides.amount : 5000));
+  });
+
+  it("only administrators can add or read entries", async () => {
+    for (const uid of [ALICE, WENDY]) {
+      await assertFails(add({ createdBy: uid }, 5000, uid));
+      await assertFails(getDocs(collection(dbAs(uid), "ledger")));
+    }
+    await assertFails(getDocs(collection(dbAnon(), "ledger")));
+  });
+
+  it("entries are immutable: no edit, no delete, by anyone", async () => {
+    await add();
+    const snap = await getDocs(collection(dbAs(ADMIN), "ledger"));
+    const id = snap.docs[0].id;
+    await assertFails(updateDoc(doc(dbAs(ADMIN), "ledger", id), { amount: 1 }));
+    await assertFails(deleteDoc(doc(dbAs(ADMIN), "ledger", id)));
+    await assertFails(deleteDoc(doc(dbAs(WENDY), "ledger", id)));
+  });
+
+  it("two concurrent additions both succeed and the budget reflects both", async () => {
+    await Promise.all([assertSucceeds(add()), assertSucceeds(add({ reference: "Sanction 15" }))]);
+    const budget = await getDoc(doc(dbAs(ADMIN), "finance", "budget"));
+    expect(budget.data()!.totalAvailable).toBe(1000 + 10_000);
   });
 });
 
