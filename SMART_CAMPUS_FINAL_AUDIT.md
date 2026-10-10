@@ -1598,3 +1598,65 @@ The live key was not changed. Restricting it by website and API needs the Google
 - Nothing was created, changed or deleted in production, and no account was signed in. The pending expense claim was not touched.
 - The duplicate project `smart-campus-unifix` failed its build again, as on every push.
 - **Final status: PASS WITH MANUAL VERIFICATION REQUIRED.** Remaining: signed-in flows in production, a QR scan on a phone, disconnecting the duplicate Vercel project, restricting the live browser key (docs/MANUAL_VERIFICATION.md).
+
+---
+
+## Release verification (2026-10-10)
+
+Scope: verification and hardening only; no feature work, no change to application code, rules, dataset or configuration. Details: [docs/MANUAL_VERIFICATION.md](docs/MANUAL_VERIFICATION.md), [docs/SUES_ON_SITE_VERIFICATION.md](docs/SUES_ON_SITE_VERIFICATION.md).
+
+### 1. Verified in code
+- Working tree clean at start, `main` = `origin/main` = `4de4e74`, all feature branches present.
+- QR ids are shape-checked (`^[a-z0-9-]{1,60}$`) before any lookup in both modes; the printed link carries one parameter, the id.
+- Signed-in issue writes refuse demo ids (`assertRealId`) before any Firestore call (10 functions).
+- No private key, service-account file, `.env` file or real `AIza` key in the tracked tree, any commit on any branch, or `.next` output.
+
+### 2. Verified in automated tests (executed 2026-10-10)
+| Suite | Result |
+| --- | --- |
+| Unit | 335 / 335 (was 326; +7 QR, +2 checklist-sync) |
+| Firestore rules (emulator) | 181 / 181 |
+| Type check, lint | clean |
+| Playwright, local production build | 121 passed, 8 skipped (the emulator-only spec) |
+
+### 3. Verified in the Firebase emulator
+`e2e/signed-in.emulator.spec.ts`, 8 / 8, seeded accounts only, refuses non-local addresses:
+- **Student:** signs in, reports at "Block 4", sees the report, posts to its discussion, is redirected away from `/admin`, `/admin/finance`, `/admin/workers` and `/worker`, and loses access after sign-out.
+- **Another student:** cannot read or post to that discussion.
+- **Admin:** assigns Demo Worker 1, escalates; both persist across a reload; the report is counted at "Blocks 3 and 4 area" on the real map.
+- **Worker:** sees the task and a repair tip, starts it, is refused a zero-amount claim, resolves with a claim; the task leaves the list.
+- **Admin:** pays the claim once; the claim offers no second review after a reload. The worker is redirected away from finance. The student sees the issue resolved and the notification.
+- **QR:** a seeded location fills the form and the stored issue keeps its name; unknown, wrong-case, trailing-space, path-traversal, script, over-length and appended-parameter ids are refused or reduced to the single known id.
+- **Failure and retry:** submitting offline shows an error and no success; going online and retrying creates exactly one issue.
+- **Explore while signed in:** only `SC-…` issues; a fresh tab makes no Firestore, Auth or Google request; a demo "add funds" does not change the real budget.
+
+Pending-worker, self-approval, double payment, receipt privacy, invalid transitions and cross-user reads are covered by the 181 rules tests (direct Firestore requests, independent of the UI).
+
+### 4. Verified on the live production site (read-only)
+- Canonical deployment `READY` on `4de4e74`; the live site serves the new build.
+- 121 passed, 8 skipped against the live URL (public pages, Explore, signed-out redirects, QR in Explore).
+- Signed-out reads of seven collections: 403.
+- Nothing was created, changed or deleted; no account was signed in; the ₹1,046 claim was not read or touched.
+
+### 5. Requires authorized human verification
+- Signed-in production workflows with accounts created for the test (A in MANUAL_VERIFICATION).
+- A QR scan with a real phone (B).
+- Disconnecting `smart-campus-unifix` (C).
+- Restricting the live browser key (D).
+- On-site campus survey (SUES_ON_SITE_VERIFICATION).
+
+### 6. Blocked by permissions
+- Vercel project settings and Google Cloud credentials are not changeable from this session, and no change was authorized.
+
+### Findings
+- **Duplicate Vercel project:** owns only its own `*.vercel.app` addresses; the production address belongs to the canonical project; its last three builds failed. Obsolete and harmless, but still connected. Not changed.
+- **Firebase browser key:** the live key carries **no website restriction**: it answered requests with a foreign and an absent `Referer`. It is a public identifier and every data request is authorised by Auth and the rules, so this is not a data-exposure issue; it leaves quota and sign-up abuse open. The old-key concern from earlier audits stands corrected: the repository and history contain only placeholders. Not changed; steps in MANUAL_VERIFICATION section D.
+- **Campus data:** no evidence in the repository resolves any unplaced location, conflicting position or footprint identity, so nothing was changed. 0 places verified, 7 approximate, 1 conflicting, 1 unverified; 6 locations unplaced.
+- **Operational note:** `next dev` overwrites `.next`; run `next build` before `npm run test:e2e`.
+
+### Release status
+**PASS WITH MANUAL VERIFICATION REQUIRED.** No defect was found in the application. Changes in this pass are tests and documentation only, and are uncommitted.
+
+### Update after the release verification: Vercel migration (2026-10-10)
+
+The "canonical" and "duplicate" Vercel projects named above have since swapped roles. The app was redeployed to `smart-campus-unifix` (<https://smart-campus-unifix.vercel.app>, commit `4de4e74`, `READY`; its earlier build failures were a missing `NEXT_PUBLIC_FIREBASE_API_KEY`). The browser suite passed against it: 121 passed, 8 emulator-only skipped. The legacy project and its address are **still serving** and have **not** been paused or deleted. Sign-in and signed-in workflows on the new address are **not verified**, and the new hostname has not been checked in Firebase Authentication's authorized domains. Steps: docs/MANUAL_VERIFICATION.md, section C.

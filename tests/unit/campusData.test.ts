@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import campus from "@/data/campuses/sues-hyderabad/campus.json";
 import institutions from "@/data/campuses/sues-hyderabad/institutions.json";
@@ -224,5 +226,24 @@ describe("research sources", () => {
       if (!["sues-site", "mjcet-sues-history"].includes(s.id)) expect(used.has(s.id), `${s.id} is cited`).toBe(true);
     }
     expect(sources.accessedAt).toBe(locations.lastVerifiedAt);
+  });
+});
+
+describe("on-site verification checklist", () => {
+  const doc = readFileSync(join(__dirname, "..", "..", "docs", "SUES_ON_SITE_VERIFICATION.md"), "utf8");
+
+  it("lists every place, every unplaced location, every campus footprint and every gate in the dataset", () => {
+    for (const p of locations.places) expect(doc, `place ${p.id}`).toContain(`\`${p.id}\``);
+    const unplaced = locations.locations.filter((l) => !l.placeId);
+    expect(unplaced.length).toBeGreaterThan(0);
+    for (const l of unplaced) expect(doc, `unplaced location ${l.id}`).toContain(`\`${l.id}\``);
+    for (const f of features.filter((x) => x.properties.kind === "building" || x.properties.kind === "gate")) expect(doc, `${f.properties.kind} ${f.properties.osm}`).toContain(`\`${f.properties.osm}\``);
+  });
+
+  it("states the counts it was written for, so a changed dataset is noticed", () => {
+    expect(locations.places).toHaveLength(9);
+    expect(locations.locations.filter((l) => !l.placeId)).toHaveLength(6); // the library and five institutions; the unverified bank has a place
+    expect(features.filter((f) => f.properties.kind === "gate")).toHaveLength(6);
+    expect(features.filter((f) => f.properties.kind === "building")).toHaveLength(6);
   });
 });
