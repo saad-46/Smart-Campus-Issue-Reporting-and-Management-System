@@ -494,18 +494,12 @@ service cloud.firestore {
       }
 
       // ---------- issue discussion thread ----------
-      // Private to the issue's reporter, the worker it is CURRENTLY assigned
-      // to, and administrators. A worker who has not taken the issue, or who
-      // was reassigned away from it, can neither read nor post. (Administrator
-      // access is the existing oversight policy; it is read-and-post only,
-      // never edit or delete.)
+      // Private to the issue's author and staff.
       match /messages/{messageId} {
 
         function canChat() {
-          let issue = get(/databases/$(database)/documents/issues/$(issueId)).data;
-          return issue.createdBy == request.auth.uid
-            || (issue.get('assignedTo', '') == request.auth.uid && isStaff())
-            || isAdmin();
+          return get(/databases/$(database)/documents/issues/$(issueId)).data.createdBy == request.auth.uid
+            || isStaff();
         }
 
         function validMessage() {
@@ -526,87 +520,6 @@ service cloud.firestore {
         allow create: if signedIn() && canChat() && validMessage();
         allow update, delete: if false;
       }
-    }
-
-    // ============================================================
-    // conversations/{issueId} — summary of an issue's private chat
-    // ============================================================
-    // One document per issue, only once the issue has a worker. It holds the
-    // two participants, the time and sender of the last message, a short
-    // preview and each participant's read marker, so unread counts need one
-    // small query instead of reading every message. The messages themselves
-    // stay in issues/{id}/messages.
-    match /conversations/{issueId} {
-
-      function issueNow() {
-        return get(/databases/$(database)/documents/issues/$(issueId)).data;
-      }
-
-      // The reporter, or the worker the issue is assigned to right now.
-      function participantNow() {
-        return signedIn()
-          && exists(/databases/$(database)/documents/issues/$(issueId))
-          && (issueNow().createdBy == request.auth.uid
-              || (issueNow().get('assignedTo', '') == request.auth.uid && isStaff()));
-      }
-
-      function summaryShape(d) {
-        return d.keys().hasOnly(['issueId', 'studentId', 'workerId', 'participants', 'createdAt',
-                                 'lastMessageAt', 'lastSenderId', 'lastPreview', 'readAt'])
-          && d.keys().hasAll(['issueId', 'studentId', 'workerId', 'participants', 'createdAt',
-                              'lastMessageAt', 'lastSenderId', 'lastPreview', 'readAt'])
-          && d.lastPreview is string && d.lastPreview.size() <= 120
-          && d.readAt is map
-          && d.participants is list && d.participants.size() == 2
-          && d.participants[0] == d.studentId && d.participants[1] == d.workerId;
-      }
-
-      // Written as membership of `participants` so a list query that
-      // filters on array-contains the caller is provably allowed.
-      allow list: if signedIn()
-        && (request.auth.uid in resource.data.participants
-            || isAdmin());
-      // A participant may also ask for the summary before it exists (the
-      // send transaction does); that is answered from the issue itself.
-      allow get: if signedIn()
-        && (resource == null
-              ? (participantNow() || isAdmin())
-              : (request.auth.uid in resource.data.participants || isAdmin()));
-
-      // Created with the first message after the issue has a worker. The
-      // participants are copied from the issue, never chosen by the client.
-      allow create: if participantNow()
-        && issueNow().get('assignedTo', '') != ''
-        && summaryShape(request.resource.data)
-        && request.resource.data.issueId == issueId
-        && request.resource.data.studentId == issueNow().createdBy
-        && request.resource.data.workerId == issueNow().assignedTo
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.lastMessageAt == request.time
-        && request.resource.data.lastSenderId == request.auth.uid
-        && request.resource.data.readAt.keys().hasOnly([request.auth.uid])
-        && request.resource.data.readAt[request.auth.uid] == request.time;
-
-      allow update: if participantNow() && (
-        // A message was sent: the sender has, by definition, read up to it. A
-        // new assignee replaces the previous worker here, and only here.
-        (request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['workerId', 'participants', 'lastMessageAt', 'lastSenderId', 'lastPreview', 'readAt'])
-          && summaryShape(request.resource.data)
-          && request.resource.data.issueId == resource.data.issueId
-          && request.resource.data.studentId == resource.data.studentId
-          && request.resource.data.workerId == issueNow().get('assignedTo', '')
-          && request.resource.data.lastMessageAt == request.time
-          && request.resource.data.lastSenderId == request.auth.uid
-          && request.resource.data.readAt.get(request.auth.uid, null) == request.time)
-        // A participant marks the conversation read: only their own marker.
-        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
-          && request.resource.data.readAt.diff(resource.data.readAt).affectedKeys().hasOnly([request.auth.uid])
-          && request.resource.data.readAt[request.auth.uid] == request.time
-          && (resource.data.studentId == request.auth.uid || resource.data.workerId == request.auth.uid))
-      );
-
-      allow delete: if false;
     }
 
     // ============================================================
@@ -639,8 +552,7 @@ service cloud.firestore {
       function validTransaction() {
         let d = request.resource.data;
         return d.keys().hasOnly(['workerId', 'workerName', 'amount', 'type', 'note',
-                                 'issueId', 'receiptUrl', 'status', 'createdAt',
-                                 'method', 'reference', 'paidOn', 'verification', 'recordedBy'])
+                                 'issueId', 'receiptUrl', 'status', 'createdAt'])
           && d.workerId is string && d.workerId.size() >= 1
           && d.workerName is string && d.workerName.size() <= 80
           && d.amount is number && d.amount > 0 && d.amount <= 1000000
@@ -650,23 +562,7 @@ service cloud.firestore {
           && d.get('receiptUrl', '') == ''
           && d.status == 'approved'
           && d.createdAt == request.time
-          && validPaymentDetails(d)
           && settlesPendingClaim(d);
-      }
-
-      // How the payment was made, as stated by the administrator who records
-      // it. Optional so entries written before these fields existed stay
-      // valid; when present they must be complete, and the entry is always
-      // labelled "manual": UniFix has no bank or gateway to confirm it.
-      function validPaymentDetails(d) {
-        return !d.keys().hasAny(['method', 'reference', 'paidOn', 'verification', 'recordedBy'])
-          || (d.keys().hasAll(['method', 'paidOn', 'verification', 'recordedBy'])
-              && d.method in ['cash', 'bank_transfer', 'upi', 'cheque', 'other']
-              && d.verification == 'manual'
-              && d.recordedBy == request.auth.uid
-              && d.paidOn is string && d.paidOn.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-              && d.get('reference', '') is string && d.get('reference', '').size() <= 60
-              && (d.method in ['cash', 'other'] || d.get('reference', '').size() >= 3));
       }
 
       // A ledger entry is only valid in the commit that moves its issue's
@@ -686,75 +582,6 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.workerId == request.auth.uid || isAdmin());
       allow create: if isAdmin() && validTransaction();
       allow update, delete: if false;
-    }
-
-    // ============================================================
-    // ledger — immutable record of funds made available to the budget
-    // ============================================================
-    // Each entry is only valid in the same commit that raises the budget's
-    // totalAvailable by exactly its amount, written by the administrator it
-    // names. It records an administrator's statement that funds were made
-    // available; it is not proof of a bank deposit. Entries are never edited
-    // or deleted: a correction would be a new entry.
-    match /ledger/{entryId} {
-
-      function validEntry() {
-        let d = request.resource.data;
-        let before = get(/databases/$(database)/documents/finance/budget).data;
-        let after = getAfter(/databases/$(database)/documents/finance/budget).data;
-        return d.keys().hasOnly(['type', 'amount', 'source', 'reference', 'description',
-                                 'receivedOn', 'createdBy', 'createdAt'])
-          && d.keys().hasAll(['type', 'amount', 'source', 'description', 'receivedOn', 'createdBy', 'createdAt'])
-          && d.type == 'funds_added'
-          && d.amount is number && d.amount > 0 && d.amount <= 100000000
-          && d.source in ['management_allocation', 'donation', 'grant', 'budget_transfer', 'other']
-          && d.get('reference', '') is string && d.get('reference', '').size() <= 60
-          && d.description is string && d.description.size() >= 3 && d.description.size() <= 300
-          && d.receivedOn is string && d.receivedOn.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-          && d.createdBy == request.auth.uid
-          && d.createdAt == request.time
-          && after.totalAvailable == before.totalAvailable + d.amount
-          && after.get('totalSpent', 0) == before.get('totalSpent', 0)
-          // ledgerHead/state names exactly one new entry per commit (see
-          // below). Two entries in one commit cannot both be the one it
-          // names, so a single budget increase can never be counted twice.
-          && getAfter(/databases/$(database)/documents/ledgerHead/state).data.lastEntryId == entryId;
-      }
-
-      allow read: if isAdmin();
-      allow create: if isAdmin() && validEntry();
-      allow update, delete: if false;
-    }
-
-    // ============================================================
-    // ledgerHead/state — which funds entry is the newest, and how many
-    // ============================================================
-    // Kept apart from finance/budget on purpose: the budget document keeps
-    // its original shape, so the previous rules can be restored at any time
-    // and still accept every budget update and payment. A head can only be
-    // written in the commit that creates the ledger entry it names, and its
-    // count rises by exactly one. It is what stops one budget increase from
-    // being recorded by two ledger entries.
-    match /ledgerHead/{docId} {
-
-      function validHead() {
-        let d = request.resource.data;
-        return d.keys().hasOnly(['lastEntryId', 'entryCount', 'updatedAt'])
-          && d.keys().hasAll(['lastEntryId', 'entryCount', 'updatedAt'])
-          && d.lastEntryId is string && d.lastEntryId.size() >= 1 && d.lastEntryId.size() <= 40
-          && d.entryCount is int && d.entryCount >= 1
-          && d.updatedAt == request.time
-          // It names an entry this commit creates, never an existing one.
-          && existsAfter(/databases/$(database)/documents/ledger/$(d.lastEntryId))
-          && !exists(/databases/$(database)/documents/ledger/$(d.lastEntryId));
-      }
-
-      allow read: if isAdmin();
-      allow create: if isAdmin() && docId == 'state' && validHead()
-        && request.resource.data.entryCount == 1;
-      allow update: if isAdmin() && docId == 'state' && validHead()
-        && request.resource.data.entryCount == resource.data.entryCount + 1;
-      allow delete: if false;
     }
 
     // ============================================================

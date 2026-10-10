@@ -13,6 +13,7 @@ import {
   ChatMessage,
   Conversation,
   LedgerEntry,
+  LedgerHead,
   Feedback,
   Issue,
   IssueEvent,
@@ -294,6 +295,12 @@ export function normalizeTransaction(id: string, data: Doc | undefined | null): 
     recordedBy: str(d.recordedBy) || undefined,
     createdAt: toDateOr(d.createdAt, new Date()),
   };
+}
+
+export function normalizeLedgerHead(data: Doc | undefined | null): LedgerHead | null {
+  if (!data) return null;
+  const count = num(data.entryCount);
+  return { lastEntryId: str(data.lastEntryId), entryCount: Number.isInteger(count) && count >= 0 ? count : 0 };
 }
 
 export function normalizeLedgerEntry(id: string, data: Doc | undefined | null): LedgerEntry {

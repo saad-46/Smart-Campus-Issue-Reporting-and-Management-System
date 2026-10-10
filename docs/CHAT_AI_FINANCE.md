@@ -92,13 +92,33 @@ If no model is configured, or the provider is slow, rate limited, down or return
 There is **no reservation**: a pending claim does not reduce Available. It is shown beside it so a shortfall is visible before paying. A rejected claim creates no entry and no expenditure. Posted entries are never edited or deleted.
 
 **UniFix does not move money.** There is no payment gateway, bank connection or webhook, and nothing here can confirm a payment with a bank. So:
-- **Add funds** is labelled as the administrator's record of an allocation. It writes an immutable `ledger` entry (amount, source, reason, date, optional reference, who recorded it) in the same commit that raises the budget by exactly that amount; the rules reject one without the other. The budget also carries `lastLedgerEntryId`, and an entry is accepted only if the budget points at exactly that entry, so one budget increase can never be counted by two entries.
+- **Add funds** is labelled as the administrator's record of an allocation. It writes an immutable `ledger` entry (amount, source, reason, date, optional reference, who recorded it) in the same commit that raises the budget by exactly that amount; the rules reject one without the other. A third document, `ledgerHead/state`, is written in the same commit (see "Funds ledger schema" below). The rules accept an entry only together with the head that names it, so one budget increase can never be counted by two entries. The budget document itself keeps its original three fields.
 - **Record payment** (formerly "Pay") states how the claim was paid outside UniFix: method, date, and a reference number where the method leaves one (bank transfer, UPI, cheque). The entry is stamped `verification: "manual"` and `recordedBy`. It is shown as "recorded by an administrator, not confirmed by a bank".
 - Recording is exactly-once: the claim must still be pending inside the transaction, the ledger entry must match the claim's amount and payee, and the budget, the worker's earnings and the entry change together. Two administrators acting at once cannot pay one claim twice.
 
 The status words for claims stay `pending`, `approved`, `rejected`. "Approved" means "paid and recorded" in the existing model; a separate "approved, payment pending" state was not added, because it would need a second administrator step with no external system to confirm it.
 
-**Compatibility.** Payment entries written before this change have no method, reference or date and remain valid; they show "Not stated". The new fields are optional in the rules for that reason. No production document is migrated or rewritten.
+**Funds ledger schema**
+
+| Document | Fields | Written by |
+| --- | --- | --- |
+| `finance/budget` | `totalAvailable`, `totalSpent`, `updatedAt` (unchanged; the rules allow no others) | Add funds (raises `totalAvailable`), Record payment (raises `totalSpent`) |
+| `ledger/{entryId}` | `type: "funds_added"`, `amount`, `source`, `reference?`, `description`, `receivedOn`, `createdBy`, `createdAt` | Add funds; immutable |
+| `ledgerHead/state` | `lastEntryId`, `entryCount`, `updatedAt` | Add funds, same commit as the entry |
+
+Rules for the head (`firestore.rules`, `match /ledgerHead/{docId}`):
+- Administrators only, document id `state` only, never deleted.
+- Created with `entryCount == 1`; every later write raises it by exactly one.
+- `lastEntryId` must name an entry that this same commit creates and that does not yet exist, so a head can neither be written alone nor point at an old entry.
+- The ledger entry rule requires `getAfter(ledgerHead/state).lastEntryId == entryId` and a budget raise equal to the entry's amount with `totalSpent` unchanged.
+
+Behaviour of `addFundsToBudget` (`lib/finance.ts`):
+- One transaction reads budget, head and entry, then writes all three. A concurrent addition makes it retry with the fresh counter; two different additions at once both land (count 2).
+- The entry id is created once per Add-funds dialog. If that entry already exists (a retry after a network error, a double click, a second tab) the transaction writes nothing. If two submissions of the same id race, the loser's commit is refused by the rules and the app then sees the entry and treats it as already recorded.
+- If `ledgerHead/state` exists but its count is unreadable (below 1), Add funds refuses with a message instead of guessing. If the head is missing, the first addition creates it (count 1). A head that disagrees with the number of ledger entries is shown as a red notice on the Finance page ("The funds ledger and its counter disagree"); payments are not blocked by it.
+- Payments do not touch the ledger or the head. They stay exactly-once through the claim's `pending` status and the rules, as before.
+
+**Compatibility.** The budget document is unchanged, so the previous application and the previous rules read and update it normally. Ledger entries and the head are new collections; before the first addition there is no head and nothing needs migrating. Payment entries written before this change have no method, reference or date and remain valid; they show "Not stated". The new fields are optional in the rules for that reason. No production document is migrated or rewritten.
 
 **Exports.** "Export CSV" on the Finance page downloads funds and payments (type, recorded time, date stated, worker, description, method, reference, signed amount). It contains no receipt images, receipt links or reporter details.
 
@@ -109,7 +129,9 @@ The status words for claims stay `pending`, `approved`, `rejected`. "Approved" m
 Changed in `firestore.rules`:
 - `issues/{id}/messages`: access narrowed to the reporter, the current assignee and administrators.
 - New `conversations/{issueId}`: create, update (send and read marker) and read rules described above; no delete.
-- New `ledger/{id}`: administrator create only, tied to the budget change in the same commit; no update, no delete.
+- New `ledger/{id}`: administrator create only, tied to the budget change and to `ledgerHead/state` in the same commit; no update, no delete.
+- New `ledgerHead/state`: see "Funds ledger schema".
+- `finance/budget`: **unchanged** (`totalAvailable`, `totalSpent`, `updatedAt` only).
 - `transactions`: optional `method`, `reference`, `paidOn`, `verification`, `recordedBy`, validated when present.
 
 No new composite index is needed (`firestore.indexes.json` is unchanged): the conversation list is a single `array-contains`, the ledger is ordered by one field.
@@ -122,11 +144,38 @@ npx firebase-tools deploy --only firestore:rules --project campus-issue-rep-man-
 
 Nothing was deployed in this change.
 
+### Rollback procedure (verified on the emulator)
+
+Rules hashes, as the sha256 of `firestore.rules` with LF line endings, first 16 hex characters: previous production rules `014a9ad7ad8f3100` (commit `4de4e74`, kept as `tests/rules/fixtures/previous-release.rules`); this release's rules `30618e400fa3df24`.
+
+To go back, restore the previous rules file and deploy it; do **not** edit any Firestore document:
+
+```bash
+git show 4de4e74:firestore.rules > firestore.rules   # or copy tests/rules/fixtures/previous-release.rules
+npx firebase-tools deploy --only firestore:rules --project campus-issue-rep-man-system
+```
+
+What happens after the rollback, as exercised by `tests/rules/rollback.rules.test.ts` (data seeded as this release leaves it, run under the previous rules):
+- The previous app can still add funds and pay claims: `finance/budget` has only its original fields, so its update rule accepts the write. (An earlier draft of this release stored a pointer on the budget; the old rules rejected every budget update after the first addition. That design was replaced, and a test pins the budget's keys.)
+- A claim already paid under this release cannot be paid again; workers still read their own payments, including the new method/reference/date fields.
+- Issue chat messages from the reporter, the assignee and administrators still work.
+- `ledger`, `ledgerHead` and `conversations` are unknown to the previous rules and become unreadable and unwritable. Their documents stay in place and become usable again when this release's rules are redeployed.
+- Funds added while the previous app runs are budget increases without ledger entries. The Finance summary shows them as part of the opening balance; they are not itemised and the ledger counter is unaffected.
+
+Roll back the **app** (Vercel promote/rollback of the previous deployment) at the same time: this release's app calls collections the previous rules deny.
+
+### Deployment order
+
+1. Deploy this release's rules first. They are backward compatible with the previous app (verified by the existing rules tests for issues, users, transactions and budget).
+2. Deploy the app.
+3. Smoke test as an administrator: Add funds (one entry, one counter step), Finance page shows no red notice.
+
 ## 5. Tests
 
 | Suite | What it covers |
 | --- | --- |
-| `tests/rules/firestore.rules.test.ts` | chat access by role, reassignment, spoofing; conversation summaries; ledger entries and immutability; payment details; exactly-once payment |
+| `tests/rules/firestore.rules.test.ts` | chat access by role, reassignment, spoofing; conversation summaries; ledger entries, head state and immutability; missing, skipped, replayed and malformed heads; concurrent and repeated additions in real transactions; additions alongside payments; payment details; exactly-once payment |
+| `tests/rules/rollback.rules.test.ts` | the previous release's rules against data this release wrote: budget updates, payments, chat, and the new collections being closed |
 | `tests/unit/reportAssistant.test.ts` | classification scenarios, location policy, safety, abuse and injection, model-output guard |
 | `tests/unit/reportAssistRoute.test.ts` | authentication, provider and timeout fallbacks, rate and size limits, key never returned |
 | `tests/unit/financeRules.test.ts` | summary definitions, reconciliation, payment and funds validation |

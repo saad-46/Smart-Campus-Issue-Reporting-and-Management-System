@@ -4,8 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Download, FileImage, Plus, Receipt, Wallet } from "lucide-react";
 import { getReceiptImage, subscribeToPendingClaims } from "@/lib/firestore";
-import { subscribeToBudget, subscribeToTransactions, subscribeToLedger, getAllWorkers, approveClaim, rejectReceipt, getGlobalBudget, addFundsToBudget } from "@/lib/finance";
-import { Issue, Budget, LedgerEntry, Transaction, User } from "@/types";
+import { subscribeToBudget, subscribeToTransactions, subscribeToLedger, subscribeToLedgerHead, newLedgerEntryId, getAllWorkers, approveClaim, rejectReceipt, getGlobalBudget, addFundsToBudget } from "@/lib/finance";
+import { Issue, Budget, LedgerEntry, LedgerHead, Transaction, User } from "@/types";
 import {
   FUND_SOURCES,
   FUND_SOURCE_LABELS,
@@ -84,6 +84,10 @@ export default function AdminFinancePage() {
   const [budget, setBudget] = useState<Budget | null>(null);
   const [transactions, setTransactions] = useState<Transaction[] | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[] | null>(null);
+  // undefined = not read yet, null = no entries yet
+  const [ledgerHead, setLedgerHead] = useState<LedgerHead | null | undefined>(undefined);
+  // One id per funds entry being submitted: a retry or a second click is the same entry, recorded once.
+  const [fundsEntryId, setFundsEntryId] = useState("");
   const [workers, setWorkers] = useState<User[]>([]);
   const [loadError, setLoadError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
@@ -121,6 +125,7 @@ export default function AdminFinancePage() {
     const unsubBudget = subscribeToBudget(setBudget, onError("subscribeToBudget"));
     const unsubTx = subscribeToTransactions(null, setTransactions, onError("subscribeToTransactions"));
     const unsubLedger = subscribeToLedger(setLedger, onError("subscribeToLedger"));
+    const unsubHead = subscribeToLedgerHead(setLedgerHead, onError("subscribeToLedgerHead"));
     getAllWorkers()
       .then((data) => {
         if (!cancelled) setWorkers(data);
@@ -132,6 +137,7 @@ export default function AdminFinancePage() {
       unsubBudget();
       unsubTx();
       unsubLedger();
+      unsubHead();
     };
   }, [retryKey]);
 
@@ -174,8 +180,9 @@ export default function AdminFinancePage() {
         transactions: transactions ?? [],
         ledger: ledger ?? [],
         pendingClaimAmounts: claims.map((c) => c.claimAmount ?? 0),
+        ledgerHead: ledgerHead === undefined || ledger === null ? undefined : ledgerHead,
       }),
-    [budget, transactions, ledger, claims]
+    [budget, transactions, ledger, ledgerHead, claims]
   );
   const available = Math.max(0, summary.available);
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
@@ -204,13 +211,14 @@ export default function AdminFinancePage() {
     }
     setProcessing(true);
     try {
-      await addFundsToBudget(amount, details, adminId);
+      await addFundsToBudget(amount, details, adminId, fundsEntryId || undefined);
       toast.success(`${currency(amount)} recorded as added to the budget`, "It is in the funds ledger with your name and the reason.");
       setFundsOpen(false);
       setFundsAmount("");
       setFundsReference("");
       setFundsReason("");
       setFundsTouched(false);
+      setFundsEntryId("");
     } catch (err) {
       logError("addFundsToBudget", err);
       toast.error("Couldn't add funds", getFriendlyErrorMessage(err, "Please try again."));
@@ -293,7 +301,13 @@ export default function AdminFinancePage() {
             >
               Export CSV
             </Button>
-            <Button icon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => setFundsOpen(true)}>
+            <Button
+              icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => {
+                setFundsEntryId((current) => current || newLedgerEntryId());
+                setFundsOpen(true);
+              }}
+            >
               Add funds
             </Button>
           </>
@@ -325,6 +339,11 @@ export default function AdminFinancePage() {
           { label: "Ledger check", value: summary.reconciliation.ok ? "Consistent" : "Mismatch", tone: summary.reconciliation.ok ? "default" : "danger", hint: "Spent total vs recorded payments" },
         ]}
       />
+      {!summary.ledgerCount.ok && (
+        <Notice tone="danger" title="The funds ledger and its counter disagree" className="mb-6">
+          {summary.ledgerCount.message}
+        </Notice>
+      )}
       {!summary.reconciliation.ok && budget && transactions && (
         <Notice tone="danger" title="The budget and the payment record disagree" className="mb-6">
           {summary.reconciliation.message} Difference: {currency(Math.abs(summary.reconciliation.spentDifference))}.

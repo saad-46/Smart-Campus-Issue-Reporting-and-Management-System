@@ -22,6 +22,7 @@ import {
   getDocs,
   increment,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -1180,7 +1181,7 @@ describe("finance", () => {
 });
 
 // ------------------------------------------------------------------
-describe("funds ledger (ledger/{id})", () => {
+describe("funds ledger (ledger/{id}) and its head (ledgerHead/state)", () => {
   const entry = (overrides: Record<string, unknown> = {}) => ({
     type: "funds_added",
     amount: 5000,
@@ -1192,101 +1193,315 @@ describe("funds ledger (ledger/{id})", () => {
     createdAt: serverTimestamp(),
     ...overrides,
   });
+  const headDoc = (id: string, count: number, overrides: Record<string, unknown> = {}) => ({
+    lastEntryId: id,
+    entryCount: count,
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  });
+  const headCount = async () => (await getDoc(doc(dbAs(ADMIN), "ledgerHead", "state"))).data()?.entryCount ?? 0;
 
-  /** The app's addFundsToBudget commit: raise the budget and write the entry together. */
-  const add = (overrides: Record<string, unknown> = {}, raiseBy = 5000, uid = ADMIN) => {
-    const db = dbAs(uid);
-    const batch = writeBatch(db);
+  interface AddOptions {
+    raiseBy?: number;
+    uid?: string;
+    head?: Record<string, unknown>;
+    skipHead?: boolean;
+    skipBudget?: boolean;
+    count?: number;
+  }
+  /** The app's addFundsToBudget commit as a batch: budget raise, entry, head. */
+  const add = async (overrides: Record<string, unknown> = {}, o: AddOptions = {}) => {
+    const db = dbAs(o.uid ?? ADMIN);
     const ref = doc(collection(db, "ledger"));
-    batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(raiseBy), lastLedgerEntryId: ref.id, updatedAt: serverTimestamp() });
+    const count = o.count ?? (await headCount());
+    const batch = writeBatch(db);
+    if (!o.skipBudget) batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(o.raiseBy ?? 5000), updatedAt: serverTimestamp() });
     batch.set(ref, entry(overrides));
+    if (!o.skipHead) batch.set(doc(db, "ledgerHead", "state"), headDoc(ref.id, count + 1, o.head));
     return batch.commit();
   };
 
-  it("an admin records funds: the entry and the budget change together", async () => {
-    await assertSucceeds(add());
-    const snap = await assertSucceeds(getDocs(collection(dbAs(ADMIN), "ledger")));
-    expect(snap.size).toBe(1);
-  });
+  /** The same steps as lib/finance.ts addFundsToBudget, as a transaction (so concurrency and retries are real). */
+  const addTx = (entryId: string, amount = 5000, uid = ADMIN) => {
+    const db = dbAs(uid);
+    const budgetRef = doc(db, "finance", "budget");
+    const headRef = doc(db, "ledgerHead", "state");
+    const entryRef = doc(db, "ledger", entryId);
+    return runTransaction(db, async (tx) => {
+      const [, headSnap, entrySnap] = await Promise.all([tx.get(budgetRef), tx.get(headRef), tx.get(entryRef)]);
+      if (entrySnap.exists()) return;
+      const count = headSnap.exists() ? (headSnap.data()!.entryCount as number) : 0;
+      tx.update(budgetRef, { totalAvailable: increment(amount), updatedAt: serverTimestamp() });
+      tx.set(entryRef, entry({ amount }));
+      const next = headDoc(entryId, count + 1);
+      if (headSnap.exists()) tx.update(headRef, next);
+      else tx.set(headRef, next);
+    });
+  };
 
-  it("an entry on its own, or a budget change that does not match it, is rejected", async () => {
-    await assertFails(addDoc(collection(dbAs(ADMIN), "ledger"), entry()));
-    await assertFails(add({}, 4000)); // budget raised by less than the entry says
-    await assertFails(add({}, 6000)); // ...or more
-    await assertFails(add({ amount: 5000 }, 0));
-  });
-
-  it("an addition cannot also move the spent total (an entry cannot launder a payment)", async () => {
+  const state = async () => {
     const db = dbAs(ADMIN);
-    const batch = writeBatch(db);
-    const ref = doc(collection(db, "ledger"));
-    batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), totalSpent: increment(100), lastLedgerEntryId: ref.id, updatedAt: serverTimestamp() });
-    batch.set(ref, entry());
-    await assertFails(batch.commit());
+    const budget = (await getDoc(doc(db, "finance", "budget"))).data()!;
+    const entries = (await getDocs(collection(db, "ledger"))).size;
+    return { available: budget.totalAvailable as number, entries, head: await headCount(), budgetKeys: Object.keys(budget).sort() };
+  };
+
+  describe("successful additions", () => {
+    it("the first addition creates the head with count 1; later ones raise it by one", async () => {
+      await assertSucceeds(add());
+      expect(await state()).toMatchObject({ available: 6000, entries: 1, head: 1 });
+      await assertSucceeds(add({ reference: "Sanction 15" }, { raiseBy: 5000 }));
+      expect(await state()).toMatchObject({ available: 11_000, entries: 2, head: 2 });
+    });
+
+    it("leaves the budget document with its original keys", async () => {
+      await add();
+      expect((await state()).budgetKeys).toEqual(["totalAvailable", "totalSpent", "updatedAt"]);
+    });
+
+    it("works with a budget document written before the ledger existed", async () => {
+      await seed(async (db) => {
+        await setDoc(doc(db, "finance", "budget"), { totalAvailable: 500_000, totalSpent: 12_000 }); // no updatedAt, as the oldest records
+      });
+      await assertSucceeds(add());
+      expect(await state()).toMatchObject({ available: 505_000, entries: 1, head: 1 });
+    });
+
+    it("payments still work after funds were added, and do not touch the ledger or its head", async () => {
+      await add();
+      await seedIssue("claim", { createdBy: ALICE, assignedTo: WENDY, status: "Resolved", claimAmount: 450, claimStatus: "pending" });
+      const db = dbAs(ADMIN);
+      const batch = writeBatch(db);
+      batch.update(doc(db, "finance", "budget"), { totalSpent: increment(450), updatedAt: serverTimestamp() });
+      batch.update(doc(db, "users", WENDY), { earnings: increment(450) });
+      batch.set(doc(collection(db, "transactions")), {
+        workerId: WENDY,
+        workerName: "wendy",
+        amount: 450,
+        type: "receipt",
+        note: "Receipt resolved for Broken light",
+        issueId: "claim",
+        receiptUrl: "",
+        status: "approved",
+        method: "cash",
+        paidOn: "2026-10-10",
+        verification: "manual",
+        recordedBy: ADMIN,
+        createdAt: serverTimestamp(),
+      });
+      batch.update(doc(db, "issues", "claim"), { claimStatus: "approved", updatedAt: serverTimestamp() });
+      await assertSucceeds(batch.commit());
+      expect(await state()).toMatchObject({ entries: 1, head: 1 });
+    });
   });
 
-  it("one budget increase cannot back two ledger entries", async () => {
-    const db = dbAs(ADMIN);
-    const first = doc(collection(db, "ledger"));
-    const second = doc(collection(db, "ledger"));
-    const batch = writeBatch(db);
-    batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), lastLedgerEntryId: first.id, updatedAt: serverTimestamp() });
-    batch.set(first, entry());
-    batch.set(second, entry({ reference: "duplicate" }));
-    await assertFails(batch.commit());
+  describe("an entry and its head must be written together", () => {
+    it("an entry on its own is rejected", async () => {
+      await assertFails(add({}, { skipHead: true }));
+      await assertFails(addDoc(collection(dbAs(ADMIN), "ledger"), entry()));
+    });
+
+    it("a head on its own is rejected, whether it names a new id or an existing entry", async () => {
+      await add();
+      const existing = (await getDocs(collection(dbAs(ADMIN), "ledger"))).docs[0].id;
+      await assertFails(setDoc(doc(dbAs(ADMIN), "ledgerHead", "state"), headDoc("brand-new-id", 2)));
+      await assertFails(setDoc(doc(dbAs(ADMIN), "ledgerHead", "state"), headDoc(existing, 2)));
+    });
+
+    it("an entry without the budget raising by exactly its amount is rejected", async () => {
+      await assertFails(add({}, { skipBudget: true }));
+      await assertFails(add({}, { raiseBy: 4000 }));
+      await assertFails(add({}, { raiseBy: 6000 }));
+    });
+
+    it("an addition cannot also move the spent total (an entry cannot launder a payment)", async () => {
+      const db = dbAs(ADMIN);
+      const ref = doc(collection(db, "ledger"));
+      const batch = writeBatch(db);
+      batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), totalSpent: increment(100), updatedAt: serverTimestamp() });
+      batch.set(ref, entry());
+      batch.set(doc(db, "ledgerHead", "state"), headDoc(ref.id, 1));
+      await assertFails(batch.commit());
+    });
+
+    it("one budget increase cannot back two entries", async () => {
+      const db = dbAs(ADMIN);
+      const first = doc(collection(db, "ledger"));
+      const second = doc(collection(db, "ledger"));
+      const batch = writeBatch(db);
+      batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), updatedAt: serverTimestamp() });
+      batch.set(first, entry());
+      batch.set(second, entry({ reference: "duplicate" }));
+      batch.set(doc(db, "ledgerHead", "state"), headDoc(first.id, 1));
+      await assertFails(batch.commit());
+      expect(await state()).toMatchObject({ available: 1000, entries: 0, head: 0 });
+    });
+
+    it("two entries in one commit are rejected even when each is paired with its own budget raise", async () => {
+      const db = dbAs(ADMIN);
+      const a = doc(collection(db, "ledger"));
+      const b = doc(collection(db, "ledger"));
+      const batch = writeBatch(db);
+      batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(10_000), updatedAt: serverTimestamp() });
+      batch.set(a, entry());
+      batch.set(b, entry());
+      batch.set(doc(db, "ledgerHead", "state"), headDoc(b.id, 1));
+      await assertFails(batch.commit());
+    });
   });
 
-  it("an entry the budget does not point at is rejected", async () => {
-    const db = dbAs(ADMIN);
-    const batch = writeBatch(db);
-    batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), updatedAt: serverTimestamp() });
-    batch.set(doc(collection(db, "ledger")), entry());
-    await assertFails(batch.commit());
-    const stale = writeBatch(db);
-    stale.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), lastLedgerEntryId: "someone-elses-entry", updatedAt: serverTimestamp() });
-    stale.set(doc(collection(db, "ledger")), entry());
-    await assertFails(stale.commit());
+  describe("missing or invalid head state", () => {
+    it.each([
+      ["a count that skips ahead", { entryCount: 5 }],
+      ["a count that does not move", { entryCount: 1 }],
+      ["a count that goes backwards", { entryCount: 0 }],
+      ["a fractional count", { entryCount: 1.5 }],
+      ["a string count", { entryCount: "2" }],
+      ["an extra field", { verified: true }],
+      ["a backdated timestamp", { updatedAt: new Date("2020-01-01") }],
+    ])("rejects %s on the second addition", async (_name, head) => {
+      await add();
+      await assertFails(add({}, { head: head as Record<string, unknown> }));
+    });
+
+    it("rejects a first head whose count is not 1", async () => {
+      await assertFails(add({}, { head: { entryCount: 3 } }));
+    });
+
+    it("rejects a head with an empty or over-long entry id", async () => {
+      const db = dbAs(ADMIN);
+      for (const id of ["", "x".repeat(41)]) {
+        const ref = doc(collection(db, "ledger"));
+        const batch = writeBatch(db);
+        batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), updatedAt: serverTimestamp() });
+        batch.set(ref, entry());
+        batch.set(doc(db, "ledgerHead", "state"), headDoc(id, 1));
+        await assertFails(batch.commit());
+      }
+    });
+
+    it("only the document id `state` exists", async () => {
+      const db = dbAs(ADMIN);
+      const ref = doc(collection(db, "ledger"));
+      const batch = writeBatch(db);
+      batch.update(doc(db, "finance", "budget"), { totalAvailable: increment(5000), updatedAt: serverTimestamp() });
+      batch.set(ref, entry());
+      batch.set(doc(db, "ledgerHead", "other"), headDoc(ref.id, 1));
+      await assertFails(batch.commit());
+    });
+
+    it("a head that is deleted cannot be silently recreated at count 1 on top of existing entries... only an admin console action could", async () => {
+      await add();
+      await assertFails(deleteDoc(doc(dbAs(ADMIN), "ledgerHead", "state")));
+    });
   });
 
-  it.each([
-    ["a zero amount", { amount: 0 }],
-    ["a negative amount", { amount: -5 }],
-    ["a non-numeric amount", { amount: "5000" }],
-    ["an absurd amount", { amount: 1_000_000_000 }],
-    ["an unknown source", { source: "found on the road" }],
-    ["no reason", { description: "" }],
-    ["a malformed date", { receivedOn: "yesterday" }],
-    ["another administrator named as the recorder", { createdBy: WENDY }],
-    ["a backdated timestamp", { createdAt: new Date("2020-01-01") }],
-    ["an entry of another type", { type: "payment" }],
-    ["an extra field", { verified: true }],
-  ] as [string, Record<string, unknown>][])("rejects %s", async (_name, overrides) => {
-    // The budget is raised by exactly the amount the entry states, so the
-    // budget match is not what makes it fail: the field under test is.
-    await assertFails(add(overrides, typeof overrides.amount === "number" ? overrides.amount : 5000));
+  describe("entry fields", () => {
+    it.each([
+      ["a zero amount", { amount: 0 }],
+      ["a negative amount", { amount: -5 }],
+      ["a non-numeric amount", { amount: "5000" }],
+      ["an absurd amount", { amount: 1_000_000_000 }],
+      ["an unknown source", { source: "found on the road" }],
+      ["no reason", { description: "" }],
+      ["a malformed date", { receivedOn: "yesterday" }],
+      ["another administrator named as the recorder", { createdBy: WENDY }],
+      ["a backdated timestamp", { createdAt: new Date("2020-01-01") }],
+      ["an entry of another type", { type: "payment" }],
+      ["an extra field", { verified: true }],
+    ] as [string, Record<string, unknown>][])("rejects %s", async (_name, overrides) => {
+      // The budget is raised by exactly the stated amount and the head is
+      // correct, so the field under test is what makes it fail.
+      await assertFails(add(overrides, { raiseBy: typeof overrides.amount === "number" ? overrides.amount : 5000 }));
+    });
   });
 
-  it("only administrators can add or read entries", async () => {
-    for (const uid of [ALICE, WENDY]) {
-      await assertFails(add({ createdBy: uid }, 5000, uid));
-      await assertFails(getDocs(collection(dbAs(uid), "ledger")));
-    }
-    await assertFails(getDocs(collection(dbAnon(), "ledger")));
+  describe("authorization", () => {
+    it("only administrators can add entries or read the ledger and head", async () => {
+      await add();
+      for (const uid of [ALICE, WENDY]) {
+        await assertFails(add({ createdBy: uid }, { uid }));
+        await assertFails(getDocs(collection(dbAs(uid), "ledger")));
+        await assertFails(getDoc(doc(dbAs(uid), "ledgerHead", "state")));
+        await assertFails(setDoc(doc(dbAs(uid), "ledgerHead", "state"), headDoc("x", 9)));
+      }
+      await assertFails(getDocs(collection(dbAnon(), "ledger")));
+      await assertFails(getDoc(doc(dbAnon(), "ledgerHead", "state")));
+    });
+
+    it("entries and the head are immutable and cannot be deleted by anyone", async () => {
+      await add();
+      const id = (await getDocs(collection(dbAs(ADMIN), "ledger"))).docs[0].id;
+      await assertFails(updateDoc(doc(dbAs(ADMIN), "ledger", id), { amount: 1 }));
+      await assertFails(deleteDoc(doc(dbAs(ADMIN), "ledger", id)));
+      await assertFails(deleteDoc(doc(dbAs(WENDY), "ledger", id)));
+      await assertFails(updateDoc(doc(dbAs(ADMIN), "ledgerHead", "state"), { entryCount: 99 }));
+      await assertFails(deleteDoc(doc(dbAs(ADMIN), "ledgerHead", "state")));
+    });
+
+    it("a new field can no longer be added to the budget document (its schema is unchanged)", async () => {
+      await assertFails(updateDoc(doc(dbAs(ADMIN), "finance", "budget"), { lastLedgerEntryId: "abc", updatedAt: serverTimestamp() }));
+    });
   });
 
-  it("entries are immutable: no edit, no delete, by anyone", async () => {
-    await add();
-    const snap = await getDocs(collection(dbAs(ADMIN), "ledger"));
-    const id = snap.docs[0].id;
-    await assertFails(updateDoc(doc(dbAs(ADMIN), "ledger", id), { amount: 1 }));
-    await assertFails(deleteDoc(doc(dbAs(ADMIN), "ledger", id)));
-    await assertFails(deleteDoc(doc(dbAs(WENDY), "ledger", id)));
-  });
+  describe("concurrency and retries (the app's transaction)", () => {
+    it("two different additions at once both land, with count 2 and the budget raised by both", async () => {
+      await Promise.all([assertSucceeds(addTx("entryAAA", 5000)), assertSucceeds(addTx("entryBBB", 2500))]);
+      expect(await state()).toMatchObject({ available: 1000 + 7500, entries: 2, head: 2 });
+    });
 
-  it("two concurrent additions both succeed and the budget reflects both", async () => {
-    await Promise.all([assertSucceeds(add()), assertSucceeds(add({ reference: "Sanction 15" }))]);
-    const budget = await getDoc(doc(dbAs(ADMIN), "finance", "budget"));
-    expect(budget.data()!.totalAvailable).toBe(1000 + 10_000);
+    it("the same entry submitted twice, one after the other, is recorded once", async () => {
+      await assertSucceeds(addTx("entryRetry", 5000));
+      await assertSucceeds(addTx("entryRetry", 5000));
+      expect(await state()).toMatchObject({ available: 6000, entries: 1, head: 1 });
+    });
+
+    it("the same entry submitted twice at once is recorded once", async () => {
+      // The loser's commit meets an existing entry and is refused by the rules
+      // (the app then sees the entry and treats it as already recorded).
+      const results = await Promise.allSettled([addTx("entryDouble", 5000), addTx("entryDouble", 5000)]);
+      expect(results.filter((r) => r.status === "fulfilled").length).toBeGreaterThanOrEqual(1);
+      expect(await state()).toMatchObject({ available: 6000, entries: 1, head: 1 });
+    });
+
+    it("a stale client view cannot add an entry: the counter must advance from what is stored", async () => {
+      await add();
+      // A second admin tab that still believes the ledger is empty.
+      await assertFails(add({}, { count: 0 }));
+      expect(await state()).toMatchObject({ entries: 1, head: 1 });
+    });
+
+    it("an addition and a payment at the same time both land and the books agree", async () => {
+      await seedIssue("claim", { createdBy: ALICE, assignedTo: WENDY, status: "Resolved", claimAmount: 450, claimStatus: "pending" });
+      const db = dbAs(ADMIN);
+      const pay = async () => {
+        await runTransaction(db, async (tx) => {
+          const budget = await tx.get(doc(db, "finance", "budget"));
+          const issue = await tx.get(doc(db, "issues", "claim"));
+          if (issue.data()!.claimStatus !== "pending") return;
+          expect(budget.exists()).toBe(true);
+          tx.update(doc(db, "finance", "budget"), { totalSpent: increment(450), updatedAt: serverTimestamp() });
+          tx.update(doc(db, "users", WENDY), { earnings: increment(450) });
+          tx.set(doc(collection(db, "transactions")), {
+            workerId: WENDY,
+            workerName: "wendy",
+            amount: 450,
+            type: "receipt",
+            note: "Receipt resolved for Broken light",
+            issueId: "claim",
+            receiptUrl: "",
+            status: "approved",
+            createdAt: serverTimestamp(),
+          });
+          tx.update(doc(db, "issues", "claim"), { claimStatus: "approved", updatedAt: serverTimestamp() });
+        });
+      };
+      await Promise.all([assertSucceeds(addTx("entryWithPay", 5000)), assertSucceeds(pay())]);
+      const budget = (await getDoc(doc(db, "finance", "budget"))).data()!;
+      expect(budget.totalAvailable).toBe(6000);
+      expect(budget.totalSpent).toBe(450);
+      expect(await state()).toMatchObject({ entries: 1, head: 1 });
+    });
   });
 });
 

@@ -255,6 +255,12 @@ export interface Transaction {
   createdAt: Date;
 }
 
+/** Pointer kept beside the ledger (ledgerHead/state): newest entry and how many there are. */
+export interface LedgerHead {
+  lastEntryId: string;
+  entryCount: number;
+}
+
 /** Immutable record of funds made available to the budget (ledger/{id}). */
 export interface LedgerEntry {
   id: string;

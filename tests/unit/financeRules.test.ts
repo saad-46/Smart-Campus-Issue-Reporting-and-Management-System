@@ -75,6 +75,31 @@ describe("finance summary: what each figure means", () => {
   });
 });
 
+describe("ledger counter check (ledgerHead/state)", () => {
+  const entries = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `e${i}`, amount: 100, createdAt: NOW }));
+  const base = { budget: { totalAvailable: 1_000, totalSpent: 0 }, transactions: [], pendingClaimAmounts: [] };
+
+  it("passes when the counter equals the number of entries", () => {
+    expect(summarizeFinance({ ...base, ledger: entries(3), ledgerHead: { entryCount: 3 } }).ledgerCount.ok).toBe(true);
+  });
+
+  it("passes for an empty ledger with no head yet", () => {
+    const s = summarizeFinance({ ...base, ledger: [], ledgerHead: null });
+    expect(s.ledgerCount).toMatchObject({ ok: true, entries: 0, head: 0 });
+  });
+
+  it("flags entries the counter does not know about, and a counter ahead of the entries", () => {
+    expect(summarizeFinance({ ...base, ledger: entries(3), ledgerHead: { entryCount: 2 } }).ledgerCount.ok).toBe(false);
+    expect(summarizeFinance({ ...base, ledger: entries(2), ledgerHead: { entryCount: 3 } }).ledgerCount.ok).toBe(false);
+    expect(summarizeFinance({ ...base, ledger: entries(1), ledgerHead: null }).ledgerCount.ok).toBe(false);
+  });
+
+  it("does not compare until the head has been read, or when the ledger fills a whole page", () => {
+    expect(summarizeFinance({ ...base, ledger: entries(3) }).ledgerCount.ok).toBe(true);
+    expect(summarizeFinance({ ...base, ledger: entries(5), ledgerHead: { entryCount: 9 }, ledgerPageSize: 5 }).ledgerCount.ok).toBe(true);
+  });
+});
+
 describe("recording a payment", () => {
   const ok = { method: "bank_transfer", reference: "UTR 123456", paidOn: "2026-10-10" };
 

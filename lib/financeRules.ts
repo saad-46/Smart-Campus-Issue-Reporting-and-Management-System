@@ -137,6 +137,8 @@ export interface FinanceSummary {
     spentDifference: number;
     message: string;
   };
+  /** The ledger's entry count agrees with ledgerHead/state. */
+  ledgerCount: { ok: boolean; entries: number; head: number | null; message: string };
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -146,6 +148,10 @@ export function summarizeFinance(input: {
   transactions: Pick<Transaction, "amount" | "status">[];
   ledger: LedgerFundEntry[];
   pendingClaimAmounts: number[];
+  /** ledgerHead/state; null when the ledger has no entries yet. */
+  ledgerHead?: { entryCount: number } | null;
+  /** How many entries the ledger query is capped at, so a full page isn't read as a mismatch. */
+  ledgerPageSize?: number;
 }): FinanceSummary {
   const totalFunds = round2(input.budget?.totalAvailable ?? 0);
   const totalSpent = round2(input.budget?.totalSpent ?? 0);
@@ -157,6 +163,13 @@ export function summarizeFinance(input: {
   const availableAfterPending = round2(available - pendingClaimsAmount);
   const spentDifference = round2(totalSpent - paidOut);
   const ok = Math.abs(spentDifference) < 0.005;
+
+  // The ledger is read newest-first up to a page; only compare when the whole ledger was read.
+  const pageSize = input.ledgerPageSize ?? 200;
+  const entries = input.ledger.length;
+  const head = input.ledgerHead === undefined ? undefined : input.ledgerHead ? input.ledgerHead.entryCount : 0;
+  const comparable = head !== undefined && entries < pageSize;
+  const countOk = !comparable || head === entries;
   return {
     totalFunds,
     fundsAdded,
@@ -176,6 +189,14 @@ export function summarizeFinance(input: {
         : spentDifference > 0
           ? "The budget shows more spent than the recorded payments add up to. Do not pay further claims until this is explained."
           : "The recorded payments add up to more than the budget shows as spent. Do not pay further claims until this is explained.",
+    },
+    ledgerCount: {
+      ok: countOk,
+      entries,
+      head: head ?? null,
+      message: countOk
+        ? "The funds ledger's entry count matches its counter."
+        : `The funds ledger has ${entries} entr${entries === 1 ? "y" : "ies"} but its counter says ${head}. Do not add funds until this is explained.`,
     },
   };
 }
