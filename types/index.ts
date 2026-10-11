@@ -212,6 +212,18 @@ export interface ChatMessage {
   createdAt: Date;
 }
 
+/** Summary of an issue's private chat (conversations/{issueId}): unread state and preview. */
+export interface Conversation {
+  issueId: string;
+  studentId: string;
+  workerId: string;
+  lastMessageAt: Date;
+  lastSenderId: string;
+  lastPreview: string;
+  /** When each participant last read the conversation, by user id. */
+  readAt: Record<string, Date>;
+}
+
 /** Financial Tracker: Budget Source */
 export interface Budget {
   id: string;
@@ -231,6 +243,35 @@ export interface Transaction {
   note?: string;
   status: "pending" | "approved" | "rejected";
   receiptUrl?: string; // If a receipt was attached
+  /** How the payment was made, as stated by the administrator who recorded it. */
+  method?: "cash" | "bank_transfer" | "upi" | "cheque" | "other";
+  /** Reference number the administrator entered (transaction, UPI or cheque number). */
+  reference?: string;
+  /** Date the payment was made, yyyy-mm-dd, as stated by the administrator. */
+  paidOn?: string;
+  /** Always "manual": recorded by an administrator, not confirmed by a bank or gateway. */
+  verification?: "manual";
+  recordedBy?: string;
+  createdAt: Date;
+}
+
+/** Pointer kept beside the ledger (ledgerHead/state): newest entry and how many there are. */
+export interface LedgerHead {
+  lastEntryId: string;
+  entryCount: number;
+}
+
+/** Immutable record of funds made available to the budget (ledger/{id}). */
+export interface LedgerEntry {
+  id: string;
+  type: "funds_added";
+  amount: number;
+  source: "management_allocation" | "donation" | "grant" | "budget_transfer" | "other";
+  reference: string;
+  description: string;
+  /** Date the funds were received or allocated, yyyy-mm-dd. */
+  receivedOn: string;
+  createdBy: string;
   createdAt: Date;
 }
 

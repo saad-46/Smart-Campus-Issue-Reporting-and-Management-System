@@ -10,6 +10,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { Tabs, tabId } from "@/components/ui/Tabs";
 import { payoutLabel } from "@/lib/claims";
+import { PAYMENT_METHOD_LABELS } from "@/lib/financeRules";
 import { StatStrip, TableWrap, td, th, trHover } from "@/components/ui/Data";
 import { EmptyState, ErrorState, Notice, SkeletonRows } from "@/components/ui/States";
 import { useToast } from "@/components/ui/Toast";
@@ -17,6 +18,7 @@ import { Issue, Transaction } from "@/types";
 import { subscribeToAssignedIssues, subscribeToOpenPool, updateIssueStatus, assignIssue, submitBill } from "@/lib/firestore";
 import { subscribeToTransactions } from "@/lib/finance";
 import RepairTip from "@/components/issue/RepairTip";
+import { useUnreadChats } from "@/hooks/useUnreadChats";
 import { useSlaConfig } from "@/hooks/useSlaConfig";
 import { useNow } from "@/hooks/useNow";
 import { computeSla } from "@/lib/intelligence/sla";
@@ -29,6 +31,7 @@ export default function WorkerPage() {
   const { userProfile, activeRole } = useAuthContext();
   const toast = useToast();
   const workerId = userProfile?.id ?? "";
+  const unreadChats = useUnreadChats(workerId);
   // null = still loading
   const [myIssues, setMyIssues] = useState<Issue[] | null>(null);
   const [poolIssues, setPoolIssues] = useState<Issue[] | null>(null);
@@ -198,6 +201,7 @@ export default function WorkerPage() {
                         <IssueRow
                           issue={issue}
                           showSla
+                          unreadChat={unreadChats.has(issue.id)}
                           footer={<RepairTip issue={issue} />}
                           actions={
                             issue.status === "Open" ? (
@@ -236,7 +240,7 @@ export default function WorkerPage() {
                   </ul>
                 )
               ) : transactions.length === 0 ? (
-                <EmptyState icon={<Wallet />} title="No payouts yet" description="Approved expense claims will be listed here." />
+                <EmptyState icon={<Wallet />} title="No payouts yet" description="When an administrator records a payment for a claim, it is listed here with how and when it was paid." />
               ) : (
                 <>
                   <TableWrap label="Payouts">
@@ -244,6 +248,7 @@ export default function WorkerPage() {
                       <tr>
                         <th className={th}>Date</th>
                         <th className={th}>Description</th>
+                        <th className={th}>Paid how</th>
                         <th className={`${th} text-right`}>Amount</th>
                       </tr>
                     </thead>
@@ -252,13 +257,18 @@ export default function WorkerPage() {
                         <tr key={tx.id} className={trHover}>
                           <td className={`${td} whitespace-nowrap text-fg-muted`}>{formatDate(tx.createdAt)}</td>
                           <td className={`${td} max-w-[22rem] truncate`}>{payoutLabel(tx.note, "Task payout")}</td>
+                          <td className={`${td} whitespace-nowrap text-fg-muted`}>
+                            {tx.method ? PAYMENT_METHOD_LABELS[tx.method] : "Not stated"}
+                            {tx.paidOn ? ` · ${tx.paidOn}` : ""}
+                            {tx.reference ? ` · ${tx.reference}` : ""}
+                          </td>
                           <td className={`${td} tabular whitespace-nowrap text-right font-medium`}>{currency(tx.amount)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </TableWrap>
                   <p className="flex justify-between px-4 py-3 text-sm sm:px-5">
-                    <span className="text-fg-subtle">Total paid</span>
+                    <span className="text-fg-subtle">Total paid (as recorded by administrators)</span>
                     <span className="tabular font-semibold text-fg">{currency(paidTotal)}</span>
                   </p>
                 </>

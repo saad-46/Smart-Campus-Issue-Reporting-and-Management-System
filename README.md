@@ -137,6 +137,23 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
+## 📍 Where things are
+
+| | |
+| --- | --- |
+| Production | <https://smart-campus-unifix.vercel.app> (Vercel project `smart-campus-unifix`, Firebase project `campus-issue-rep-man-system`) |
+| Legacy URL | `https://smart-campus-issue-reporting-and-ma.vercel.app` belonged to the project it replaced. It is not yet retired and may still serve the app; use the address above. |
+| Repository | <https://github.com/saad-46/Smart-Campus-Issue-Reporting-and-Management-System> (`main`) |
+| Local checkout | `D:\Projects\unifix\Smart-Campus-Issue-Reporting-and-Management-System` (the folder above it holds only backups and loose reference images, not application code) |
+
+**Run:** `npm install`, then `npm run dev` (needs `.env.local`; see `.env.local.example`).
+**Check:** `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:rules` (needs Java 21+), `npm run build`, `npm run test:e2e` (after a build).
+**Deploy:** Vercel builds every push to `main` from the Git integration. It needs the six `NEXT_PUBLIC_FIREBASE_*` variables listed in `.env.local.example`; there is no `vercel.json`.
+**Chat, assistant and finance:** [docs/CHAT_AI_FINANCE.md](docs/CHAT_AI_FINANCE.md) (who can read an issue chat, how the quick-report assistant works and what it cannot do, what the finance figures mean and why a "recorded payment" is not a verified one).
+**Documentation:** [docs/](docs/): campus research and on-site checklist, Explore parity, manual verification, Firestore rules notes, and [archived setup notes](docs/archive/).
+
+---
+
 ## 👀 Explore Mode and the signed-in app
 
 The same product runs in two data environments that are kept strictly apart:
@@ -184,7 +201,7 @@ Demo accounts and their emulator-only password are listed at the top of `scripts
 > Use the rules in [`firestore.rules`](./firestore.rules) — do not paste hand-written rules.
 > Deploy them with `npx firebase-tools deploy --only firestore:rules`, or copy the file's
 > contents into Firebase Console → Firestore → Rules. See
-> [FIRESTORE_RULES_FIX.md](./FIRESTORE_RULES_FIX.md) for the permission model and how to grant admin access.
+> [FIRESTORE_RULES_FIX.md](./docs/FIRESTORE_RULES_FIX.md) for the permission model and how to grant admin access.
 >
 > The notification centre needs one composite index (`notifications`: `recipientId` ↑, `createdAt` ↓), defined in
 > [`firestore.indexes.json`](./firestore.indexes.json). Deploy it with
