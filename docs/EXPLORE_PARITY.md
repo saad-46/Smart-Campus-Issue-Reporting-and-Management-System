@@ -142,6 +142,9 @@ Demo ids are recognisable on sight: issues are `SC-<number>`, ledger entries `TX
 | Marking a notification unread | Not offered in either mode | The Firestore rules let a recipient mark a notification read once and never unread, so the Explore page matches that |
 | Deleting an issue | Not offered in either mode | No screen uses it |
 | Removing the Worker persona | Refused in Explore | The Worker perspective would have no account to show |
+| Recording a payment, adding funds | Explore's dialogs do not ask for method, reference or date, and it has no funds ledger or reconciliation card | Added to the signed-in Finance page afterwards (docs/CHAT_AI_FINANCE.md); the demo still simulates "approve and pay" and "add funds" |
+| Chat | Explore keeps its in-memory discussion and has no unread badge, "Load earlier" or assignee-only rule | The real chat's access rules are enforced by Firestore, which Explore never contacts |
+| Quick report | Explore uses the single-message parser; the signed-in assistant asks follow-up questions and may use a server-side model | The assistant needs a signed-in session and the server endpoint, neither of which Explore has |
 
 ## QR codes
 

@@ -99,7 +99,8 @@ export const LIMITS = {
   description: 5000,
   location: 200,
   chatMessage: 2000,
-  passwordMin: 8,
+  /** Registration PIN: exactly this many digits (kept as a string, so leading zeros survive). */
+  pinLength: 6,
   maxImages: 3,
   /** Max size of a file the user may pick before compression. */
   uploadMb: 5,

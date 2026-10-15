@@ -43,6 +43,7 @@ export const VIEWER_ROUTES = [
   "/viewer/map",
   "/viewer/workers",
   "/viewer/finance",
+  "/viewer/transactions",
   "/viewer/locations",
   "/viewer/notifications",
   "/viewer/search",

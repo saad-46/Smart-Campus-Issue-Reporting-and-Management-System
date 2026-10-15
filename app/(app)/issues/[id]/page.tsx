@@ -17,7 +17,7 @@ import Button, { IconButton } from "@/components/ui/Button";
 import { DescriptionList } from "@/components/ui/Data";
 import { ErrorState, EmptyState, Skeleton, SkeletonLines } from "@/components/ui/States";
 import { Actor, getIssueImages, subscribeToSingleIssue } from "@/lib/firestore";
-import { subscribeToIssueChat, sendChatMessage } from "@/services/chatService";
+import { subscribeToIssueChat, sendChatMessage, markConversationRead, CHAT_PAGE_SIZE, CHAT_MAX_LOADED } from "@/services/chatService";
 import { Issue, ChatMessage } from "@/types";
 import { LIMITS } from "@/lib/constants";
 import { formatDate, formatRelative, formatTime } from "@/lib/dates";
@@ -117,19 +117,44 @@ export default function IssueDetailPage() {
   }, [issueId, imageCount]);
   const displayImages = (issue?.thumbnails ?? []).map((thumb, i) => fullImages[i] ?? thumb);
 
-  // The thread is private to the issue's author and staff (the security
-  // rules enforce this; the check here just avoids a doomed subscription).
+  // The thread is private to the reporter, the worker the issue is assigned
+  // to right now, and administrators. The security rules enforce this; the
+  // check here just avoids a doomed subscription and says why it is closed.
   const issueAuthor = issue?.createdBy;
-  const canChat = !!userProfile && !!issueAuthor && (userProfile.id === issueAuthor || activeRole === "worker" || activeRole === "admin");
+  const assignee = issue?.assignedTo ?? "";
+  const isReporter = !!userProfile && userProfile.id === issueAuthor;
+  const isAssignee = !!userProfile && !!assignee && userProfile.id === assignee && activeRole !== "user";
+  const canChat = !!userProfile && !!issueAuthor && (isReporter || isAssignee || isAdmin);
+  /** The other side of the conversation, for the "Chat with …" wording. */
+  const chatWith = isReporter ? (assignee ? "worker" : null) : "student";
+
+  const [pageSize, setPageSize] = useState(CHAT_PAGE_SIZE);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     if (!id || !canChat) return;
     setChatError("");
-    return subscribeToIssueChat(id, setMessages, (err) => {
-      logError("subscribeToIssueChat", err);
-      setChatError(getFriendlyErrorMessage(err, "We couldn't load the discussion."));
-    });
-  }, [id, canChat]);
+    return subscribeToIssueChat(
+      id,
+      (list, more) => {
+        setMessages(list);
+        setHasMore(more);
+      },
+      (err) => {
+        logError("subscribeToIssueChat", err);
+        setChatError(getFriendlyErrorMessage(err, "We couldn't load the discussion."));
+      },
+      pageSize
+    );
+  }, [id, canChat, pageSize]);
+
+  // Opening the thread (and every new message while it is open) marks it read.
+  const lastMessageId = messages.at(-1)?.id;
+  const readerId = userProfile?.id;
+  useEffect(() => {
+    if (!id || !canChat || !readerId || !lastMessageId || !(isReporter || isAssignee)) return;
+    markConversationRead(id, readerId).catch((err) => logError("markConversationRead", err));
+  }, [id, canChat, readerId, lastMessageId, isReporter, isAssignee]);
 
   // Keep the newest message in view inside the thread (not the page).
   useEffect(() => {
@@ -144,7 +169,10 @@ export default function IssueDetailPage() {
     setSending(true);
     setChatError("");
     try {
-      await sendChatMessage(id, text, userProfile.id, userProfile.name, activeRole);
+      await sendChatMessage(id, text, userProfile.id, userProfile.name, activeRole, {
+        studentId: issue.createdBy,
+        workerId: issue.assignedTo ?? "",
+      });
       setChatInput(""); // only cleared once the message is actually saved
     } catch (err) {
       logError("sendChatMessage", err);
@@ -194,6 +222,18 @@ export default function IssueDetailPage() {
           )}
         </div>
         <h1 className="mt-2.5 break-words text-xl font-semibold tracking-tight text-fg sm:text-2xl">{issue.title}</h1>
+        {canChat && (isReporter || isAssignee) && chatWith && (
+          <div className="mt-3">
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />}
+              onClick={() => document.getElementById("panel-discussion")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            >
+              {chatWith === "worker" ? "Chat with worker" : "Chat with student"}
+            </Button>
+          </div>
+        )}
         <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-subtle">
           <span className="inline-flex items-center gap-1">
             <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
@@ -255,17 +295,36 @@ export default function IssueDetailPage() {
 
           <Panel
             title="Discussion"
-            description={canChat ? "Visible to the reporter, workers and administrators." : undefined}
+            description={
+              canChat
+                ? chatWith === null
+                  ? "Private to you and the worker who takes this issue. Anything you write now will be there for them."
+                  : chatWith === "worker"
+                    ? "Private to you, the assigned worker and administrators."
+                    : "Private to the reporter, you and administrators."
+                : undefined
+            }
             flush
           >
             {!canChat ? (
               <div className="flex items-start gap-3 border-t border-border px-4 py-5 text-[13px] text-fg-subtle">
                 <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                The discussion is private to the person who reported this issue and campus staff.
+                The discussion is private to the person who reported this issue, the worker it is assigned to, and administrators.
               </div>
             ) : (
               <>
                 <div ref={logRef} role="log" aria-live="polite" aria-label="Messages" className="max-h-[26rem] min-h-[8rem] space-y-4 overflow-y-auto border-t border-border px-4 py-4">
+                  {hasMore && pageSize < CHAT_MAX_LOADED && (
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setPageSize((n) => Math.min(CHAT_MAX_LOADED, n + CHAT_PAGE_SIZE))}
+                        className="rounded-md border border-border px-3 py-1 text-xs font-medium text-fg-muted hover:bg-surface-hover hover:text-fg"
+                      >
+                        Load earlier messages
+                      </button>
+                    </div>
+                  )}
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center py-6 text-center">
                       <MessageSquare className="h-5 w-5 text-fg-subtle" aria-hidden="true" />

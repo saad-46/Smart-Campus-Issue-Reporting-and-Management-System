@@ -1,6 +1,6 @@
 # 🔒 Firestore Security Rules
 
-The rules for this project live in [`firestore.rules`](./firestore.rules). They are the
+The rules for this project live in [`firestore.rules`](../firestore.rules). They are the
 application's backend: every permission is enforced there, not in the web client.
 
 > ⚠️ Earlier versions of this file suggested pasting `allow read, write: if request.auth != null`

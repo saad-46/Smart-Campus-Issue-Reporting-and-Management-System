@@ -13,7 +13,7 @@ import { Notice } from "@/components/ui/States";
 import { LIMITS } from "@/lib/constants";
 import { getFriendlyErrorMessage } from "@/lib/errors";
 import { dashboardPathForRole } from "@/lib/roles";
-import { cleanText, getPasswordError, isValidEmail, validateRegistration } from "@/lib/validation";
+import { cleanText, getPasswordError, isValidEmail, sanitizePinInput, validateRegistration } from "@/lib/validation";
 import { cn } from "@/lib/cn";
 
 const ROLES: { value: UserRole; icon: React.ReactNode; title: string; desc: string }[] = [
@@ -112,16 +112,17 @@ export default function RegisterPage() {
           required
         />
         <Input
-          label="Password"
+          label={`${LIMITS.pinLength}-digit PIN`}
           type="password"
+          inputMode="numeric"
           autoComplete="new-password"
-          minLength={LIMITS.passwordMin}
+          maxLength={LIMITS.pinLength}
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => setPassword(sanitizePinInput(e.target.value))}
           onBlur={blur("password")}
           error={show("password") ? passwordError : undefined}
           valid={touched.password && !passwordError}
-          hint={`At least ${LIMITS.passwordMin} characters, with a letter and a number.`}
+          hint={`Exactly ${LIMITS.pinLength} digits. You'll use it to sign in.`}
           required
         />
 

@@ -21,6 +21,8 @@
 
 # misc
 .DS_Store
+Thumbs.db
+desktop.ini
 *.pem
 
 # debug
@@ -29,7 +31,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files — never commit real configuration or credentials
+# env files - never commit real configuration or credentials
 .env
 .env.*
 !.env.local.example

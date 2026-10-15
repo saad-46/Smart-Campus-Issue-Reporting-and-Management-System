@@ -34,15 +34,25 @@ export function isValidEmail(email: string): boolean {
   return email.length <= 254 && EMAIL_PATTERN.test(email);
 }
 
-/** Returns an error message, or null when the password is acceptable. */
+/**
+ * Keeps only digits, at most pinLength of them. For typing and pasting into the
+ * PIN field. The result stays a string: parsing it as a number would drop
+ * leading zeros ("000123" is a valid PIN).
+ */
+export function sanitizePinInput(value: string): string {
+  return String(value ?? "").replace(/\D/g, "").slice(0, LIMITS.pinLength);
+}
+
+/**
+ * The registration PIN policy: exactly LIMITS.pinLength digits, nothing else.
+ * Returns an error message, or null when the PIN is acceptable. This governs
+ * new registrations only; signing in with an existing account's password is
+ * not checked against it.
+ */
 export function getPasswordError(password: string): string | null {
-  if (password.length < LIMITS.passwordMin) {
-    return `Password must be at least ${LIMITS.passwordMin} characters.`;
-  }
-  if (password.length > 128) return "Password must be 128 characters or fewer.";
-  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-    return "Password must include at least one letter and one number.";
-  }
+  if (!password) return `Enter your ${LIMITS.pinLength}-digit PIN.`;
+  if (!/^\d+$/.test(password)) return "The PIN can only contain the digits 0 to 9.";
+  if (password.length !== LIMITS.pinLength) return `The PIN must be exactly ${LIMITS.pinLength} digits.`;
   return null;
 }
 

@@ -1598,3 +1598,103 @@ The live key was not changed. Restricting it by website and API needs the Google
 - Nothing was created, changed or deleted in production, and no account was signed in. The pending expense claim was not touched.
 - The duplicate project `smart-campus-unifix` failed its build again, as on every push.
 - **Final status: PASS WITH MANUAL VERIFICATION REQUIRED.** Remaining: signed-in flows in production, a QR scan on a phone, disconnecting the duplicate Vercel project, restricting the live browser key (docs/MANUAL_VERIFICATION.md).
+
+---
+
+## Release verification (2026-10-10)
+
+Scope: verification and hardening only; no feature work, no change to application code, rules, dataset or configuration. Details: [docs/MANUAL_VERIFICATION.md](docs/MANUAL_VERIFICATION.md), [docs/SUES_ON_SITE_VERIFICATION.md](docs/SUES_ON_SITE_VERIFICATION.md).
+
+### 1. Verified in code
+- Working tree clean at start, `main` = `origin/main` = `4de4e74`, all feature branches present.
+- QR ids are shape-checked (`^[a-z0-9-]{1,60}$`) before any lookup in both modes; the printed link carries one parameter, the id.
+- Signed-in issue writes refuse demo ids (`assertRealId`) before any Firestore call (10 functions).
+- No private key, service-account file, `.env` file or real `AIza` key in the tracked tree, any commit on any branch, or `.next` output.
+
+### 2. Verified in automated tests (executed 2026-10-10)
+| Suite | Result |
+| --- | --- |
+| Unit | 335 / 335 (was 326; +7 QR, +2 checklist-sync) |
+| Firestore rules (emulator) | 181 / 181 |
+| Type check, lint | clean |
+| Playwright, local production build | 121 passed, 8 skipped (the emulator-only spec) |
+
+### 3. Verified in the Firebase emulator
+`e2e/signed-in.emulator.spec.ts`, 8 / 8, seeded accounts only, refuses non-local addresses:
+- **Student:** signs in, reports at "Block 4", sees the report, posts to its discussion, is redirected away from `/admin`, `/admin/finance`, `/admin/workers` and `/worker`, and loses access after sign-out.
+- **Another student:** cannot read or post to that discussion.
+- **Admin:** assigns Demo Worker 1, escalates; both persist across a reload; the report is counted at "Blocks 3 and 4 area" on the real map.
+- **Worker:** sees the task and a repair tip, starts it, is refused a zero-amount claim, resolves with a claim; the task leaves the list.
+- **Admin:** pays the claim once; the claim offers no second review after a reload. The worker is redirected away from finance. The student sees the issue resolved and the notification.
+- **QR:** a seeded location fills the form and the stored issue keeps its name; unknown, wrong-case, trailing-space, path-traversal, script, over-length and appended-parameter ids are refused or reduced to the single known id.
+- **Failure and retry:** submitting offline shows an error and no success; going online and retrying creates exactly one issue.
+- **Explore while signed in:** only `SC-…` issues; a fresh tab makes no Firestore, Auth or Google request; a demo "add funds" does not change the real budget.
+
+Pending-worker, self-approval, double payment, receipt privacy, invalid transitions and cross-user reads are covered by the 181 rules tests (direct Firestore requests, independent of the UI).
+
+### 4. Verified on the live production site (read-only)
+- Canonical deployment `READY` on `4de4e74`; the live site serves the new build.
+- 121 passed, 8 skipped against the live URL (public pages, Explore, signed-out redirects, QR in Explore).
+- Signed-out reads of seven collections: 403.
+- Nothing was created, changed or deleted; no account was signed in; the ₹1,046 claim was not read or touched.
+
+### 5. Requires authorized human verification
+- Signed-in production workflows with accounts created for the test (A in MANUAL_VERIFICATION).
+- A QR scan with a real phone (B).
+- Disconnecting `smart-campus-unifix` (C).
+- Restricting the live browser key (D).
+- On-site campus survey (SUES_ON_SITE_VERIFICATION).
+
+### 6. Blocked by permissions
+- Vercel project settings and Google Cloud credentials are not changeable from this session, and no change was authorized.
+
+### Findings
+- **Duplicate Vercel project:** owns only its own `*.vercel.app` addresses; the production address belongs to the canonical project; its last three builds failed. Obsolete and harmless, but still connected. Not changed.
+- **Firebase browser key:** the live key carries **no website restriction**: it answered requests with a foreign and an absent `Referer`. It is a public identifier and every data request is authorised by Auth and the rules, so this is not a data-exposure issue; it leaves quota and sign-up abuse open. The old-key concern from earlier audits stands corrected: the repository and history contain only placeholders. Not changed; steps in MANUAL_VERIFICATION section D.
+- **Campus data:** no evidence in the repository resolves any unplaced location, conflicting position or footprint identity, so nothing was changed. 0 places verified, 7 approximate, 1 conflicting, 1 unverified; 6 locations unplaced.
+- **Operational note:** `next dev` overwrites `.next`; run `next build` before `npm run test:e2e`.
+
+### Release status
+**PASS WITH MANUAL VERIFICATION REQUIRED.** No defect was found in the application. Changes in this pass are tests and documentation only, and are uncommitted.
+
+### Update after the release verification: Vercel migration (2026-10-10)
+
+The "canonical" and "duplicate" Vercel projects named above have since swapped roles. The app was redeployed to `smart-campus-unifix` (<https://smart-campus-unifix.vercel.app>, commit `4de4e74`, `READY`; its earlier build failures were a missing `NEXT_PUBLIC_FIREBASE_API_KEY`). The browser suite passed against it: 121 passed, 8 emulator-only skipped. The legacy project and its address are **still serving** and have **not** been paused or deleted. Sign-in and signed-in workflows on the new address are **not verified**, and the new hostname has not been checked in Firebase Authentication's authorized domains. Steps: docs/MANUAL_VERIFICATION.md, section C.
+
+---
+
+## Issue chat, quick-report assistant and finance records (2026-10-11)
+
+Details and definitions: [docs/CHAT_AI_FINANCE.md](docs/CHAT_AI_FINANCE.md). Uncommitted, undeployed. Firestore rules changed; they must be deployed together with the app.
+
+### Found on audit
+- **Chat:** a private thread existed (`issues/{id}/messages`) but any worker could read and post in every issue's thread (`isStaff()`), the history was unbounded, and there was no unread state.
+- **Quick report:** deterministic keyword parsing only; no follow-up questions, no hazard warning, no model.
+- **Finance:** claims, approval and a ledger entry existed. Adding funds left no record of who, why or from what; "Pay" wrote an entry that looked like a payment although UniFix moves no money; there was no reconciliation.
+- **Existing and reused:** the claim, receipt and one-time payment rules, the Explore isolation, the notification centre.
+
+### Implemented
+- **Chat:** access narrowed to the reporter, the current assignee and administrators; reassignment removes the previous worker; bounded history with "Load earlier"; a `conversations/{issueId}` summary (participants copied from the issue, preview, read markers) written in the same transaction as each message; "Chat with worker/student"; "New message" badge on both dashboards.
+- **Assistant:** a conversation that asks only what is missing, warns about hazards, drafts an editable report, and submits only on the student's press. Server route `POST /api/report-assist` (Firebase ID token verified against Firebase Auth, per-user rate limit, size limits); model layer optional via a server-only key; rules fallback; every model answer validated.
+- **Finance:** immutable `ledger` entries tied to the budget change in one commit, and to exactly one entry per budget increase (a pre-commit review found two entries could otherwise share one increase; closed with a `ledgerHead/state` pointer written in the same commit; a first version that put the pointer on the budget document was replaced because the previous rules rejected every budget update on such a document, which would have broken rollback); payment records state method, date and reference and are stamped `manual`; a summary with defined figures and a reconciliation check; CSV export; worker view of how each payment was recorded.
+
+### Verification (executed 2026-10-11)
+| Suite | Result |
+| --- | --- |
+| Unit | 399 / 399 (335 before; +64: assistant 31, route 9, finance 24) |
+| Firestore rules | 225 / 225 (181 before; +44 covering chat access, conversation summaries, the funds ledger and payment details) |
+| Typecheck, lint, production build | clean |
+| Browser, local build | 121 passed, 11 skipped (the emulator-only spec) |
+| Signed-in emulator spec | 11 / 11 |
+| Provider key in browser output | 0 occurrences of a canary key in `.next/static` after a build with the key set |
+
+The emulator spec covers: report, protected pages, discussion privacy for another student and for an unassigned worker, assign and escalate with persistence, worker chat and the student's unread badge clearing, resolve with claim, validated payment recording (a bank transfer without a reference is refused), one-time payment, ledger and reconciliation, QR validation, offline failure and retry, Explore isolation while signed in, and the assistant's ask-where, draft, edit and submit flow.
+
+### Not verified or not done
+- **A live model.** No provider key was available, so every automated run used the rules path or a mocked provider. The model layer is exercised only against a fake; its real answers, latency and cost are unmeasured.
+- **Production.** Nothing was deployed, no production data was read or written, and the pending expense claim was not touched. The new rules are untested against production data.
+- **Real payments.** There is no payment gateway or bank connection to integrate; no payment can be "confirmed". Recorded payments are administrators' statements.
+- **Push notifications** for chat; photos in Quick report; per-message read receipts.
+- **Explore Mode** does not mirror the new payment fields, ledger, unread badges or the assistant's follow-ups (listed in docs/EXPLORE_PARITY.md).
+- **Rate limit** is per server instance. Set a spend limit on the provider key.
+- **Deploying the rules is a precondition** for the app changes: with the old rules, the first message sent after assignment fails to write its conversation summary, and Add funds fails to write its ledger entry.

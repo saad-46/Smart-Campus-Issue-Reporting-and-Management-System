@@ -11,6 +11,9 @@ import {
   Budget,
   CampusLocation,
   ChatMessage,
+  Conversation,
+  LedgerEntry,
+  LedgerHead,
   Feedback,
   Issue,
   IssueEvent,
@@ -238,6 +241,29 @@ export function normalizeChatMessage(id: string, data: Doc | undefined | null): 
   };
 }
 
+export function normalizeConversation(id: string, data: Doc | undefined | null): Conversation {
+  const d = data ?? {};
+  const read: Record<string, Date> = {};
+  const raw = (d.readAt && typeof d.readAt === "object" ? d.readAt : {}) as Record<string, unknown>;
+  for (const [uid, value] of Object.entries(raw)) read[uid] = toDateOr(value, new Date(0));
+  return {
+    issueId: str(d.issueId) || id,
+    studentId: str(d.studentId),
+    workerId: str(d.workerId),
+    lastMessageAt: toDateOr(d.lastMessageAt, new Date(0)),
+    lastSenderId: str(d.lastSenderId),
+    lastPreview: str(d.lastPreview),
+    readAt: read,
+  };
+}
+
+/** Whether a participant has messages they haven't seen. */
+export function isConversationUnread(c: Conversation, uid: string): boolean {
+  if (!c.lastSenderId || c.lastSenderId === uid) return false;
+  const seen = c.readAt[uid];
+  return !seen || seen.getTime() < c.lastMessageAt.getTime();
+}
+
 export function normalizeBudget(id: string, data: Doc | undefined | null): Budget {
   const d = data ?? {};
   return {
@@ -262,6 +288,33 @@ export function normalizeTransaction(id: string, data: Doc | undefined | null): 
       ? (d.status as Transaction["status"])
       : "approved",
     receiptUrl: str(d.receiptUrl),
+    method: ["cash", "bank_transfer", "upi", "cheque", "other"].includes(d.method as string) ? (d.method as Transaction["method"]) : undefined,
+    reference: str(d.reference) || undefined,
+    paidOn: /^\d{4}-\d{2}-\d{2}$/.test(str(d.paidOn)) ? str(d.paidOn) : undefined,
+    verification: d.verification === "manual" ? "manual" : undefined,
+    recordedBy: str(d.recordedBy) || undefined,
+    createdAt: toDateOr(d.createdAt, new Date()),
+  };
+}
+
+export function normalizeLedgerHead(data: Doc | undefined | null): LedgerHead | null {
+  if (!data) return null;
+  const count = num(data.entryCount);
+  return { lastEntryId: str(data.lastEntryId), entryCount: Number.isInteger(count) && count >= 0 ? count : 0 };
+}
+
+export function normalizeLedgerEntry(id: string, data: Doc | undefined | null): LedgerEntry {
+  const d = data ?? {};
+  const sources = ["management_allocation", "donation", "grant", "budget_transfer", "other"];
+  return {
+    id,
+    type: "funds_added",
+    amount: Math.max(0, num(d.amount)),
+    source: sources.includes(d.source as string) ? (d.source as LedgerEntry["source"]) : "other",
+    reference: str(d.reference),
+    description: str(d.description),
+    receivedOn: /^\d{4}-\d{2}-\d{2}$/.test(str(d.receivedOn)) ? str(d.receivedOn) : "",
+    createdBy: str(d.createdBy),
     createdAt: toDateOr(d.createdAt, new Date()),
   };
 }

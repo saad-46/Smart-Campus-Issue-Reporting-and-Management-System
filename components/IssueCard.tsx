@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowUpRight, Flame, MapPin, Siren } from "lucide-react";
+import { ArrowUpRight, Flame, MapPin, MessageSquare, Siren } from "lucide-react";
 import { Issue } from "@/types";
 import Badge, { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
 import UpvoteButton from "@/components/ui/UpvoteButton";
@@ -20,6 +20,8 @@ interface IssueRowProps {
   actions?: React.ReactNode;
   /** Additional content under the meta line (e.g. a tip). */
   footer?: React.ReactNode;
+  /** The private chat on this issue has messages the viewer hasn't read. */
+  unreadChat?: boolean;
   className?: string;
 }
 
@@ -28,7 +30,7 @@ interface IssueRowProps {
  * with status signals on the right. The whole row opens the issue; controls
  * inside it stay independently clickable.
  */
-export default function IssueRow({ issue, viewContext = "my-issues", showSla = false, actions, footer, className }: IssueRowProps) {
+export default function IssueRow({ issue, viewContext = "my-issues", showSla = false, actions, footer, unreadChat = false, className }: IssueRowProps) {
   const thumb = issue.thumbnails[0];
   const explore = viewContext === "explore";
 
@@ -45,6 +47,11 @@ export default function IssueRow({ issue, viewContext = "my-issues", showSla = f
             </Link>
           </h3>
           <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            {unreadChat && (
+              <Badge tone="info" icon={<MessageSquare aria-hidden="true" />}>
+                New message
+              </Badge>
+            )}
             {issue.escalated && issue.status !== "Resolved" && (
               <Badge tone="danger" icon={<Siren aria-hidden="true" />}>
                 Escalated

@@ -75,7 +75,7 @@ describe("demo records can't be written to Firestore", () => {
     ["assignIssue", () => assignIssue("SC-1140", "workerUid")],
     ["deleteIssue", () => deleteIssue("SC-1140")],
     ["toggleUpvote", () => toggleUpvote("SC-1140", "studentUid")],
-    ["approveClaim", () => approveClaim("SC-1140", "Worker", "adminUid")],
+    ["approveClaim", () => approveClaim("SC-1140", "Worker", "adminUid", { method: "cash", reference: "", paidOn: "2026-10-09" })],
     ["rejectReceipt", () => rejectReceipt("SC-1140", "adminUid")],
   ])("%s refuses a demo issue before touching Firestore", async (_name, call) => {
     await expect(call()).rejects.toThrow(/belongs to the demo/);
@@ -89,7 +89,7 @@ describe("a failed real write is a failure", () => {
     ["updateIssueStatus", () => updateIssueStatus("3GGhQ1x9aBcD4eFgH5iJ", "In Progress", worker)],
     ["adminAssignIssue", () => adminAssignIssue("3GGhQ1x9aBcD4eFgH5iJ", "workerUid", admin)],
     ["assignIssue", () => assignIssue("3GGhQ1x9aBcD4eFgH5iJ", "workerUid")],
-    ["approveClaim", () => approveClaim("3GGhQ1x9aBcD4eFgH5iJ", "Worker", "adminUid")],
+    ["approveClaim", () => approveClaim("3GGhQ1x9aBcD4eFgH5iJ", "Worker", "adminUid", { method: "cash", reference: "", paidOn: "2026-10-09" })],
     ["rejectReceipt", () => rejectReceipt("3GGhQ1x9aBcD4eFgH5iJ", "adminUid")],
   ])("%s rejects when Firestore denies it, and nothing falls back to the demo", async (_name, call) => {
     const denied = Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });

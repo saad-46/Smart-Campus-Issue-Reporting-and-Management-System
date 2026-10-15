@@ -9,6 +9,7 @@ import {
   Map,
   MapPin,
   PlusCircle,
+  Receipt,
   Search,
   Settings,
   Users,
@@ -51,6 +52,7 @@ export function navForRole(role: UserRole): NavGroup[] {
         items: [
           { label: "Workers", href: "/admin/workers", icon: <Users /> },
           { label: "Finance", href: "/admin/finance", icon: <Wallet /> },
+          { label: "Transactions", href: "/admin/transactions", icon: <Receipt /> },
         ],
       },
       {

@@ -43,10 +43,10 @@
 1. In Firestore Database, go to **"Rules"** tab
 2. Replace the default rules with:
 
-> Use the rules in [`firestore.rules`](./firestore.rules) — do not paste hand-written rules.
+> Use the rules in [`firestore.rules`](../../firestore.rules) — do not paste hand-written rules.
 > Deploy them with `npx firebase-tools deploy --only firestore:rules`, or copy the file's
 > contents into Firebase Console → Firestore → Rules. See
-> [FIRESTORE_RULES_FIX.md](./FIRESTORE_RULES_FIX.md) for the permission model and how to grant admin access.
+> [FIRESTORE_RULES_FIX.md](../FIRESTORE_RULES_FIX.md) for the permission model and how to grant admin access.
 
 3. Click **"Publish"**
 

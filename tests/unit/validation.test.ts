@@ -10,6 +10,7 @@ import {
   normalizeCategory,
   normalizePriority,
   parseAmount,
+  sanitizePinInput,
   validateChatMessage,
   validateImages,
   validateIssueInput,
@@ -74,7 +75,7 @@ describe("validateIssueInput", () => {
 });
 
 describe("validateRegistration", () => {
-  const valid = { name: "Asha Rao", email: "asha@example.com", password: "campus2024", role: "user" as const };
+  const valid = { name: "Asha Rao", email: "asha@example.com", password: "482910", role: "user" as const };
 
   it("accepts a valid registration and lower-cases the email", () => {
     expect(validateRegistration({ ...valid, email: " Asha@Example.COM " }).email).toBe("asha@example.com");
@@ -96,20 +97,77 @@ describe("validateRegistration", () => {
     expect(() => validateRegistration({ ...valid, name: "   " })).toThrow(ValidationError);
     expect(() => validateRegistration({ ...valid, name: "n".repeat(LIMITS.name + 1) })).toThrow(ValidationError);
   });
+
+  it("keeps the PIN exactly as typed, including leading zeros", () => {
+    expect(validateRegistration({ ...valid, password: "000123" }).password).toBe("000123");
+  });
+
+  it("accepts a worker registration with a valid PIN", () => {
+    const out = validateRegistration({ ...valid, role: "worker", password: "090909" });
+    expect(out.role).toBe("worker");
+    expect(out.password).toBe("090909");
+  });
+
+  it.each(["", "12345", "1234567", "12ab56", "abcdef", "12 456", "١٢٣٤٥٦", "campus2024"])("rejects the PIN %j", (password) => {
+    expect(() => validateRegistration({ ...valid, password })).toThrow(ValidationError);
+  });
+
+  it("rejects an administrator registration even with a valid PIN", () => {
+    expect(() => validateRegistration({ ...valid, role: "admin", password: "123456" })).toThrow(ValidationError);
+  });
+
+  it("reports the PIN problem with the same message the form shows", () => {
+    expect(() => validateRegistration({ ...valid, password: "12ab56" })).toThrow(getPasswordError("12ab56") as string);
+  });
 });
 
-describe("getPasswordError", () => {
-  it("rejects short passwords", () => {
-    expect(getPasswordError("abc12")).toMatch(/at least/);
+describe("getPasswordError (the six-digit registration PIN)", () => {
+  it.each(["123456", "000123", "000000", "999999"])("accepts %j", (pin) => {
+    expect(getPasswordError(pin)).toBeNull();
   });
 
-  it("requires both a letter and a number", () => {
-    expect(getPasswordError("abcdefghij")).toMatch(/letter and one number/);
-    expect(getPasswordError("1234567890")).toMatch(/letter and one number/);
+  it("asks for a PIN when it is empty", () => {
+    expect(getPasswordError("")).toMatch(/Enter your 6-digit PIN/);
   });
 
-  it("accepts a reasonable password", () => {
-    expect(getPasswordError("campus2024")).toBeNull();
+  it.each(["1", "12345"])("rejects the too-short PIN %j", (pin) => {
+    expect(getPasswordError(pin)).toMatch(/exactly 6 digits/);
+  });
+
+  it.each(["1234567", "12345678901234567890"])("rejects the too-long PIN %j", (pin) => {
+    expect(getPasswordError(pin)).toMatch(/exactly 6 digits/);
+  });
+
+  it.each(["abcdef", "12ab56", "12-456", "12 456", "campus2024", "1234.5", "+12345", "123456\n"])("rejects the non-numeric PIN %j", (pin) => {
+    expect(getPasswordError(pin)).toMatch(/only contain the digits/);
+  });
+
+  it("uses the same length as the form's input limit", () => {
+    expect(LIMITS.pinLength).toBe(6);
+  });
+});
+
+describe("sanitizePinInput (what the PIN field keeps)", () => {
+  it("drops everything that is not a digit", () => {
+    expect(sanitizePinInput("12ab-34 56")).toBe("123456");
+  });
+
+  it("limits the PIN to six digits, from typing or pasting", () => {
+    expect(sanitizePinInput("123456789")).toBe("123456");
+  });
+
+  it("keeps leading zeros", () => {
+    expect(sanitizePinInput("000123")).toBe("000123");
+    expect(typeof sanitizePinInput("000123")).toBe("string");
+  });
+
+  it("handles empty and missing input", () => {
+    expect(sanitizePinInput("")).toBe("");
+    expect(sanitizePinInput(undefined as unknown as string)).toBe("");
+  });
+
+  it("produces a value the policy accepts when six digits were entered", () => {
+    expect(getPasswordError(sanitizePinInput("0 0 1 2 3 4"))).toBeNull();
   });
 });
 
