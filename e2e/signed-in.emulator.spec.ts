@@ -326,6 +326,42 @@ test("admin: funds are recorded with a source and reason, appear in the ledger, 
   await expect(page.locator("main")).toContainText("Consistent");
 });
 
+test("admin: the dashboard balance matches Finance, and Transactions lists the funds and the payment", async ({ page }) => {
+  await signIn(page, "admin@unifix.test");
+  await page.goto("/admin");
+  const tile = page.locator("dl > div").filter({ hasText: "Total money available" });
+  await expect(tile).toContainText(/₹[\d,]+\.\d{2}/, { timeout: 30_000 });
+  const balance = (await tile.innerText()).match(/₹[\d,]+\.\d{2}/)![0];
+
+  // The Finance page states the same available figure, from the same definition.
+  await page.goto("/admin/finance");
+  await expect(page.locator("main")).toContainText(balance, { timeout: 30_000 });
+
+  // Transactions: the funds entry recorded above and the payment made earlier, with details.
+  await page.goto("/admin/transactions");
+  const table = page.getByRole("table");
+  await expect(table).toContainText(`TEST allocation ${STAMP}`, { timeout: 30_000 });
+  await expect(table).toContainText("Funds added");
+  await expect(table).toContainText("Payment");
+  await page.getByRole("searchbox", { name: "Search transactions" }).fill(`TEST allocation ${STAMP}`);
+  await expect(table.locator("tbody tr")).toHaveCount(1);
+  await table.locator("tbody tr").first().getByRole("button").click();
+  await expect(page.getByRole("dialog")).toContainText("Recorded by");
+  await expect(page.getByRole("dialog")).toContainText("Entries are immutable");
+});
+
+test("transactions and finance totals stay out of reach of a student and a worker", async ({ page }) => {
+  for (const [email, label] of [["student4@unifix.test", "student"], ["worker1@unifix.test", "worker"]] as const) {
+    await signIn(page, email);
+    await page.goto("/admin/transactions");
+    await page.waitForTimeout(1500);
+    expect(new URL(page.url()).pathname, `${label} is sent away from the admin page`).not.toBe("/admin/transactions");
+    await expect(page.getByText("Incoming funds")).toHaveCount(0);
+    await expect(page.getByText("Total money available")).toHaveCount(0);
+    await signOut(page);
+  }
+});
+
 test("quick report: the assistant asks where, drafts, lets the student edit, and submits only when told", async ({ page }) => {
   await signIn(page, "student4@unifix.test");
   await page.goto("/dashboard/report");

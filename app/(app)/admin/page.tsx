@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowRight, CheckCircle2, Layers, Lightbulb, RefreshCw, Siren, Wrench } from "lucide-react";
-import { Feedback, Issue, IssueSummary } from "@/types";
+import { Budget, Feedback, Issue, IssueSummary } from "@/types";
 import { useAuthContext } from "@/components/AuthProvider";
 import {
   ADMIN_ISSUE_WINDOW,
@@ -16,6 +16,8 @@ import {
   subscribeToRecentIssues,
 } from "@/lib/firestore";
 import { getRecentFeedback, summarizeSatisfaction } from "@/lib/feedback";
+import { subscribeToBudget } from "@/lib/finance";
+import { availableFunds, fundsTile } from "@/lib/financeLedger";
 import { toIssueSummary } from "@/lib/models";
 import { hotspots, resolutionStats, slaSummary, timeSeries } from "@/lib/intelligence/analytics";
 import { confirmedClusters, IncidentCluster, suggestClusters } from "@/lib/intelligence/similarity";
@@ -60,6 +62,12 @@ export default function AdminOverviewPage() {
   const [historyError, setHistoryError] = useState("");
   const [counts, setCounts] = useState<{ total: number; unresolved: number } | null>(null);
   const [feedback, setFeedback] = useState<Feedback[] | null>(null);
+  // A failed read must say so, not sit on a skeleton or read as "no ratings".
+  const [countsFailed, setCountsFailed] = useState(false);
+  const [feedbackFailed, setFeedbackFailed] = useState(false);
+  // undefined = not read yet, null = no budget document
+  const [budget, setBudget] = useState<Budget | null | undefined>(undefined);
+  const [budgetFailed, setBudgetFailed] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [busy, setBusy] = useState("");
   const [pendingCluster, setPendingCluster] = useState<IncidentCluster | null>(null);
@@ -76,9 +84,20 @@ export default function AdminOverviewPage() {
     );
   }, [refreshKey]);
 
+  // The same live budget document the Finance page reads.
+  useEffect(() => {
+    setBudgetFailed(false);
+    return subscribeToBudget(setBudget, (err) => {
+      logError("subscribeToBudget", err);
+      setBudgetFailed(true);
+    });
+  }, [refreshKey]);
+
   useEffect(() => {
     let cancelled = false;
     setHistoryError("");
+    setCountsFailed(false);
+    setFeedbackFailed(false);
     fetchIssueSummaries({ since: new Date(Date.now() - RISK_WINDOW_DAYS * DAY) })
       .then((result) => {
         if (!cancelled) setHistory(result);
@@ -91,20 +110,27 @@ export default function AdminOverviewPage() {
       .then((c) => {
         if (!cancelled) setCounts(c);
       })
-      .catch((err) => logError("getIssueCounts", err));
+      .catch((err) => {
+        logError("getIssueCounts", err);
+        if (!cancelled) setCountsFailed(true);
+      });
     getRecentFeedback()
       .then((f) => {
         if (!cancelled) setFeedback(f);
       })
       .catch((err) => {
         logError("getRecentFeedback", err);
-        if (!cancelled) setFeedback([]);
+        if (!cancelled) {
+          setFeedback([]);
+          setFeedbackFailed(true);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [refreshKey]);
 
+  const funds = useMemo(() => fundsTile(availableFunds(budget), { loadFailed: budgetFailed }), [budget, budgetFailed]);
   const liveSummaries = useMemo(() => (live ?? []).map(toIssueSummary), [live]);
   const openLive = useMemo(() => liveSummaries.filter((i) => i.status !== "Resolved"), [liveSummaries]);
   const sla = useMemo(() => slaSummary(openLive, slaConfig, now), [openLive, slaConfig, now]);
@@ -191,8 +217,23 @@ export default function AdminOverviewPage() {
 
       <StatStrip
         className="mb-6"
+        columns={3}
         stats={[
-          { label: "Open issues", value: counts?.unresolved, loading: !counts, hint: counts ? `${counts.total} reported in total` : undefined },
+          {
+            label: "Total money available",
+            value: funds.value,
+            loading: budget === undefined && !budgetFailed,
+            tone: funds.tone,
+            hint: funds.hint,
+            action: { label: "Open finance", href: "/admin/finance" },
+            wide: true,
+          },
+          {
+            label: "Open issues",
+            value: counts ? counts.unresolved : countsFailed ? "—" : undefined,
+            loading: !counts && !countsFailed,
+            hint: counts ? `${counts.total} reported in total` : countsFailed ? "Couldn't be loaded. Use Refresh." : undefined,
+          },
           { label: "High priority", value: highOpen, loading: live === null, hint: "Open, high priority", tone: highOpen ? "warning" : "default" },
           {
             label: "Overdue",
@@ -211,7 +252,7 @@ export default function AdminOverviewPage() {
             label: "Satisfaction",
             value: satisfaction?.average != null ? `${satisfaction.average}/5` : "—",
             loading: feedback === null,
-            hint: satisfaction?.count ? `${satisfaction.count} ratings` : "No ratings yet",
+            hint: feedbackFailed ? "Couldn't be loaded. Use Refresh." : satisfaction?.count ? `${satisfaction.count} ratings` : "No ratings yet",
           },
         ]}
       />

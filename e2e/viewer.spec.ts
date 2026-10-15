@@ -480,7 +480,7 @@ test.describe("isolation", () => {
     const { requests, problems } = watch(page);
     await skipTour(page);
     await page.goto("/viewer");
-    for (const href of ["/viewer/student", "/viewer/report", "/viewer/issues", "/viewer/worker", "/viewer/admin", "/viewer/analytics", "/viewer/map", "/viewer/workers", "/viewer/finance", "/viewer/locations", "/viewer/notifications", "/viewer/search", "/viewer/timeline", "/viewer/settings", "/viewer/how-it-works"]) {
+    for (const href of ["/viewer/student", "/viewer/report", "/viewer/issues", "/viewer/worker", "/viewer/admin", "/viewer/analytics", "/viewer/map", "/viewer/workers", "/viewer/finance", "/viewer/transactions", "/viewer/locations", "/viewer/notifications", "/viewer/search", "/viewer/timeline", "/viewer/settings", "/viewer/how-it-works"]) {
       await page.goto(href);
       await ready(page);
     }

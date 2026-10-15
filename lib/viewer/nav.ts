@@ -19,6 +19,7 @@ export type ViewerIcon =
   | "analytics"
   | "workers"
   | "finance"
+  | "transactions"
   | "locations"
   | "settings"
   | "notifications"
@@ -72,6 +73,7 @@ export function navForViewerRole(role: ViewerRole): ViewerNavGroup[] {
         items: [
           { href: "/viewer/workers", label: "Workers", icon: "workers", tour: "nav-workers" },
           { href: "/viewer/finance", label: "Finance", icon: "finance", tour: "nav-finance" },
+          { href: "/viewer/transactions", label: "Transactions", icon: "transactions" },
         ],
       },
       {
@@ -126,6 +128,7 @@ const ROLE_PAGES: { prefix: string; roles: ViewerRole[] }[] = [
   { prefix: "/viewer/map", roles: ["admin"] },
   { prefix: "/viewer/workers", roles: ["admin"] },
   { prefix: "/viewer/finance", roles: ["admin"] },
+  { prefix: "/viewer/transactions", roles: ["admin"] },
   { prefix: "/viewer/locations", roles: ["admin"] },
   { prefix: "/viewer/settings", roles: ["admin"] },
   { prefix: "/viewer/report", roles: ["student", "worker"] },

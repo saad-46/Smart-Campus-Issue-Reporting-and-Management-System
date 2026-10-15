@@ -110,16 +110,12 @@ export default function LandingPage() {
                   <Play className="h-4 w-4" aria-hidden="true" />
                   Explore the Platform
                 </Link>
-                <Link href="/login" className={buttonClasses("secondary", "lg")}>
-                  Sign in
+                <Link href="/register" className={buttonClasses("secondary", "lg")}>
+                  Create an account
                 </Link>
               </div>
               <p className="mt-4 max-w-md text-[13px] leading-relaxed text-fg-subtle">
-                The live demo needs no account. It runs on sample data, and nothing you do is saved. New here?{" "}
-                <Link href="/register" className="font-medium text-brand-fg underline-offset-2 hover:underline">
-                  Create an account
-                </Link>
-                .
+                The live demo needs no account. It runs on sample data, and nothing you do is saved.
               </p>
             </div>
             <ProductPreview />
@@ -273,8 +269,8 @@ export default function LandingPage() {
                 Explore the Platform
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
-              <Link href="/login" className={buttonClasses("secondary", "lg")}>
-                Sign in
+              <Link href="/register" className={buttonClasses("secondary", "lg")}>
+                Create an account
               </Link>
             </div>
           </div>

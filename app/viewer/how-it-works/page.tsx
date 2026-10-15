@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { Play, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import Card, { CardHeader } from "@/components/ui/Card";
@@ -54,13 +53,6 @@ export default function ViewerHowItWorksPage() {
             dataset and never reads or writes campus records.
           </p>
         </div>
-      </Card>
-
-      <Card className="mt-6 flex flex-col gap-2 p-4 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
-        <span>Ready to use it for real?</span>
-        <Link href="/login" prefetch={false} className="font-medium text-brand-fg hover:underline">
-          Sign in
-        </Link>
       </Card>
     </>
   );

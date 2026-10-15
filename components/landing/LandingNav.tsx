@@ -16,7 +16,11 @@ export const SECTION_LINKS = [
   { label: "Live demo", href: "#demo" },
 ] as const;
 
-/** Public navigation: product links, theme, Sign in and the primary Explore action. */
+/**
+ * Public navigation, and the one place on the landing page that owns "Sign in":
+ * product links, theme, Sign in and the primary Explore action. Page sections
+ * offer "Create an account" and the demo, never a second Sign in.
+ */
 export default function LandingNav() {
   const [open, setOpen] = useState(false);
   return (
@@ -32,7 +36,7 @@ export default function LandingNav() {
         </nav>
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <ThemeToggle />
-          <Link href="/login" className={buttonClasses("ghost", "md", "hidden md:inline-flex")}>
+          <Link href="/login" className={buttonClasses("ghost", "md", "px-3 max-[420px]:px-2")}>
             Sign in
           </Link>
           <Link href="/viewer" className={buttonClasses("primary", "md", "px-3.5 max-[420px]:px-3")}>
@@ -56,10 +60,7 @@ export default function LandingNav() {
             <Link href="/viewer" onClick={() => setOpen(false)} className={buttonClasses("primary", "lg")}>
               Explore the Platform
             </Link>
-            <Link href="/login" className={buttonClasses("secondary", "lg")}>
-              Sign in
-            </Link>
-            <Link href="/register" className="px-3 py-2 text-center text-sm text-fg-muted hover:text-fg">
+            <Link href="/register" onClick={() => setOpen(false)} className={buttonClasses("secondary", "lg")}>
               Create an account
             </Link>
           </div>

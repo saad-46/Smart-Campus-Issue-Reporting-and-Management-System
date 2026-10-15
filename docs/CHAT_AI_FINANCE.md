@@ -124,6 +124,13 @@ Behaviour of `addFundsToBudget` (`lib/finance.ts`):
 
 **Workers** see their own payments with method, date and reference. They cannot create or change a payment, and they cannot read the ledger.
 
+### Balance and Transactions
+
+- **Total money available** (admin dashboard) is `finance/budget.totalAvailable - totalSpent`, computed by `availableFunds` in `lib/financeLedger.ts`, the same subtraction the Finance page uses. Pending claims are not subtracted. A missing or unreadable budget shows "Not set up" / "Unavailable", never a made-up figure; an overspend shows as a negative amount.
+- **Transactions** (`/admin/transactions`, and `/viewer/transactions` in Explore Mode) lists funds-added ledger entries (incoming) and recorded payments (outgoing), newest first, with search, type/direction/status/date filters, sorting, pages of 15 and a details panel. Only posted entries count in the incoming, outgoing and net figures. The net is movement, not a balance: the opening balance is not itemised.
+- Read-only: nothing on these pages creates, edits or deletes a record. Access is administrators only (the page guard and the existing Firestore rules on `transactions` and `ledger`).
+- Money is shown as ₹1,25,000.00 everywhere (`formatInr`).
+
 ## 4. Firestore rules and indexes
 
 Changed in `firestore.rules`:

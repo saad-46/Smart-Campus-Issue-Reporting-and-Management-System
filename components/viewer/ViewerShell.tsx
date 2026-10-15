@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChartLine, CircleQuestionMark, ClipboardList, Eye, FilePlus2, Globe2, GraduationCap, HardHat, History, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, MapPin, RotateCcw, Search, Settings, ShieldCheck, Users, Wallet, Workflow, Wrench } from "lucide-react";
+import { Bell, ChartLine, CircleQuestionMark, ClipboardList, Eye, FilePlus2, Globe2, GraduationCap, HardHat, History, LayoutDashboard, ListChecks, LogOut, Map as MapIcon, MapPin, Receipt, RotateCcw, Search, Settings, ShieldCheck, Users, Wallet, Workflow, Wrench } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { IconButton, buttonClasses } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Data";
@@ -28,6 +28,7 @@ const ICONS: Record<ViewerIcon, React.ElementType> = {
   analytics: ChartLine,
   workers: Users,
   finance: Wallet,
+  transactions: Receipt,
   locations: MapPin,
   settings: Settings,
   notifications: Bell,
