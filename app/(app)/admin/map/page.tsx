@@ -159,7 +159,7 @@ export default function AdminMapPage() {
     <>
       <PageHeader
         title="Campus map"
-        description="Where issues are concentrated. Issues are placed by their QR location or by matching the typed location to a researched SUES campus place. Positions are approximate."
+        description="Where issues are concentrated. Issues are placed by their chosen location or by matching the typed location to a researched SUES campus place. Positions are approximate."
         actions={
           <>
             <Select aria-label="Period" value={days} onChange={(e) => setDays(Number(e.target.value) as (typeof RANGES)[number])} wrapperClassName="w-36">

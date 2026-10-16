@@ -79,7 +79,7 @@ export function navForViewerRole(role: ViewerRole): ViewerNavGroup[] {
       {
         label: "Configuration",
         items: [
-          { href: "/viewer/locations", label: "Locations & QR", icon: "locations", tour: "nav-locations" },
+          { href: "/viewer/locations", label: "Locations", icon: "locations", tour: "nav-locations" },
           { href: "/viewer/settings", label: "Settings", icon: "settings", tour: "nav-settings" },
         ],
       },
@@ -94,7 +94,6 @@ export function navForViewerRole(role: ViewerRole): ViewerNavGroup[] {
         items: [
           { href: "/viewer/worker", label: "My work", icon: "worker", tour: "nav-overview" },
           { href: "/viewer/issues", label: "All issues", icon: "issues", tour: "nav-issues" },
-          { href: "/viewer/report", label: "Report an issue", icon: "report", tour: "nav-report" },
         ],
       },
       { label: "Activity", items: ACTIVITY },

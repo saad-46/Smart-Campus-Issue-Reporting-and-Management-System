@@ -15,7 +15,7 @@ const RUN = process.env.E2E_EMULATOR === "1";
 const PASSWORD = process.env.SEED_PASSWORD || "emulator-only-demo"; // the documented emulator-only seed password
 const STAMP = String(Date.now()).slice(-6);
 const TITLE = `TEST lifecycle ${STAMP}: ceiling fan not working`;
-const QR_TITLE = `TEST QR ${STAMP}: tap dripping`;
+const LOCATION_TITLE = `TEST managed location ${STAMP}: projector`;
 const RETRY_TITLE = `TEST retry ${STAMP}: window latch broken`;
 
 test.describe.configure({ mode: "serial" });
@@ -219,32 +219,37 @@ test("admin: pays the claim exactly once; a worker cannot reach finance; the stu
   await expect(page.getByText(TITLE).first()).toBeVisible();
 });
 
-test("QR: a seeded location fills the form and the report keeps it; unknown, malformed and tampered ids are refused", async ({ page }) => {
+test("report form: a managed location can be chosen, old QR-style links are ignored, and workers cannot report", async ({ page }) => {
   await signIn(page, "student2@unifix.test");
-  await page.goto("/dashboard/report?location=mjcet-seminar-hall");
-  await expect(page.getByText("From the QR code you scanned")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator("main")).toContainText("Seminar Hall, Block 4");
-  await page.getByLabel("Title").fill(QR_TITLE);
+  // An old printed link carries ?location=…; it now opens the plain form.
+  for (const bad of ["mjcet-seminar-hall", "no-such-place", "%3Cscript%3Ealert(1)%3C%2Fscript%3E", ""]) {
+    await page.goto(`/dashboard/report?location=${bad}`);
+    await expect(page.getByRole("heading", { level: 1, name: "Report an issue" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByPlaceholder("e.g. Block 4, 2nd floor, near the staircase")).toHaveValue("");
+    await expect(page.getByText(/QR/)).toHaveCount(0);
+  }
+
+  // A location an administrator manages is offered in the form and kept on the report.
+  await page.goto("/dashboard/report");
+  const place = page.getByLabel("Campus place (optional)");
+  await expect(place.locator("optgroup[label='Added by administrators'] option").first()).toBeAttached({ timeout: 30_000 });
+  const managed = place.locator("optgroup[label='Added by administrators'] option").first();
+  const managedLabel = (await managed.innerText()).trim();
+  await place.selectOption({ label: managedLabel });
+  await expect(page.getByPlaceholder("e.g. Block 4, 2nd floor, near the staircase")).toHaveValue(managedLabel);
+  await page.getByLabel("Title").fill(LOCATION_TITLE);
   await page.getByLabel("Describe the problem").fill("The projector in the seminar hall will not power on.");
   await page.getByRole("button", { name: /^Submit issue/ }).click();
   await page.waitForURL(/\/issues\/[A-Za-z0-9]+$/, { timeout: 60_000 });
-  await expect(page.locator("main")).toContainText("Seminar Hall, Block 4");
+  await expect(page.locator("main")).toContainText(managedLabel.split(" · ")[0]);
+  await signOut(page);
 
-  for (const bad of ["no-such-place", "BLOCK-4", "mjcet-block-4%20", "..%2F..%2Fadmin", "%3Cscript%3Ealert(1)%3C%2Fscript%3E", "a".repeat(80), "mjcet-seminar-hall&location=admin", ""]) {
-    await page.goto(`/dashboard/report?location=${bad}`);
-    if (bad === "") {
-      await expect(page.getByText("QR location not recognised")).toHaveCount(0);
-      continue;
-    }
-    // Either the whole parameter is refused, or (for an appended parameter) only the known id is used; never an unknown one.
-    if (bad.startsWith("mjcet-seminar-hall&")) {
-      await expect(page.getByText("From the QR code you scanned")).toBeVisible({ timeout: 30_000 });
-      await expect(page.locator("main")).not.toContainText("admin");
-    } else {
-      await expect(page.getByText("QR location not recognised")).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByText("From the QR code you scanned")).toHaveCount(0);
-    }
-  }
+  // Workers are sent away from the reporting page and are never offered it.
+  await signIn(page, "worker1@unifix.test");
+  await page.goto("/dashboard/report");
+  await expect(page).toHaveURL(/\/worker$/, { timeout: 30_000 });
+  await expect(page.getByRole("link", { name: /Report an issue/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Report an issue/ })).toHaveCount(0);
 });
 
 test("submission failure shows no success, and a retry succeeds without a duplicate", async ({ page, context }) => {

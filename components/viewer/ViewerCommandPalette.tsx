@@ -73,7 +73,7 @@ export default function ViewerCommandPalette({ open, onClose, now }: { open: boo
       out.push(
         ...locations.filter((l) => l.name.toLowerCase().includes(q))
           .slice(0, 4)
-          .map((l): Result => ({ group: "Locations", key: `l-${l.id}`, label: l.name, hint: "Location and QR code", href: `/viewer/locations?location=${l.id}`, icon: <MapPin className="h-4 w-4" /> })),
+          .map((l): Result => ({ group: "Locations", key: `l-${l.id}`, label: l.name, hint: "Campus location", href: "/viewer/locations", icon: <MapPin className="h-4 w-4" /> })),
         ...workers.filter((w) => w.name.toLowerCase().includes(q) || w.team.toLowerCase().includes(q))
           .slice(0, 4)
           .map((w): Result => ({ group: "Workers", key: `w-${w.id}`, label: w.name, hint: w.team, href: `/viewer/workers?worker=${w.id}`, icon: <HardHat className="h-4 w-4" /> })),

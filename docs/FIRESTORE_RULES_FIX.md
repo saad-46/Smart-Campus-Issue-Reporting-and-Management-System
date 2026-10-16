@@ -38,7 +38,7 @@ Delete the document to revoke access. The `admins` collection is not writable by
 |---|---|---|
 | user | Every signed-in account | Report issues (one per 30 s, database-enforced), read issues, upvote, chat on own issues, withdraw own open + unassigned issue, link own new report to an existing incident, rate own resolved issue once |
 | worker | Requested at registration, granted only when an admin sets `users/{uid}.role = "worker"` | Claim open issues, move own tasks Open → In Progress → Resolved, submit an expense claim, see own payouts |
-| admin | A document at `admins/{uid}` (console only) | Read everything, manage workflow fields (assign to approved workers, escalate, link incidents), approve/reject claims, manage the budget, change user roles, manage QR locations and SLA targets |
+| admin | A document at `admins/{uid}` (console only) | Read everything, manage workflow fields (assign to approved workers, escalate, link incidents), approve/reject claims, manage the budget, change user roles, manage locations and SLA targets |
 
 ## Collections added for the intelligence features
 
@@ -66,3 +66,7 @@ Runs `tests/rules/*.rules.test.ts` (core hardening + the intelligence features) 
 - You are signed out, or signed in as an account without the needed role.
 - You are an admin in the UI but have no `admins/{uid}` document (see above).
 - The deployed rules are older than the app. Redeploy `firestore.rules`.
+
+## Known limitation: who may create an issue
+
+The application does not offer issue reporting to workers (no menu entry, and the report page redirects them to their own workspace). The Firestore rule is broader: `match /issues/{issueId}` allows `create` for any signed-in user whose document passes `validNewIssue()` (the author must be the signed-in user; nothing checks the author's role). A worker who calls Firestore directly, outside the app, can therefore still create an issue as themselves. They cannot create one for someone else, assign it, or escalate it. Closing this needs a rules change (for example requiring an `admins/{uid}` document or a non-worker profile) that has to be reviewed, tested and deployed; none was made.

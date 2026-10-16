@@ -111,7 +111,7 @@ const PLACES = [
   // SUES campus places (data/campuses/sues-hyderabad). Rooms and floors are a reporter's own words, as in real use.
   "Block 1, ground floor corridor", "Block 1, near the staircase", "Block 2, classroom at the end", "Block 2 corridor", "Block 3, first floor", "Block 3 washroom",
   "Block 4, second floor", "Block 4, near the lift", "Block 5, lab on the first floor", "Block 5 entrance", "Seminar Hall, Block 4", "Ghulam Ahmed Hall, stage",
-  "Ghulam Ahmed Hall, back rows", "S.M. Nizamuddin Central Library, reading area", "Sports grounds, basketball court", "Shuttle court (Physical Education)", "Gymnasium",
+  "Ghulam Ahmed Hall, back rows", "S.M. Nizamuddin Central Library, reading area", "Sports grounds, basketball court", "Shuttle court (Physical Education)",
   "Garden", "Sultan-ul-Uloom College of Pharmacy, corridor", "Amjad Ali Khan College of Business Administration", "Sultan-Ul-Uloom College of Law", "Near the big tree", "Parking area",
 ];
 const CATEGORIES = Object.keys(TEMPLATES);
@@ -162,8 +162,8 @@ async function main() {
     const id = `seed${String(n).padStart(5, "0")}${Math.floor(rand() * 1e6).toString(36)}`;
     const category = pick(CATEGORIES);
     const title = pick(TEMPLATES[category]);
-    const useQr = rand() < 0.12;
-    const loc = useQr ? pick(locations) : null;
+    const useLocation = rand() < 0.12;
+    const loc = useLocation ? pick(locations) : null;
     const location = loc ? loc.name : pick(PLACES);
     const ageDays = Math.pow(rand(), 1.6) * 120;
     const createdAt = new Date(now - ageDays * D - rand() * D);
@@ -216,7 +216,7 @@ async function main() {
     if (writes.length >= 2000) await flush();
   }
   await flush();
-  console.log(`Seeded ${ISSUE_COUNT} issues, 1 admin, ${workers.length} workers, ${students.length} students, ${locations.length} QR locations into ${PROJECT} (emulator).`);
+  console.log(`Seeded ${ISSUE_COUNT} issues, 1 admin, ${workers.length} workers, ${students.length} students, ${locations.length} locations into ${PROJECT} (emulator).`);
 }
 
 main().catch((err) => {

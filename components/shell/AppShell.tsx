@@ -78,7 +78,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         logoHref={dashboardPathForRole(activeRole)}
         logoSubtitle="Campus operations"
         sidebarFooter={
-          activeRole !== "user"
+          activeRole === "admin"
             ? ({ collapsed, onNavigate }) =>
                 collapsed ? (
                   <Link href="/dashboard/report" aria-label="Report an issue" title="Report an issue" className={buttonClasses("secondary", "md", "w-full px-0")}>

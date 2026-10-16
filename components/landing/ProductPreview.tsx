@@ -1,5 +1,5 @@
 import React from "react";
-import { AlarmClock, BarChart3, ListChecks, LayoutDashboard, Map as MapIcon, Users, UserCheck } from "lucide-react";
+import { AlarmClock, BarChart3, ListChecks, LayoutDashboard, Map as MapIcon, Users } from "lucide-react";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
 
 const NAV = [
@@ -109,21 +109,12 @@ export default function ProductPreview() {
         </div>
       </div>
 
-      {/* Two selective glass annotations, kept inside the frame on small screens. */}
-      <div aria-hidden="true" className="glass-blur depth-2 absolute -bottom-5 left-3 hidden w-60 items-center gap-2.5 rounded-xl p-2.5 sm:flex lg:-left-6">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-success-border bg-success-subtle text-success">
-          <UserCheck className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 text-[11px] leading-tight">
-          <span className="block font-semibold text-fg">Suggested worker · 95% match</span>
-          <span className="block truncate text-fg-subtle">Resolved 5 similar issues, no active tasks</span>
-        </span>
-      </div>
+      {/* One glass annotation, kept inside the frame on small screens. */}
       <div aria-hidden="true" className="glass-blur depth-2 absolute -right-2 -top-4 hidden items-center gap-2 rounded-xl px-3 py-2 sm:flex lg:-right-5">
         <AlarmClock className="h-4 w-4 text-warning" />
         <span className="text-[11px] font-semibold text-fg">4h 0m left · due soon</span>
       </div>
-      <figcaption className="mt-8 text-center text-xs text-fg-subtle sm:text-right">Illustration with sample data. Open the live demo to use the real interface.</figcaption>
+      <figcaption className="mt-5 text-center text-xs text-fg-subtle sm:text-right">Illustration with sample data. Open the live demo to use the real interface.</figcaption>
     </figure>
   );
 }

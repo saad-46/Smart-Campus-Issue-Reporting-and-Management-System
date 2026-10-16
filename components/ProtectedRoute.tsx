@@ -13,7 +13,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      // Come back here after signing in (e.g. a scanned QR report link).
+      // Come back here after signing in (e.g. a shared report link).
       const here = `${window.location.pathname}${window.location.search}`;
       router.replace(here === "/" ? "/login" : `/login?next=${encodeURIComponent(here)}`);
     }

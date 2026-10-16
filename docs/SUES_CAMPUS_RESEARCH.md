@@ -34,12 +34,12 @@ Not used: Google Maps or any paid or keyed API, any geocoding service, satellite
 | `naac-411-index` | Official | [MJCET-QIF-4.1.1.pdf](https://mjcollege.ac.in/naac/SSR-2023/C4/MJCET-QIF-4.1.1.pdf) | Five blocks; auditorium named Ghulam Ahmed Hall; address |
 | `naac-411-f` | Official | [4.1.1-F](https://www.mjcollege.ac.in/naac/SSR-2023/C4/MJCET-QIF-4.1.1-F.pdf) | Geotagged photographs of Blocks 1 to 5 |
 | `naac-411-c` | Official | [4.1.1-C](https://www.mjcollege.ac.in/naac/SSR-2023/C4/MJCET-QIF-4.1.1-C.pdf) | Geotagged photographs inside Ghulam Ahmed Hall |
-| `naac-411-d` | Official | [4.1.1-D](https://www.mjcollege.ac.in/naac/SSR-2023/C4/MJCET-QIF-4.1.1-D.pdf) | Geotagged photographs of courts, grounds and the gymnasium |
+| `naac-411-d` | Official | [4.1.1-D](https://www.mjcollege.ac.in/naac/SSR-2023/C4/MJCET-QIF-4.1.1-D.pdf) | Geotagged photographs of courts and grounds |
 | `naac-411-e` | Official | [4.1.1-E](https://www.mjcollege.ac.in/naac/SSR-2023/C4/MJCET-QIF-4.1.1-E.pdf) | Seminar hall, 150 seats; banner reads "Seminar Hall, Block-4" |
 | `sucp`, `law`, `aakcba`, `gacoe`, `sujc` | Official | Each institution's website | Official names and founding years; none gives a building or position |
 | `cbse-saras` | Government | [CBSE affiliation record](https://saras.cbse.gov.in/SARAS/AffiliatedList/AfflicationDetails/3630008) | Public School address at Mount Pleasant. Seen in a search result only; the record was not opened |
 | `wikipedia-sues` | Secondary | [Wikipedia](https://en.wikipedia.org/wiki/Sultan-ul-Uloom_Education_Society) | "22-acre" campus; institution list |
-| `osm` | Map data | [OpenStreetMap](https://www.openstreetmap.org/way/737548446) | Geometry only: outlines, footprints, roads, gates, a garden, a bank node |
+| `osm` | Map data | [OpenStreetMap](https://www.openstreetmap.org/way/737548446) | Geometry only: outlines, footprints, roads, gates, a garden |
 | `sues-site` | Official | <https://sultanululoom.ac.in/> | Society name only. The page returned no address, list or map to the fetch tool |
 
 ## Confidence levels
@@ -91,9 +91,7 @@ Elsewhere, listed but never drawn: Sultan-Ul-Uloom Public Schools, Old City (Sye
 | College of Pharmacy | 17.42773, 78.44355 | 40 m | Approximate | Centre of the OSM outline with that name (way 737603230); one map source |
 | Sports grounds | 17.4290, 78.4451 | 60 m | Approximate | Basketball, volleyball and football photographs; OSM maps grass beside it |
 | Shuttle court (Physical Education) | 17.4283, 78.4429 | 30 m | Approximate | One photograph beside a "Physical Education" sign |
-| Gymnasium | 17.4270, 78.4416 | 80 m | Approximate | One photograph; latitude printed to three decimals |
 | Garden | 17.42755, 78.44170 | 20 m | Approximate | OSM park named "Garden", operator MJCET (way 737554364); one map source |
-| State Bank of India (as mapped) | 17.42757, 78.44226 | 20 m | Unverified | An OSM bank node; whether it is inside the campus is not established |
 
 Counts: 0 verified, 0 corroborated, 7 approximate, 1 conflicting, 1 unverified.
 
@@ -101,7 +99,7 @@ The geotags are **camera positions**, not building centres, and a phone's overla
 
 ## Reportable locations (19)
 
-Block 1, Block 2, Block 3, Block 4, Block 5, Seminar Hall (Block 4), Ghulam Ahmed Hall, S.M. Nizamuddin Central Library, Sports grounds, Shuttle court, Gymnasium, Garden, the six other institutions, and the bank as mapped.
+Block 1, Block 2, Block 3, Block 4, Block 5, Seminar Hall (Block 4), Ghulam Ahmed Hall, S.M. Nizamuddin Central Library, Sports grounds, Shuttle court, Garden, and the six other institutions.
 
 - 13 are attached to a map place (11 approximate, 1 conflicting, 1 unverified).
 - **6 have no known position** and no marker: the Central Library, and the Colleges of Law, Business Administration and Education, the Junior College and the Public School. Their existence at Mount Pleasant is supported; where they stand inside the campus is not published. Issues reported there are counted as "not placed on the map" and never guessed onto a marker.
@@ -133,7 +131,6 @@ The map is drawn as inline SVG from this file. No tiles are loaded and no reques
 4. **Sports grounds** are geotagged outside the mapped college outline.
 5. **Positions of the library and five institutions** are unknown.
 6. **Gates**: mapped barrier nodes; which are real entrances, and which is the main gate, is unknown.
-7. **The bank** may or may not be inside the campus.
 8. **The society's own website** could not be read beyond its name, so the institution list rests on the college's page and each institution's site.
 
 ## How to improve this

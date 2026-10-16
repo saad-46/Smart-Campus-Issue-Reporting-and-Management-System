@@ -151,7 +151,7 @@ test.describe("administrator actions", () => {
     await expect(assign).not.toContainText("Anil Verma");
   });
 
-  test("add a location, report against it through its QR link, then delete it", async ({ page }) => {
+  test("add a location, report against it, then delete it", async ({ page }) => {
     await as(page, "admin");
     await page.goto("/viewer/locations");
     await page.getByRole("button", { name: "Add location" }).click();
@@ -163,12 +163,16 @@ test.describe("administrator actions", () => {
     await add.getByLabel("Room (optional)").fill("12");
     await add.getByRole("button", { name: "Add location (demo)" }).click();
 
-    const qr = page.getByRole("dialog", { name: "Location QR code" });
-    await expect(qr.getByRole("img", { name: /QR code for reporting an issue at Staff room/ })).toBeVisible();
-    await expect(qr).toContainText("/viewer/report?location=blocks-3-4-staff-room-12");
-    await qr.getByRole("link", { name: "Open the report form as a scan would" }).click();
-    await expect(page).toHaveURL(/\/viewer\/report\?location=blocks-3-4-staff-room-12$/);
-    await expect(page.getByLabel("Location", { exact: true })).toHaveValue("blocks-3-4-staff-room-12");
+    // The new place opens in its details: no QR code anywhere.
+    const details = page.getByRole("dialog", { name: /Staff room/ });
+    await expect(details).toContainText("Added in this demo");
+    await expect(page.getByText(/QR/)).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // It can be chosen when reporting (client navigation keeps the demo state).
+    await roleButton(page, "Student").click();
+    await nav(page, "Report an issue").click();
+    await page.getByLabel("Location", { exact: true }).selectOption({ label: "Staff room" });
     await expect(page.getByTestId("location-detail")).toContainText("Blocks 3 and 4 area");
     await expect(page.getByTestId("location-detail")).toContainText("Approximate position");
     await page.getByLabel("Title").fill("Broken chair in the staff room");
@@ -177,20 +181,13 @@ test.describe("administrator actions", () => {
     await expect(page.getByRole("heading", { name: "Demo report submitted" })).toBeVisible();
 
     await roleButton(page, "Admin").click();
-    await nav(page, "Locations & QR").click();
+    await nav(page, "Locations").click();
     await expect(page.getByRole("list", { name: "Locations" })).toContainText("Added in this demo");
     await page.getByRole("button", { name: /Staff room/ }).click();
-    await qr.getByRole("button", { name: "Delete this location" }).click();
+    await page.getByRole("dialog", { name: /Staff room/ }).getByRole("button", { name: "Delete this location" }).click();
     await page.getByRole("button", { name: "Delete location" }).click();
     await expect(page.getByRole("list", { name: "Locations" })).not.toContainText("Staff room");
-    // Researched locations can't be deleted.
-    await page.getByRole("button", { name: /Seminar Hall, Block 4/ }).click();
-    await expect(qr).toContainText("can't be deleted here");
-    await expect(qr.getByRole("button", { name: "Delete this location" })).toHaveCount(0);
   });
-});
-
-test.describe("students and workers", () => {
   test("the discussion accepts a message from the reporter and stays private to others", async ({ page }) => {
     await as(page, "student");
     await page.goto("/viewer/issues/SC-1140");
@@ -228,23 +225,35 @@ test.describe("students and workers", () => {
     await expect(page.getByRole("button", { name: /^Upvote \(9\)/ })).toBeVisible();
   });
 
-  test("a quick report is parsed, reviewed and submitted", async ({ page }) => {
+  test("a quick report is assisted, reviewed, edited and submitted", async ({ page }) => {
     await as(page, "student");
     await page.goto("/viewer/report");
     await page.getByRole("group", { name: "Report mode" }).getByRole("button", { name: "Quick report" }).click();
-    await page.getByRole("button", { name: "Review report" }).click();
-    await expect(page.getByText("Describe the problem in a few words")).toBeVisible();
-    await page.getByLabel("What is wrong, and where?").fill("The projector in the Seminar Hall does not turn on since this morning.");
-    await page.getByRole("button", { name: "Review report" }).click();
-    await expect(page.getByTestId("quick-review")).toContainText("IT");
-    await expect(page.getByLabel("Location", { exact: true })).toHaveValue("mjcet-seminar-hall");
+    // The assistance says it is simulated: nothing leaves the browser.
+    await expect(page.getByText(/simulated with built-in rules/)).toBeVisible();
+    const log = page.getByRole("log", { name: /Conversation with the report assistant/ });
+    await expect(log).toContainText("What problem are you experiencing");
+    await page.getByLabel("Your message").fill("The projector in the Seminar Hall does not turn on since this morning.");
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    const review = page.getByTestId("quick-review");
+    // It may ask a follow-up first; skipping goes straight to the draft.
+    const skip = page.getByRole("button", { name: "Skip questions and review" });
+    // (The skip button is disabled while the assistant is reading, so wait until it is usable.)
+    await expect(review.or(skip.and(page.locator(":enabled")))).toBeVisible({ timeout: 15_000 });
+    if (!(await review.isVisible())) await skip.click();
+    await expect(review).toBeVisible();
+    await expect(review.getByLabel("Category")).toHaveValue("IT");
+    await expect(review.getByLabel("Location")).toHaveValue("mjcet-seminar-hall");
+    await expect(review).toContainText("simulated");
+    // The suggestions can be edited before submitting.
+    await review.getByLabel("Title").fill("Seminar Hall projector will not start");
+    await review.getByLabel("Priority").selectOption("High");
     await page.getByRole("button", { name: "Submit report (demo)" }).click();
     await expect(page.getByRole("heading", { name: "Demo report submitted" })).toBeVisible();
     await page.getByRole("link", { name: /^Open SC-1146/ }).click();
-    await expect(page.locator("h1")).toContainText("The projector in the Seminar Hall does not turn on since this morning");
+    await expect(page.locator("h1")).toContainText("Seminar Hall projector will not start");
     await expect(page.locator("header").filter({ hasText: "SC-1146" })).toContainText("Seminar Hall, Block 4");
   });
-
   test("a worker sees a repair tip, and can't act on someone else's task", async ({ page }) => {
     await as(page, "worker");
     await page.goto("/viewer/worker");
@@ -367,11 +376,13 @@ test.describe("campus map labels", () => {
         expect(hits, `zoom step ${step}`).toEqual([]);
         expect(shown).toBeGreaterThanOrEqual(6);
         // Shown or not, every place is a focusable button with its full name.
-        await expect(map.getByRole("button")).toHaveCount(9);
+        await expect(map.getByRole("button")).toHaveCount(7);
         await page.getByRole("button", { name: "Zoom in" }).click();
       }
       await page.getByRole("button", { name: "Reset the map view" }).click();
-      for (const name of [/^Ghulam Ahmed Hall/, /^Blocks 1, 2 and 5 area/, /^Shuttle court/, /^State Bank of India/]) await expect(map.getByRole("button", { name })).toHaveCount(1);
+      for (const name of [/^Ghulam Ahmed Hall/, /^Blocks 1, 2 and 5 area/, /^Shuttle court/]) await expect(map.getByRole("button", { name })).toHaveCount(1);
+      // Places that are not part of the campus dataset are never drawn.
+      for (const name of [/Gymnasium/, /State Bank|SBI/]) await expect(map.getByRole("button", { name })).toHaveCount(0);
     });
   }
 
@@ -379,7 +390,7 @@ test.describe("campus map labels", () => {
     await as(page, "admin");
     await page.goto("/viewer/map");
     const map = page.getByRole("group", { name: /^SUES campus map/ });
-    for (const id of ["ghulam-ahmed-hall", "physical-education", "sbi", "garden"]) {
+    for (const id of ["ghulam-ahmed-hall", "physical-education", "garden"]) {
       const marker = map.locator(`[data-place=${id}]`);
       await marker.focus();
       await page.keyboard.press("Enter");

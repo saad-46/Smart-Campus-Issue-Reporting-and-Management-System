@@ -74,6 +74,6 @@ describe("campus map label placement", () => {
   });
 
   it("estimates label width from the text", () => {
-    expect(labelWidth("Blocks 1 · 2 · 5", 8.5)).toBeGreaterThan(labelWidth("SBI", 8.5));
+    expect(labelWidth("Blocks 1 · 2 · 5", 8.5)).toBeGreaterThan(labelWidth("A1", 8.5));
   });
 });

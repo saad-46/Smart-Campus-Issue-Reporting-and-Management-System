@@ -58,7 +58,7 @@ export function navForRole(role: UserRole): NavGroup[] {
       {
         label: "Configuration",
         items: [
-          { label: "Locations & QR", href: "/admin/locations", icon: <MapPin /> },
+          { label: "Locations", href: "/admin/locations", icon: <MapPin /> },
           { label: "Settings", href: "/admin/settings", icon: <Settings /> },
         ],
       },
@@ -70,7 +70,6 @@ export function navForRole(role: UserRole): NavGroup[] {
         label: "Work",
         items: [
           { label: "My work", href: "/worker", icon: <HardHat /> },
-          { label: "Report an issue", href: "/dashboard/report", icon: <PlusCircle /> },
           { label: "Search", href: "/search", icon: <Search /> },
         ],
       },

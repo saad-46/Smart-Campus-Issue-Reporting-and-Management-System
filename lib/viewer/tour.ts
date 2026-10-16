@@ -165,9 +165,9 @@ export const TOUR_STEPS: TourStep[] = [
     target: "workers-table",
   },
   {
-    id: "qr",
-    title: "Locations and QR reporting",
-    body: "Each place can have a QR code. Scanning it opens the report form with the location already filled in. Open one to see and print its code.",
+    id: "locations",
+    title: "Locations",
+    body: "The campus places people can choose when they report an issue. Open one to see how well its position is known, or add your own.",
     role: "admin",
     path: "/viewer/locations",
     target: "locations-list",

@@ -15,7 +15,7 @@ Explore Mode is a demonstration. It is not an official system of, or endorsed by
 | --- | --- |
 | Enter | "Explore the Platform" on the landing page, or open `/viewer` |
 | Switch role | "Explore as" Student / Worker / Admin under the header. It chooses which fictional account you act as; it grants nothing real |
-| Try a workflow | Report an issue (form, quick report, QR link or map), assign it as Admin, start and resolve it as Worker, claim an expense, pay it as Admin, rate the fix as Student |
+| Try a workflow | Report an issue (form, quick report assistant or map), assign it as Admin, start and resolve it as Worker, claim an expense, pay it as Admin, rate the fix as Student |
 | See what changed | The "Reset demo" control in the demo strip counts your simulated changes |
 | Start again | "Reset demo" (asks first if you have changes), or reload the page |
 | Use the real app | "Sign in" in the sidebar or on the landing page |
@@ -99,7 +99,6 @@ Demo ids are recognisable on sight: issues are `SC-<number>`, ledger entries `TX
 | --- | --- | --- | --- | --- |
 | Report an issue (full form) | Anyone | `createIssue` | `createIssue` | unit, e2e |
 | Quick report (one message, parsed, reviewed) | Anyone | `ChatReporter` | Quick report | e2e |
-| Report from a QR link; unknown id refused | Anyone | Location looked up in Firestore | Location looked up in the demo list | unit, e2e |
 | Pick the place on the map | Anyone | Campus place list | List and map picker | e2e |
 | Duplicate suggestions before submitting | Anyone | Same function | Same function | unit |
 | Upvote / remove upvote | Student | `toggleUpvote` | `toggleUpvote` | unit, e2e |
@@ -118,9 +117,8 @@ Demo ids are recognisable on sight: issues are `SC-<number>`, ledger entries `TX
 | Add funds to the budget | Admin | `addFundsToBudget` | `addFunds` | unit, e2e |
 | Approve / reject a worker request | Admin | `setWorkerAccess` | `decideWorkerRequest` | unit, e2e |
 | Remove worker access (assignments stay) | Admin | `setWorkerAccess("revoke")` | `removeWorker` | unit, e2e |
-| Add a location with a QR code | Admin | `createCampusLocation` | `addLocation` | unit, e2e |
+| Add a location | Admin | `createCampusLocation` | `addLocation` | unit, e2e |
 | Delete a location | Admin | `deleteCampusLocation` | `deleteLocation` (added ones) | unit, e2e |
-| Print, download, copy a QR code | Admin | Same dialog | Same dialog | e2e |
 | Change deadline targets | Admin | `saveSlaConfig` | `saveSla` | unit, e2e |
 | Notifications: open, mark read, mark all read | Anyone | Same | Same | unit, e2e |
 | Analytics filters: range, category, department, place, status, priority, worker | Admin | Same | Same | e2e |
@@ -146,11 +144,10 @@ Demo ids are recognisable on sight: issues are `SC-<number>`, ledger entries `TX
 | Chat | Explore keeps its in-memory discussion and has no unread badge, "Load earlier" or assignee-only rule | The real chat's access rules are enforced by Firestore, which Explore never contacts |
 | Quick report | Explore uses the single-message parser; the signed-in assistant asks follow-up questions and may use a server-side model | The assistant needs a signed-in session and the server endpoint, neither of which Explore has |
 
-## QR codes
+## Locations
 
-- A QR code carries one thing: a location id in a link (`/dashboard/report?location=<id>` when signed in, `/viewer/report?location=<id>` in Explore). No user data, no secret.
-- The id is untrusted input. It must match `^[a-z0-9-]{1,60}$` and name a known location (Firestore `campusLocations` when signed in, the demo list in Explore). Anything else shows "That QR code isn't recognised" and leaves the location empty.
-- The location shown after scanning is the one submitted: the form field is filled from the resolved location, and the stored issue keeps its id.
+- A location is an id and a name. People choose one from the report form's list (the researched SUES places, plus any an administrator added); there is no QR code, scan or printed link.
+- An old link that still carries `?location=<id>` opens the normal report form and ignores the parameter.
 - A location's confidence travels with it: the report form shows "Approximate position", "Sources disagree" or "Unverified", and says when a place has no known position and won't appear on the map.
-- A location added in Explore exists only in that tab, so its QR code works there only. The dialog says so and offers "Open the report form as a scan would".
-- Physical scanning with a phone camera has not been tested by automation. See [MANUAL_VERIFICATION.md](MANUAL_VERIFICATION.md).
+- A location added in Explore exists only in that tab and disappears when you leave or reset.
+- Location ids are untrusted input wherever they are read: they must match `^[a-z0-9-]{1,60}$` and name a known location.

@@ -12,25 +12,48 @@ test.describe("entry and roles", () => {
     await expect(page.getByText("Viewer mode").first()).toBeVisible();
   });
 
-  test("Student, Worker, Admin and back to Student without a reload", async ({ page }) => {
+  test("the overview hero holds the one role selector and it drives the whole workspace", async ({ page }) => {
     await skipTour(page);
     await page.goto("/viewer");
     await page.evaluate(() => ((window as unknown as { __m: number }).__m = 1));
+    const hero = page.locator("main .depth-2").first();
+    // One selector, inside the hero card; no strip above it and no suggested-worker card on the page.
+    await expect(page.getByRole("group", { name: "Choose a perspective" })).toHaveCount(1);
+    await expect(hero.getByRole("group", { name: "Choose a perspective" })).toBeVisible();
+    await expect(page.getByText(/Suggested worker/)).toHaveCount(0);
     const nav = page.locator("aside nav");
-    for (const [role, path, first] of [
-      ["Student", /\/viewer\/student$/, "My issues"],
-      ["Worker", /\/viewer\/worker$/, "My work"],
-      ["Admin", /\/viewer\/admin$/, "Overview"],
-      ["Student", /\/viewer\/student$/, "My issues"],
+    for (const [role, first, absent] of [
+      ["Student", "My issues", null],
+      ["Worker", "My work", "Report an issue"],
+      ["Admin", "Overview", null],
+      ["Student", "My issues", null],
     ] as const) {
       await roleButton(page, role).click();
-      await expect(page).toHaveURL(path);
-      await expect(nav.getByRole("link").first()).toContainText(first);
       await expect(roleButton(page, role)).toHaveAttribute("aria-pressed", "true");
+      await expect(page).toHaveURL(/\/viewer$/); // the overview stays; only the perspective changes
+      await expect(nav.getByRole("link").first()).toContainText(first);
+      if (absent) await expect(nav.getByRole("link", { name: absent })).toHaveCount(0);
+      await expect(hero).toContainText(role);
     }
+    await page.getByRole("link", { name: /^Open the student workspace/ }).click();
+    await expect(page).toHaveURL(/\/viewer\/student$/);
+    // Elsewhere the selector is in the sidebar, still just one.
+    await expect(page.getByRole("group", { name: "Choose a perspective" })).toHaveCount(1);
+    await roleButton(page, "Worker").click();
+    await expect(page).toHaveURL(/\/viewer\/worker$/);
+    await expect(page.locator("main")).not.toContainText("Report an issue");
     expect(await page.evaluate(() => (window as unknown as { __m: number }).__m)).toBe(1);
   });
 
+  test("a worker who opens the report page is sent back to their own workspace", async ({ page }) => {
+    await skipTour(page);
+    await page.addInitScript(() => sessionStorage.setItem("smart-campus-viewer-role", "worker"));
+    await page.goto("/viewer/worker");
+    await expect(page.locator("main h1").first()).toBeVisible();
+    await page.goto("/viewer/report");
+    await expect(page).toHaveURL(/\/viewer\/worker$/, { timeout: 15_000 });
+    await expect(page.locator("aside nav").getByRole("link", { name: /report/i })).toHaveCount(0);
+  });
   test("a deep link works, survives a refresh and keeps back/forward working", async ({ page }) => {
     await skipTour(page);
     await page.goto("/viewer/analytics");
@@ -349,7 +372,9 @@ test.describe("analytics, theme and interface", () => {
     await expect(page.locator("main")).toContainText("none of these issues happened");
     // Real footprints, never a guessed building name.
     expect(await map.locator("[data-layer=footprints] path, [data-layer=footprints] polygon").count()).toBe(6);
-    expect(await map.locator("[data-place]").count()).toBe(9);
+    expect(await map.locator("[data-place]").count()).toBe(7);
+    // Places that are not part of the campus dataset are never drawn.
+    await expect(map).not.toContainText(/Gymnasium|SBI|State Bank/);
     await expect(map).not.toContainText(/Computer Science|Block A|Hostel|Canteen/);
 
     await page.getByRole("radio", { name: /SLA hotspots/ }).check();
@@ -361,7 +386,6 @@ test.describe("analytics, theme and interface", () => {
     const detail = page.locator(".glass", { has: page.getByRole("heading", { name: "Blocks 3 and 4 area" }) }).first();
     await expect(detail).toContainText("Approximate position");
     await expect(detail).toContainText("17.4277, 78.4420");
-    await expect(detail.getByRole("link", { name: "Seminar Hall, Block 4" })).toHaveAttribute("href", "/viewer/report?location=mjcet-seminar-hall");
   });
 
   test("map feature layers, search and filters change what is drawn", async ({ page }) => {
@@ -376,7 +400,7 @@ test.describe("analytics, theme and interface", () => {
     await page.getByRole("checkbox", { name: "Campus places" }).uncheck();
     await expect(map.locator("[data-place]")).toHaveCount(0);
     await page.getByRole("checkbox", { name: "Campus places" }).check();
-    await expect(map.locator("[data-place]")).toHaveCount(9);
+    await expect(map.locator("[data-place]")).toHaveCount(7);
 
     const search = page.getByRole("searchbox", { name: "Search the map" }).or(page.getByLabel("Search the map"));
     await search.fill("seminar");
@@ -391,23 +415,14 @@ test.describe("analytics, theme and interface", () => {
     await expect(page.getByRole("button", { name: /Remove filter: Sources disagree/ })).toBeVisible();
   });
 
-  test("a QR link fills the location, and an unknown or malformed id is refused", async ({ page }) => {
-    await page.goto("/viewer/report?location=mjcet-seminar-hall");
-    await expect(page.getByLabel("Location", { exact: true })).toHaveValue("mjcet-seminar-hall");
-    await expect(page.getByTestId("location-detail")).toContainText("Seminar Hall, Block 4");
-    await expect(page.getByText("That QR code isn't recognised")).toHaveCount(0);
-
-    // A real location whose position isn't known says so instead of borrowing a marker.
-    await page.goto("/viewer/report?location=mjcet-central-library");
-    await expect(page.getByTestId("location-detail")).toContainText("won't appear on the map");
-
-    for (const bad of ["block-a", "mjcet-block-99", "%3Cscript%3Ealert(1)%3C%2Fscript%3E"]) {
-      await page.goto(`/viewer/report?location=${bad}`);
-      await expect(page.getByText("That QR code isn't recognised")).toBeVisible();
+  test("an old QR-style link opens the normal report form and is otherwise ignored", async ({ page }) => {
+    for (const query of ["mjcet-seminar-hall", "block-a", "%3Cscript%3Ealert(1)%3C%2Fscript%3E", ""]) {
+      await page.goto(`/viewer/report?location=${query}`);
+      await expect(page.getByRole("heading", { level: 1, name: "Report an issue" })).toBeVisible();
       await expect(page.getByLabel("Location", { exact: true })).toHaveValue("");
+      await expect(page.getByText(/QR/)).toHaveCount(0);
     }
   });
-
   test("a place can be chosen on the map in the report form", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/viewer/report");
@@ -439,17 +454,18 @@ test.describe("analytics, theme and interface", () => {
     await expect(page.getByRole("button", { name: "Notifications", exact: true })).toBeVisible();
   });
 
-  test("the location QR dialog draws a code and focus returns when it closes", async ({ page }) => {
+  test("a location opens its details, with no QR code, and focus returns when it closes", async ({ page }) => {
     await page.goto("/viewer/locations");
     const opener = page.getByRole("button", { name: /Seminar Hall, Block 4/ });
     await opener.click();
-    const dialog = page.getByRole("dialog", { name: "Location QR code" });
-    await expect(dialog.getByRole("img", { name: /QR code for reporting an issue/ })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Print" })).toBeEnabled();
+    const dialog = page.getByRole("dialog", { name: /Seminar Hall, Block 4/ });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).not.toContainText(/QR/);
+    await expect(dialog.getByRole("img")).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
+    await expect(opener).toBeFocused();
   });
-
   test("reduced motion shows KPI numbers immediately", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/viewer/admin");
