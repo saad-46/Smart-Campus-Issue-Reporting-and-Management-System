@@ -10,7 +10,7 @@ import { useAuthContext } from "@/components/AuthProvider";
 import PageHeader from "@/components/ui/PageHeader";
 import { Segmented } from "@/components/ui/Tabs";
 import { Skeleton } from "@/components/ui/States";
-import { dashboardPathForRole } from "@/lib/roles";
+import { canReportIssues, dashboardPathForRole } from "@/lib/roles";
 
 function FormSkeleton() {
   return (
@@ -24,17 +24,18 @@ function FormSkeleton() {
 }
 
 function ReportContent() {
-  const { activeRole } = useAuthContext();
+  const { activeRole, userProfile, isAdmin } = useAuthContext();
   const router = useRouter();
   const [mode, setMode] = useState<"form" | "quick">("form");
 
-  // Reporting is for students (and administrators). A worker who opens this address
-  // directly is sent to their own workspace; they are never shown the form.
-  const isWorker = activeRole === "worker";
+  // Reporting is for students and administrators. An account whose stored role is
+  // worker (whichever view it has switched to) is sent to its own workspace and is
+  // never shown the form; firestore.rules refuses the write as well.
+  const blocked = !!userProfile && !canReportIssues(userProfile, isAdmin);
   useEffect(() => {
-    if (isWorker) router.replace(dashboardPathForRole("worker"));
-  }, [isWorker, router]);
-  if (isWorker) return <FormSkeleton />;
+    if (blocked) router.replace(dashboardPathForRole("worker"));
+  }, [blocked, router]);
+  if (blocked) return <FormSkeleton />;
 
   return (
     <>

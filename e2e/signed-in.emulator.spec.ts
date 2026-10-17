@@ -359,8 +359,8 @@ test("transactions and finance totals stay out of reach of a student and a worke
   for (const [email, label] of [["student4@unifix.test", "student"], ["worker1@unifix.test", "worker"]] as const) {
     await signIn(page, email);
     await page.goto("/admin/transactions");
-    await page.waitForTimeout(1500);
-    expect(new URL(page.url()).pathname, `${label} is sent away from the admin page`).not.toBe("/admin/transactions");
+    // The guard redirects once the profile has loaded; wait for it rather than sleeping.
+    await expect.poll(() => new URL(page.url()).pathname, { message: `${label} is sent away from the admin page`, timeout: 30_000 }).not.toBe("/admin/transactions");
     await expect(page.getByText("Incoming funds")).toHaveCount(0);
     await expect(page.getByText("Total money available")).toHaveCount(0);
     await signOut(page);

@@ -67,6 +67,25 @@ Runs `tests/rules/*.rules.test.ts` (core hardening + the intelligence features) 
 - You are an admin in the UI but have no `admins/{uid}` document (see above).
 - The deployed rules are older than the app. Redeploy `firestore.rules`.
 
-## Known limitation: who may create an issue
+## Who may create an issue (an allow-list)
 
-The application does not offer issue reporting to workers (no menu entry, and the report page redirects them to their own workspace). The Firestore rule is broader: `match /issues/{issueId}` allows `create` for any signed-in user whose document passes `validNewIssue()` (the author must be the signed-in user; nothing checks the author's role). A worker who calls Firestore directly, outside the app, can therefore still create an issue as themselves. They cannot create one for someone else, assign it, or escalate it. Closing this needs a rules change (for example requiring an `admins/{uid}` document or a non-worker profile) that has to be reviewed, tested and deployed; none was made.
+`match /issues/{issueId}` allows `create` only if `signedIn() && canReport() && validNewIssue()`, where
+
+```
+function isStudent() { signed in, users/{uid} exists, and its role is exactly 'user' }
+function canReport() { return isAdmin() || isStudent(); }
+```
+
+- **Allowed:** an administrator (a document at `admins/{uid}`, console-only; a profile is not needed, and a stored role of `worker` does not matter), and a student (a profile whose stored `role` is exactly `user`).
+- **Denied:** workers (including after switching to the student view or writing the document directly), signed-out visitors, signed-in accounts with no profile document, and profiles with a missing, empty, differently cased, non-string or unrecognised `role` (including a stored `admin` role with no admin document).
+- **Where the role comes from:** `users/{uid}.role` can only be created as `user` at registration and only changed by an admin; `activeRole` (which the owner can switch) and everything in the issue payload are ignored.
+- **Registration and pending requests:** registration writes the profile (`role: 'user'`, optionally `workerRequest: 'pending'`), so a new account can report as soon as its profile exists. A pending worker request is still a student; once an admin approves it the account is a worker and can no longer report. An account whose registration was interrupted gets its profile from `createMissingProfile` at the next sign-in.
+- **Unchanged:** update and delete rules, the rate-limit stamp, field validation, and every worker workflow (claim, start, resolve, chat).
+- **Tests:** `describe("who may report an issue")` in `tests/rules/firestore.rules.test.ts` (27 tests; 14 fail against the previous rules). The app mirrors the rule in `canReportIssues` (`lib/roles.ts`): the report entry and page are hidden from every account the rule would refuse.
+
+**Not deployed.** Until this file is deployed to Firebase, production still has the previous rule (any signed-in user could create an issue).
+
+**Remaining limitations**
+- The restriction covers creation only; workers can still read issues.
+- An administrator who sets someone's stored role to anything other than `user` (for example `worker`) removes that account's ability to report; that is the intended effect for workers, and a mistake for anything else.
+- An account that was stored with a role such as `admin` but has no admin document cannot report; admin authority is the `admins` collection only.
