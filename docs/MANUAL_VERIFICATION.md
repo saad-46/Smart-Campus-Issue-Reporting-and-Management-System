@@ -29,27 +29,9 @@ What automation could not verify, and how a person can. Everything else is cover
 
 Record the date, the accounts used and the result of each step in `SMART_CAMPUS_FINAL_AUDIT.md`.
 
-## B. QR code on a real phone
+## B. (removed)
 
-**Status: not done.** No physical phone or camera was available to the automated runs, so no real scan has been verified. The link a scan opens, and every refusal case, is covered by `tests/unit/qr.test.ts`, `e2e/qr.spec.ts` (Explore) and `e2e/signed-in.emulator.spec.ts` (signed in, emulators).
-
-**Which code:** use a code the app generated, from **Locations & QR** (signed in as admin, or `/viewer/locations` in Explore). The researched locations already exist there, for example **Seminar Hall, Block 4** (`mjcet-seminar-hall`) or **Block 4** (`mjcet-block-4`). Do not draw a code by hand or from a third-party generator.
-
-**Environment:** the live site, a phone with a camera, and for the real flow the test student account from section A.
-
-| # | Step | Expected |
-| --- | --- | --- |
-| 1 | Explore: on a desktop open `/viewer/locations`, click **Seminar Hall, Block 4**, scan the code on the screen with the phone's camera app | The phone opens `…/viewer/report?location=mjcet-seminar-hall`. The form shows **Seminar Hall, Block 4** and "Approximate position". No sign-in is asked for |
-| 2 | Submit "TEST – please ignore" | "Demo report submitted". Nothing is saved; reloading removes it |
-| 3 | Real flow: signed in as admin on a desktop, open **Locations & QR**, **Add location** "TEST QR" with map place "Blocks 3 and 4 area", open its code and scan it on the phone | The phone opens `…/dashboard/report?location=blocks-3-4-test-qr` (after sign-in as the test student if asked). The form shows "TEST QR" under "From the QR code you scanned" |
-| 4 | Submit "TEST QR – please ignore" | You land on the issue page and its location reads "TEST QR". On the admin map it is counted at "Blocks 3 and 4 area" |
-| 5 | Admin: delete the "TEST QR" location. Scan the same code again | "QR location not recognised"; the location field is empty and nothing is pre-filled |
-| 6 | Unknown id: on the phone, open `…/viewer/report?location=nothing-here` and `…/dashboard/report?location=nothing-here` | Both show a not-recognised notice and an empty location |
-| 7 | Camera permission: deny the camera permission once in the phone's camera app, then scan | The phone's own app handles this; the web app asks for no camera access and must not prompt for it |
-
-**Clean up:** delete the "TEST QR" location (step 5). The app has no screen for deleting an issue, so either leave the clearly labelled TEST issue (it is harmless and visible only as a sample-looking report) or have the project owner delete that one document in the Firebase console. Do not touch any other record.
-
-**Do not** record a GPS position for a QR code; the code carries an id only.
+QR codes are no longer part of the product, so there is no phone-scan check. Locations are chosen from a list in the report form; see section A for the signed-in report flow.
 
 ## C. Vercel: new production project and the legacy project
 
@@ -63,7 +45,7 @@ Record the date, the accounts used and the result of each step in `SMART_CAMPUS_
 What was verified on 2026-10-10:
 
 - The new project failed to build earlier only because `NEXT_PUBLIC_FIREBASE_API_KEY` was missing from its environment. That variable was added (production and preview) and the commit redeployed. Nothing was changed in the legacy project.
-- Against the new address the browser suite gave 121 passed, 8 skipped (the emulator-only spec): landing, Explore, `/viewer/worker`, login and registration pages, QR validation, map, mobile layouts and signed-out redirects.
+- Against the new address the browser suite gave 121 passed, 8 skipped (the emulator-only spec): landing, Explore, `/viewer/worker`, login and registration pages, map, mobile layouts and signed-out redirects.
 - The Firebase settings compiled into the new bundle are identical to the legacy bundle's, so both talk to the same Firebase project.
 - Signed-out Firestore reads are still denied.
 
@@ -133,4 +115,4 @@ npx next dev -p 3230
 E2E_EMULATOR=1 E2E_BASE_URL=http://localhost:3230 npx playwright test e2e/signed-in.emulator.spec.ts --workers=1
 ```
 
-Delete `.env.development.local` afterwards. The spec covers: student report at a campus place, protected routes, discussion privacy, admin assign and escalate with persistence, worker start and resolve with a claim, one-time payment, worker kept out of finance, notification to the student, QR acceptance and refusals, submission failure and retry, and Explore while signed in.
+Delete `.env.development.local` afterwards. The spec covers: student report at a campus place, protected routes, discussion privacy, admin assign and escalate with persistence, worker start and resolve with a claim, one-time payment, worker kept out of finance, notification to the student, managed locations in the report form and the worker redirect, submission failure and retry, and Explore while signed in.

@@ -132,24 +132,6 @@
       ]
     },
     {
-      "id": "gymnasium",
-      "name": "Gymnasium",
-      "short": "Gymnasium",
-      "type": "sports",
-      "institutionId": "mjcet",
-      "latitude": 17.427,
-      "longitude": 78.4416,
-      "precisionMeters": 80,
-      "verificationStatus": "approximate",
-      "sourceIds": [
-        "naac-411-d"
-      ],
-      "notes": "One official photograph; the latitude is printed to three decimals, so the true position may be tens of metres away.",
-      "patterns": [
-        "\\bgym(nasium)?\\b"
-      ]
-    },
-    {
       "id": "garden",
       "name": "Garden",
       "short": "Garden",
@@ -166,25 +148,6 @@
       "patterns": [
         "\\bgarden\\b",
         "\\blawn\\b"
-      ]
-    },
-    {
-      "id": "sbi",
-      "name": "State Bank of India (as mapped)",
-      "short": "SBI",
-      "type": "bank",
-      "institutionId": null,
-      "latitude": 17.4275672,
-      "longitude": 78.4422612,
-      "precisionMeters": 20,
-      "verificationStatus": "unverified",
-      "sourceIds": [
-        "osm"
-      ],
-      "notes": "A bank node in OpenStreetMap next to the Blocks 3 and 4 photographs. Whether it is inside the campus, and whether it is open to students, is not established.",
-      "patterns": [
-        "\\bsbi\\b",
-        "\\bstate bank\\b"
       ]
     }
   ],
@@ -357,22 +320,6 @@
       "isActive": true
     },
     {
-      "id": "mjcet-gymnasium",
-      "name": "Gymnasium",
-      "aliases": [
-        "Gym"
-      ],
-      "type": "sports",
-      "institutionId": "mjcet",
-      "placeId": "gymnasium",
-      "verificationStatus": "approximate",
-      "sourceIds": [
-        "naac-411-d",
-        "mjcet-sports"
-      ],
-      "isActive": true
-    },
-    {
       "id": "mjcet-garden",
       "name": "Garden",
       "aliases": [
@@ -490,23 +437,6 @@
       "sourceIds": [
         "cbse-saras",
         "mjcet-other-institutions"
-      ],
-      "isActive": true
-    },
-    {
-      "id": "sbi-as-mapped",
-      "name": "State Bank of India (as mapped)",
-      "aliases": [
-        "SBI",
-        "Bank"
-      ],
-      "type": "bank",
-      "institutionId": null,
-      "placeId": "sbi",
-      "description": "Mapped in OpenStreetMap beside the campus; not confirmed as a campus facility.",
-      "verificationStatus": "unverified",
-      "sourceIds": [
-        "osm"
       ],
       "isActive": true
     }

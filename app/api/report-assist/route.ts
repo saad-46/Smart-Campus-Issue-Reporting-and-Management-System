@@ -1,7 +1,7 @@
 // ============================================
 // Quick-report assistant endpoint
 // ============================================
-// POST /api/report-assist  { messages: string[], presetLocation?, locationAnswer? }
+// POST /api/report-assist  { messages: string[], locationAnswer? }
 //
 // Signed-in users only (a Firebase ID token in the Authorization header,
 // checked against Firebase Auth). It returns a *suggested* draft; it cannot
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
 
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (declared > MAX_BODY_BYTES) return NextResponse.json({ error: "That message is too long." }, { status: 413 });
-  let body: { messages?: unknown; presetLocation?: unknown; locationAnswer?: unknown };
+  let body: { messages?: unknown; locationAnswer?: unknown };
   try {
     const raw = await request.text();
     if (raw.length > MAX_BODY_BYTES) return NextResponse.json({ error: "That message is too long." }, { status: 413 });
@@ -133,7 +133,6 @@ export async function POST(request: Request) {
   const messages = normalizeMessages(body.messages);
   if (messages.length === 0) return NextResponse.json({ error: "Describe the problem first." }, { status: 400 });
   const options = {
-    presetLocation: typeof body.presetLocation === "string" ? body.presetLocation.slice(0, 200) : undefined,
     locationAnswer: typeof body.locationAnswer === "string" ? body.locationAnswer.slice(0, 200) : undefined,
   };
 

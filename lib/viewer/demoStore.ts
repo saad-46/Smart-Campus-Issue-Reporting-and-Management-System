@@ -170,7 +170,7 @@ export function demoBudget(state: Pick<DemoState, "budgetAdded">): number {
 }
 
 /**
- * A location from an untrusted id (a QR link). Only an id of the right shape
+ * A location from an untrusted id (a URL value). Only an id of the right shape
  * that names a known, current location resolves; everything else is refused.
  */
 export function resolveDemoLocation(state: Pick<DemoState, "locations">, id: unknown): DemoLocation | undefined {
@@ -507,7 +507,7 @@ function run(state: DemoState, action: DemoAction, role: DemoRole, at: Date): De
         institutionId: place?.institutionId ?? null,
         custom: true,
       };
-      return done({ locations: [...state.locations, location] }, { title: "Location added (demo)", description: `Its QR code opens the demo report form. ${DEMO_NOTE}` }, { locationId: location.id });
+      return done({ locations: [...state.locations, location] }, { title: "Location added (demo)", description: `It can now be chosen in the demo report form. ${DEMO_NOTE}` }, { locationId: location.id });
     }
 
     case "deleteLocation": {

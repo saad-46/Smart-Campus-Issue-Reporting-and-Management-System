@@ -91,7 +91,7 @@ export const DEMO_WORKER_REQUESTS = [
 type Zone = "class" | "lab" | "wash" | "hall" | "outdoor" | "office" | "library" | "sports";
 
 export interface DemoLocation {
-  /** Stable canonical location id (the same id a QR code carries). */
+  /** Stable canonical location id (the same id the signed-in app uses). */
   id: string;
   /** Added by the demo administrator during this visit (not part of the researched dataset). */
   custom?: boolean;
@@ -119,7 +119,6 @@ const ZONES: Record<string, { spot?: string; zones: Zone[] }> = {
   "mjcet-central-library": { spot: "the Central Library", zones: ["library", "office"] },
   "mjcet-sports-grounds": { spot: "the sports grounds", zones: ["sports", "outdoor"] },
   "mjcet-shuttle-court": { spot: "the shuttle court", zones: ["sports", "outdoor"] },
-  "mjcet-gymnasium": { spot: "the gymnasium", zones: ["sports"] },
   "mjcet-garden": { spot: "the garden", zones: ["outdoor"] },
   "sucp-college": { spot: "the College of Pharmacy", zones: ["class", "lab", "office"] },
   "law-college": { spot: "the College of Law", zones: ["class", "office"] },
@@ -129,7 +128,7 @@ const ZONES: Record<string, { spot?: string; zones: Zone[] }> = {
   "sups-bh-school": { spot: "the Public School", zones: ["class", "office"] },
 };
 
-// Places whose link to the campus is unverified (the mapped bank) get no sample issues.
+// Only places with a zone profile above are demo reporting places.
 export const DEMO_LOCATIONS: DemoLocation[] = CAMPUS_LOCATIONS.filter((l) => l.isActive && ZONES[l.id]).map((l) => ({
   id: l.id,
   name: l.name,

@@ -2,20 +2,15 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import IssueForm from "@/components/IssueForm";
 import ChatReporter from "@/components/ChatReporter";
 import { useAuthContext } from "@/components/AuthProvider";
 import PageHeader from "@/components/ui/PageHeader";
 import { Segmented } from "@/components/ui/Tabs";
-import { Notice, Skeleton } from "@/components/ui/States";
-import { dashboardPathForRole } from "@/lib/roles";
-import { getCampusLocation } from "@/lib/locations";
-import { logError } from "@/lib/errors";
-import { CampusLocation } from "@/types";
-
-const LOCATION_ID = /^[a-z0-9-]{1,60}$/;
+import { Skeleton } from "@/components/ui/States";
+import { canReportIssues, dashboardPathForRole } from "@/lib/roles";
 
 function FormSkeleton() {
   return (
@@ -29,39 +24,18 @@ function FormSkeleton() {
 }
 
 function ReportContent() {
-  const { activeRole } = useAuthContext();
-  const searchParams = useSearchParams();
-  const locationParam = searchParams.get("location") ?? "";
+  const { activeRole, userProfile, isAdmin } = useAuthContext();
+  const router = useRouter();
   const [mode, setMode] = useState<"form" | "quick">("form");
-  // undefined = still loading; null = none / not recognised.
-  const [preset, setPreset] = useState<CampusLocation | null | undefined>(locationParam ? undefined : null);
-  const [presetMissing, setPresetMissing] = useState(false);
 
+  // Reporting is for students and administrators. An account whose stored role is
+  // worker (whichever view it has switched to) is sent to its own workspace and is
+  // never shown the form; firestore.rules refuses the write as well.
+  const blocked = !!userProfile && !canReportIssues(userProfile, isAdmin);
   useEffect(() => {
-    if (!locationParam) return;
-    if (!LOCATION_ID.test(locationParam)) {
-      setPreset(null);
-      setPresetMissing(true);
-      return;
-    }
-    let cancelled = false;
-    getCampusLocation(locationParam)
-      .then((loc) => {
-        if (cancelled) return;
-        setPreset(loc);
-        setPresetMissing(!loc);
-      })
-      .catch((err) => {
-        logError("getCampusLocation", err);
-        if (!cancelled) {
-          setPreset(null);
-          setPresetMissing(true);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [locationParam]);
+    if (blocked) router.replace(dashboardPathForRole("worker"));
+  }, [blocked, router]);
+  if (blocked) return <FormSkeleton />;
 
   return (
     <>
@@ -87,19 +61,7 @@ function ReportContent() {
         }
       />
 
-      {presetMissing && (
-        <Notice tone="warning" title="QR location not recognised" className="mb-6">
-          It may have been removed. Please type the location instead.
-        </Notice>
-      )}
-
-      {preset === undefined ? (
-        <FormSkeleton />
-      ) : mode === "quick" ? (
-        <ChatReporter key={preset?.id ?? "none"} locationPreset={preset} />
-      ) : (
-        <IssueForm key={preset?.id ?? "none"} locationPreset={preset} />
-      )}
+      {mode === "quick" ? <ChatReporter /> : <IssueForm />}
     </>
   );
 }

@@ -2,12 +2,11 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Building2, FilePlus2, Layers, MapPin } from "lucide-react";
+import { Building2, Layers, MapPin } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Badge, { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
 import { VERIFICATION_TONE } from "@/components/viewer/verification";
-import { buttonClasses } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Field";
 import { FilterBar, FilterChip } from "@/components/ui/Filters";
 import { DescriptionList } from "@/components/ui/Data";
@@ -67,7 +66,7 @@ export default function ViewerMapPage() {
 
   return (
     <ViewerGate>
-      {({ data, stats, slaConfig, locations }) => {
+      {({ data, stats, slaConfig }) => {
         const since = data.now.getTime() - Number(f.days) * DAY;
         const issues = data.issues.filter(
           (i) => i.createdAt.getTime() >= since && (!f.category || i.category === f.category) && (!f.status || i.status === f.status) && (!f.priority || i.priority === f.priority)
@@ -118,7 +117,6 @@ export default function ViewerMapPage() {
         const here = issues.filter((i) => placeOf(i) === selected).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         const openHere = here.filter((i) => i.status !== "Resolved");
         const risks = stats.risk.sufficient ? stats.risk.indicators.filter((r) => r.buildingId === selected) : [];
-        const locationsHere = locations.filter((l) => l.buildingId === selected);
 
         return (
           <>
@@ -285,21 +283,6 @@ export default function ViewerMapPage() {
                           { label: "Within about", value: `${place.precisionMeters} m` },
                         ]}
                       />
-                      {locationsHere.length > 0 && (
-                        <div>
-                          <h3 className="mb-1.5 text-[13px] font-semibold text-fg">Report an issue here</h3>
-                          <ul className="flex flex-wrap gap-1.5">
-                            {locationsHere.map((l) => (
-                              <li key={l.id}>
-                                <Link href={`/viewer/report?location=${l.id}`} className={buttonClasses("secondary", "sm")}>
-                                  <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
-                                  {l.name}
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
                       {risks.map((r) => (
                         <p key={r.key} className="rounded-lg border border-warning-border bg-warning-subtle p-2.5 text-[13px] text-fg">
                           <Badge tone={r.level === "High" ? "danger" : r.level === "Medium" ? "warning" : "neutral"}>{r.level} risk (estimate)</Badge>{" "}

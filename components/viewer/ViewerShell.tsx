@@ -59,33 +59,53 @@ export function ViewerBadge({ className }: { className?: string }) {
   );
 }
 
-/** Student / Worker / Admin switcher. Same-page client navigation; nothing reloads. */
-function PerspectiveSwitcher() {
+/**
+ * Student / Worker / Admin switcher: the one control that chooses the demo
+ * perspective. It lives in the sidebar (and so in the mobile navigation
+ * drawer), and in the overview's hero card on /viewer, where the sidebar's copy
+ * is left out so there is never more than one. Client navigation only:
+ * nothing reloads.
+ */
+export function PerspectiveSwitcher({ variant = "sidebar", navigate = true, onChange }: { variant?: "sidebar" | "collapsed" | "hero"; navigate?: boolean; onChange?: () => void }) {
   const { role, setRole } = useViewer();
+  const hero = variant === "hero";
+  const collapsed = variant === "collapsed";
   return (
-    <div className="flex items-center gap-3" data-tour="role-switcher">
-      <span className="hidden text-[13px] text-fg-subtle sm:inline">Explore as</span>
-      <div role="group" aria-label="Choose a perspective" className="grid flex-1 grid-cols-3 rounded-lg border border-glass-border bg-surface-2/70 p-0.5 sm:flex-none">
-        {VIEWER_PERSPECTIVES.map((p) => {
-          const active = p.role === role;
-          return (
-            <button
-              key={p.role}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setRole(p.role)}
-              className={cn(
-                "flex h-9 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium transition-[background-color,color,box-shadow] duration-150 sm:h-8",
-                "[&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0",
-                active ? "bg-surface text-fg shadow-sm ring-1 ring-brand-subtle-border" : "text-fg-subtle hover:text-fg"
-              )}
-            >
-              <ViewerNavIcon icon={p.icon} />
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
+    <div
+      role="group"
+      aria-label="Choose a perspective"
+      data-tour="role-switcher"
+      className={cn(
+        "rounded-lg border border-glass-border bg-surface-2/70 p-0.5",
+        collapsed ? "flex flex-col gap-0.5" : "grid grid-cols-3",
+        hero && "w-full max-w-md bg-surface/70"
+      )}
+    >
+      {VIEWER_PERSPECTIVES.map((p) => {
+        const active = p.role === role;
+        return (
+          <button
+            key={p.role}
+            type="button"
+            aria-pressed={active}
+            aria-label={collapsed ? p.label : undefined}
+            title={collapsed ? p.label : undefined}
+            onClick={() => {
+              setRole(p.role, navigate);
+              onChange?.();
+            }}
+            className={cn(
+              "flex items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] duration-150",
+              "[&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0",
+              collapsed ? "h-8 w-full" : hero ? "h-10 px-3" : "h-8 px-1.5 text-[13px]",
+              active ? "bg-surface text-fg shadow-sm ring-1 ring-brand-subtle-border" : "text-fg-subtle hover:text-fg"
+            )}
+          >
+            <ViewerNavIcon icon={p.icon} />
+            {!collapsed && p.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -160,20 +180,29 @@ export default function ViewerShell({ children }: { children: React.ReactNode })
       groups={groups}
       logoHref="/viewer"
       logoSubtitle="Demo workspace"
-      sidebarFooter={({ collapsed, onNavigate }) =>
-        collapsed ? (
-          <Link href="/login" prefetch={false} aria-label="Sign in" title="Sign in" className={buttonClasses("secondary", "md", "w-full px-0")}>
-            <LogOut className="h-4 w-4 rotate-180" aria-hidden="true" />
-          </Link>
-        ) : (
-          <p className="text-[13px] text-fg-subtle">
-            Want to report a real issue?{" "}
-            <Link href="/login" prefetch={false} onClick={onNavigate} className="font-medium text-brand-fg hover:underline">
-              Sign in
+      sidebarFooter={({ collapsed, onNavigate }) => (
+        <div className="space-y-3">
+          {/* The overview carries its own copy inside the hero card. */}
+          {pathname !== "/viewer" && (
+            <div>
+              {!collapsed && <p className="mb-1.5 px-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">Explore as</p>}
+              <PerspectiveSwitcher variant={collapsed ? "collapsed" : "sidebar"} onChange={onNavigate} />
+            </div>
+          )}
+          {collapsed ? (
+            <Link href="/login" prefetch={false} aria-label="Sign in" title="Sign in" className={buttonClasses("secondary", "md", "w-full px-0")}>
+              <LogOut className="h-4 w-4 rotate-180" aria-hidden="true" />
             </Link>
-          </p>
-        )
-      }
+          ) : (
+            <p className="text-[13px] text-fg-subtle">
+              Want to report a real issue?{" "}
+              <Link href="/login" prefetch={false} onClick={onNavigate} className="font-medium text-brand-fg hover:underline">
+                Sign in
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
       headerStart={
         <>
           <Logo href="/viewer" className="max-[399px]:hidden lg:hidden" />
@@ -210,7 +239,6 @@ export default function ViewerShell({ children }: { children: React.ReactNode })
           </Link>
         </>
       }
-      subHeader={<PerspectiveSwitcher />}
       banner={<DemoStrip />}
     >
       <span className="sr-only" role="status">

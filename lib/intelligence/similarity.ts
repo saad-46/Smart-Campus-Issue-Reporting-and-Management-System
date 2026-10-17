@@ -59,7 +59,7 @@ function roomNumbers(location: string): Set<string> {
 }
 
 /**
- * 1 for the same place (same QR location, or same building and room
+ * 1 for the same place (same managed location, or same building and room
  * number), 0.5 for the same building, 0 otherwise.
  */
 export function locationSimilarity(

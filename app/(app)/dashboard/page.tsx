@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ClipboardList, Globe2, Plus, SearchX } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
+import { canReportIssues } from "@/lib/roles";
 import IssueRow from "@/components/IssueCard";
 import { useUnreadChats } from "@/hooks/useUnreadChats";
 import AccountNotices from "@/components/AccountNotices";
@@ -28,7 +29,9 @@ type Tab = "my-issues" | "explore";
 const LOAD_ERROR = "We couldn't load issues right now. Please check your connection and try again.";
 
 function DashboardContent() {
-  const { userProfile } = useAuthContext();
+  const { userProfile, isAdmin } = useAuthContext();
+  // A worker who views the student pages can follow issues but not report them.
+  const canReport = canReportIssues(userProfile, isAdmin);
   const unreadChats = useUnreadChats(userProfile?.id);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -104,10 +107,12 @@ function DashboardContent() {
         title={exploring ? "Community" : "My issues"}
         description={exploring ? "Recent issues reported across campus. Vote on the ones that affect you too." : "Track what you've reported, from submitted to resolved."}
         actions={
-          <Link href="/dashboard/report" className={buttonClasses("primary")}>
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Report an issue
-          </Link>
+          canReport ? (
+            <Link href="/dashboard/report" className={buttonClasses("primary")}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Report an issue
+            </Link>
+          ) : undefined
         }
       />
 
@@ -176,11 +181,13 @@ function DashboardContent() {
               <EmptyState
                 icon={<ClipboardList />}
                 title="You haven't reported anything yet"
-                description="Spotted something broken, unsafe or unclean? Report it and follow it until it's fixed."
+                description={canReport ? "Spotted something broken, unsafe or unclean? Report it and follow it until it's fixed." : "Issues you report appear here."}
                 action={
-                  <Link href="/dashboard/report" className={buttonClasses("primary")}>
-                    <Plus className="h-4 w-4" aria-hidden="true" /> Report an issue
-                  </Link>
+                  canReport ? (
+                    <Link href="/dashboard/report" className={buttonClasses("primary")}>
+                      <Plus className="h-4 w-4" aria-hidden="true" /> Report an issue
+                    </Link>
+                  ) : undefined
                 }
               />
             )

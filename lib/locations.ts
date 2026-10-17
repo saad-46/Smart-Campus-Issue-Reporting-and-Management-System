@@ -1,30 +1,24 @@
 // ============================================
-// Campus locations (QR reporting) and SLA configuration
+// Campus locations and SLA configuration
 // ============================================
 
-import { collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, query, runTransaction, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs, limit, onSnapshot, query, runTransaction, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { CampusLocation, Priority, SlaConfig } from "@/types";
 import { ValidationError } from "./errors";
 import { ListenerErrorHandler } from "./firestore";
 import { track } from "./listeners";
 import { normalizeCampusLocation } from "./models";
-import { NewLocationInput, isLocationIdShape, validateLocationInput } from "./sharedRules";
+import { NewLocationInput, validateLocationInput } from "./sharedRules";
 import { DEFAULT_SLA_CONFIG, normalizeSlaConfig, validateSlaHours } from "./intelligence/sla";
 
 const LOCATIONS = "campusLocations";
-/** Upper bound on QR locations loaded at once (admin-managed, normally far fewer). */
+/** Upper bound on managed locations loaded at once (admin-managed, normally far fewer). */
 const MAX_LOCATIONS = 500;
 
 export async function listCampusLocations(): Promise<CampusLocation[]> {
   const snap = await getDocs(query(collection(db, LOCATIONS), limit(MAX_LOCATIONS)));
   return snap.docs.map((d) => normalizeCampusLocation(d.id, d.data())).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export async function getCampusLocation(id: string): Promise<CampusLocation | null> {
-  if (!isLocationIdShape(id)) return null;
-  const snap = await getDoc(doc(db, LOCATIONS, id));
-  return snap.exists() ? normalizeCampusLocation(snap.id, snap.data()) : null;
 }
 
 // The input rules live in lib/sharedRules.ts so Explore Mode validates with the same code.
@@ -44,11 +38,6 @@ export async function createCampusLocation(input: NewLocationInput): Promise<Cam
 
 export async function deleteCampusLocation(id: string): Promise<void> {
   await deleteDoc(doc(db, LOCATIONS, id));
-}
-
-/** Link printed on a location's QR code. */
-export function qrReportUrl(origin: string, locationId: string): string {
-  return `${origin.replace(/\/+$/, "")}/dashboard/report?location=${encodeURIComponent(locationId)}`;
 }
 
 // ---------- SLA configuration (config/sla) ----------

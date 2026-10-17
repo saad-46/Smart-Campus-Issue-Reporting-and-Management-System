@@ -18,7 +18,7 @@ How the data was researched, what each source supports and what could not be est
 - Do not mark a position `verified` without an official source for both what the place is and where it is. Today no position is.
 - Do not add floors, room numbers, laboratory counts or building uses that a public source does not state. People type those themselves when reporting.
 - Do not name an OpenStreetMap footprint. They stay "Mapped building A–F" until someone confirms on site which block is which.
-- Ids are stable: QR codes and stored issues refer to them. Retire a location with `"isActive": false`; never reuse or rename an id.
+- Ids are stable: stored issues and managed locations refer to them. Retire a location with `"isActive": false`; never reuse or rename an id.
 - Coordinates are WGS84. GeoJSON uses `[longitude, latitude]`; `places` use named `latitude` / `longitude` fields.
 - Do not add restricted or security-sensitive places (CCTV, server rooms, guard posts, hostel room lists).
 

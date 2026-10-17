@@ -137,7 +137,7 @@ export async function fetchIncidentMembers(masterId: string): Promise<IssueSumma
 export interface ReportExtras {
   /** Output of the analysis layer (suggestions only). */
   analysis?: { summary: string; confidence: number; department: string };
-  /** campusLocations id from a QR code. */
+  /** campusLocations id when a managed location was chosen. */
   locationId?: string;
   /** "Same problem as" an existing issue. */
   duplicateOf?: string;

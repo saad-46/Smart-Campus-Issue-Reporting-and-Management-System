@@ -33,7 +33,7 @@ export const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
 
 export const VERIFICATION_MEANINGS = locationsJson.statusMeanings as Record<VerificationStatus, string>;
 
-export type PlaceType = "academic" | "hall" | "institution" | "sports" | "grounds" | "bank" | "library";
+export type PlaceType = "academic" | "hall" | "institution" | "sports" | "grounds" | "library";
 
 export const PLACE_TYPE_LABELS: Record<PlaceType, string> = {
   academic: "Academic block",
@@ -41,7 +41,6 @@ export const PLACE_TYPE_LABELS: Record<PlaceType, string> = {
   institution: "Institution",
   sports: "Sports",
   grounds: "Grounds",
-  bank: "Bank",
   library: "Library",
 };
 
@@ -170,7 +169,7 @@ export const CAMPUS_LOCATIONS: CampusPlace[] = locationsJson.locations.map((l) =
 
 const LOCATION_BY_ID = new Map(CAMPUS_LOCATIONS.map((l) => [l.id, l]));
 
-/** A canonical campus location by its stable id (used by QR codes and forms). */
+/** A canonical campus location by its stable id (used by forms and the map). */
 export function getCanonicalLocation(id: string | undefined | null): CampusPlace | undefined {
   return id ? LOCATION_BY_ID.get(id) : undefined;
 }
@@ -208,7 +207,7 @@ export function matchBuilding(location: string | undefined | null): Building | u
 }
 
 /**
- * Place for an issue: an exact QR / canonical location wins, otherwise the text.
+ * Place for an issue: an exact managed / canonical location wins, otherwise the text.
  * `locationBuildings` maps campusLocations ids to place ids.
  */
 export function buildingForIssue(
@@ -235,7 +234,7 @@ export function slugifyLocation(text: string): string {
     .slice(0, 60);
 }
 
-/** Human-readable label for a QR location. */
+/** Human-readable label for a managed location. */
 export function describeLocation(loc: { name: string; buildingId: string; floor: string; room: string }): string {
   const building = getBuilding(loc.buildingId)?.name;
   const parts = [loc.name];

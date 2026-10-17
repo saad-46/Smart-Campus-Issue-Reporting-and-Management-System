@@ -14,6 +14,7 @@ rules_version = '2';
 //            Registration may record a request (workerRequest: 'pending')
 //            which an admin approves or rejects.
 //   user   — any signed-in account.
+//   Only students (profile role 'user') and admins can report issues (see canReport()).
 //
 // Enums and size limits mirror lib/constants.ts.
 // Anything not explicitly allowed below is denied.
@@ -42,6 +43,25 @@ service cloud.firestore {
     // Workers and admins may both carry out maintenance work.
     function isStaff() {
       return isWorker() || isAdmin();
+    }
+
+    // A student is an account with a profile whose stored role is exactly
+    // 'user'. A missing profile, 'worker', or any other value is not a student.
+    function isStudent() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'user';
+    }
+
+    // Who may report an issue: students and administrators, and nobody else.
+    // The decision is an allow-list built from two things no client can write
+    // freely: the admins/{uid} document (console only) and users/{uid}.role
+    // (registration can only create 'user'; only an admin changes it). It
+    // deliberately ignores activeRole, which the owner can switch, and anything
+    // in the issue payload. A worker who switches to the student view is still
+    // a worker; an account with no profile, or an unrecognised role, cannot report.
+    function canReport() {
+      return isAdmin() || isStudent();
     }
 
     // ---------- shared validation ----------
@@ -316,7 +336,7 @@ service cloud.firestore {
       }
 
       allow read: if signedIn();
-      allow create: if signedIn() && validNewIssue();
+      allow create: if signedIn() && canReport() && validNewIssue();
       allow update: if signedIn()
         && (upvoteUpdate() || staffClaim() || staffStart() || staffResolve()
             || (isAdmin() && adminUpdate()));

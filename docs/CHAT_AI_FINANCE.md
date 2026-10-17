@@ -56,7 +56,7 @@ If no model is configured, or the provider is slow, rate limited, down or return
 
 **What a model cannot do** (tested in `tests/unit/reportAssistant.test.ts` and `reportAssistRoute.test.ts`)
 - The report description is always the student's own words. A model cannot rewrite it.
-- It cannot introduce a location the student did not state (or a QR code did not carry).
+- It cannot introduce a location the student did not state.
 - It cannot lower the priority of a hazard the rules found, or remove a safety flag.
 - Categories and priorities outside the application's lists are dropped; unknown fields are ignored; links and over-long strings are removed.
 - It has no tools and no Firestore access. The student's text is passed as delimited data and never as instructions; text such as "ignore previous instructions" is either refused or treated as part of a report.
@@ -72,7 +72,7 @@ If no model is configured, or the provider is slow, rate limited, down or return
 
 **Cost and limits.** A call is one short request (a few hundred input tokens, 400 output tokens at most). The route allows 12 requests per signed-in user per minute per server instance, 6 messages of 1000 characters, and an 8 KB body; abusive or empty input costs no provider call. The per-instance limiter is best-effort on serverless hosting: set a monthly spend limit on the provider key as the real ceiling. Check the provider's current pricing before enabling.
 
-**Privacy.** Only the student's own messages (and, when scanned, the QR location name) are sent to the provider. No name, e-mail, uid, token or financial data is sent, and the route does not log message text. The conversation is not stored: it lives in the page until the report is submitted or the page is closed.
+**Privacy.** Only the student's own messages are sent to the provider. No name, e-mail, uid, token or financial data is sent, and the route does not log message text. The conversation is not stored: it lives in the page until the report is submitted or the page is closed.
 
 **Not done.** Photos are not attached from Quick report; use the full form. Explore Mode's quick report still uses the older single-message parser.
 

@@ -1698,3 +1698,9 @@ The emulator spec covers: report, protected pages, discussion privacy for anothe
 - **Explore Mode** does not mirror the new payment fields, ledger, unread badges or the assistant's follow-ups (listed in docs/EXPLORE_PARITY.md).
 - **Rate limit** is per server instance. Set a spend limit on the provider key.
 - **Deploying the rules is a precondition** for the app changes: with the old rules, the first message sent after assignment fails to write its conversation summary, and Add funds fails to write its ledger entry.
+
+---
+
+## Change note: QR codes, two campus places and the worker report entry removed
+
+QR reporting (generation, printing, scanning, `?location=` presets and the `qrcode` dependency), the Gymnasium and State Bank of India places, and every "Report an issue" entry point for workers were removed from the product after the entries above were written. The sections above describe the product as it was then; they are kept as the record of what was verified at that time. Administrator-managed locations remain and are now offered in the report form's place list. Old links that still carry `?location=<id>` open the normal report form and are ignored.
