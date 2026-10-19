@@ -23,7 +23,7 @@
 - 🔐 **Authentication & roles** — Email/password login. Admins are granted in `admins/{uid}` (console only); worker access is approved by an admin.
 - 🏷️ **Automatic categorisation (keyword-based)** — category, priority, a *heuristic* confidence, a one-line explanation, an extractive summary and the suggested team. No language model; staff can always change it, and a failure never blocks a report.
 - 🔁 **Duplicate detection & incidents** — before submitting, similar open reports from the last 14 days are suggested; the reporter (or an admin) can link a report into an incident. Nothing is merged, hidden or deleted.
-- 📍 **QR reporting** — admins create campus locations and print QR codes; scanning one opens the report form with the location filled in (after sign-in if needed).
+- 📍 **Campus locations** — admins manage the places people can choose when they report an issue, alongside the researched SUES campus places.
 - ⏱️ **SLA engine** — per-priority targets set by admins; on-track / approaching / breached / met / missed is *computed* from timestamps, never stored. Admins can escalate.
 - 👷 **Assignment recommendations** — ranked by category experience, current workload and ratings. The admin decides.
 - 🔔 **Notification centre** — bell with unread count, All/Unread, mark read / all read, open the related issue. Notifications carry no free text.
@@ -33,7 +33,7 @@
 - 📊 **Analytics** — ranges (Today, 7/30/90 days, semester, custom) and filters (category, building, status, priority, worker, department), charts, and CSV/JSON exports without reporter identities.
 - 🧭 **Campus Operations overview** — KPIs from real data, SLA alerts, confirmed and suggested incidents, maintenance risk indicator (rule-based, with "not enough data" states), worker workload and factual insights.
 - 🔎 **Search** — issue ID, title, location and category over a bounded projection of recent issues; also from anywhere with Ctrl/⌘K.
-- 👀 **Viewer Mode** (`/viewer`) — the whole product as a public, no-sign-in demo: Student, Worker and Admin perspectives with their own menus, an issues table with filters, issue pages with deadlines, timeline and assignment suggestions, a report form with live suggestions and duplicate detection, analytics, a layered campus map, workers, finance, location QR codes, notifications, search (Ctrl/⌘ K), the campus timeline and settings, plus a 24-step guided tour. It runs on a generated sample campus (`lib/viewer/`, about 130 issues, 12 workers, 26 locations); actions are simulated in the browser and disappear when you leave. It never loads the Firebase SDK, so it cannot read or write campus records.
+- 👀 **Viewer Mode** (`/viewer`) — the whole product as a public, no-sign-in demo: Student, Worker and Admin perspectives with their own menus, an issues table with filters, issue pages with deadlines, timeline and assignment suggestions, a report form with live suggestions and duplicate detection, analytics, a layered campus map, workers, finance, transactions, locations, notifications, search (Ctrl/⌘ K), the campus timeline and settings, plus a 24-step guided tour. It runs on a generated sample campus (`lib/viewer/`, about 130 issues, 12 workers, 26 locations); actions are simulated in the browser and disappear when you leave. It never loads the Firebase SDK, so it cannot read or write campus records.
 - 🖥️ **Interface** — one design system (semantic colour tokens, light and dark themes, reduced-motion support), role-based sidebar navigation, keyboard-accessible dialogs, menus and tabs, and layouts checked from 320 px phones to 1920 px desktops.
 
 ---
@@ -45,7 +45,7 @@
 | Frontend | Next.js 15 (App Router), React 19 |
 | Styling | Tailwind CSS 4 |
 | Backend | Firebase (Firestore + Auth), client-only — security is enforced by `firestore.rules` |
-| Charts / QR | Recharts, `qrcode` (generated in the browser) |
+| Charts | Recharts |
 | Language | TypeScript 5 |
 | Tests | Vitest (unit), `@firebase/rules-unit-testing` on the Firestore emulator (rules) |
 | "AI" | Deterministic keyword rules in `services/aiService.ts` and `lib/intelligence/*` |
@@ -57,12 +57,12 @@
 ```
 app/
   page.tsx, login/, register/, switch-role/
-  dashboard/            # student: My issues, Community, Report (+ report/ page with ?location= QR preset)
+  dashboard/            # student: My issues, Community, Report (full form and Quick report assistant)
   worker/               # worker dashboard (SLA "needs attention", tasks, open pool, payouts)
   issues/[id]/          # issue detail: analysis, SLA, timeline, incident, feedback, admin controls, chat
   search/               # global search
   viewer/               # public Viewer Mode (outside the (app) route group, so no Firebase): overview, student/, worker/, admin/, issues/, report/, analytics/, map/, workers/, finance/, locations/, notifications/, search/, timeline/, settings/, how-it-works/
-  admin/                # Overview, issues/, analytics/, map/, workers/, finance/ (budget, claims), locations/ (QR), settings/ (SLA targets)
+  admin/                # Overview, issues/, analytics/, map/, workers/, finance/ (budget, claims), locations/, transactions/, settings/ (SLA targets)
 components/
   ui/                   # design system: Button, Field (Input/Select/Textarea), Badge, Card, Dialog, Drawer, Menu, Tabs, Toast, States, Data
   shell/                # AppShell (sidebar, top bar, Ctrl/⌘K command palette), navigation, auth layout
@@ -167,11 +167,11 @@ The same product runs in two data environments that are kept strictly apart:
 
 - **Enter:** "Explore the Platform" on the landing page, or open `/viewer`.
 - **Switch role:** "Explore as" Student / Worker / Admin. It picks a fictional account; it grants nothing real.
-- **Try it:** report an issue (form, quick report, QR link or map), assign and escalate it as Admin, start and resolve it as Worker, claim and pay an expense, rate the fix, link reports into an incident, add a location, add funds, approve or remove a worker.
+- **Try it:** report an issue (form, quick report assistant or map), assign and escalate it as Admin, start and resolve it as Worker, claim and pay an expense, rate the fix, link reports into an incident, add a location, add funds, approve or remove a worker.
 - **Reset:** "Reset demo" in the demo strip (it counts your simulated changes), or reload.
 - **Real app:** "Sign in". Nothing done in Explore is carried over.
 
-Explore never loads Firebase, and a demo record can never be written to Firestore; both are tested. The full feature-by-feature comparison, the architecture and the QR rules are in [docs/EXPLORE_PARITY.md](docs/EXPLORE_PARITY.md). Explore is a demonstration and not an official SUES system.
+Explore never loads Firebase, and a demo record can never be written to Firestore; both are tested. The full feature-by-feature comparison, and the architecture are in [docs/EXPLORE_PARITY.md](docs/EXPLORE_PARITY.md). Explore is a demonstration and not an official SUES system.
 
 ---
 
@@ -184,7 +184,7 @@ npm run test:e2e     # Playwright browser tests against a local production build
 npm run typecheck && npm run lint && npm run build
 ```
 
-`E2E_BASE_URL=https://… npm run test:e2e` runs the browser tests against a deployed site; they only read public pages and Explore Mode. What still needs a person (signed-in production flows, a QR scan on a real phone, the Vercel and Google Cloud dashboards) is in [docs/MANUAL_VERIFICATION.md](docs/MANUAL_VERIFICATION.md).
+`E2E_BASE_URL=https://… npm run test:e2e` runs the browser tests against a deployed site; they only read public pages and Explore Mode. What still needs a person (signed-in production flows, the Vercel and Google Cloud dashboards) is in [docs/MANUAL_VERIFICATION.md](docs/MANUAL_VERIFICATION.md).
 
 To try the app with demo data, run against the **local** Firebase Emulator Suite — never the real project:
 
@@ -214,7 +214,7 @@ Demo accounts and their emulator-only password are listed at the top of `scripts
 Everything is **deterministic and runs in the browser** — there is no language model and no server:
 
 - **Categorisation** (`services/aiService.ts`): keyword matching. The "confidence" is a heuristic from how many keywords matched and how clearly one category won — not a probability. It is labelled that way in the UI.
-- **Duplicates** (`lib/intelligence/similarity.ts`): word overlap with synonym folding, plus same building/room or same QR location.
+- **Duplicates** (`lib/intelligence/similarity.ts`): word overlap with synonym folding, plus same building/room or the same managed location.
 - **Maintenance risk** (`lib/intelligence/maintenance.ts`): a transparent score from frequency, recurrence, recency and priority. Shown only with at least 10 issues and 14 days of history.
 - **Recommendations / insights**: computed from recorded issues and ratings only.
 

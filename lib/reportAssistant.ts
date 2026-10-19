@@ -24,9 +24,9 @@ export interface AssistantDraft {
   description: string;
   category: string;
   priority: Priority;
-  /** "" while unknown. Only ever something the student said, or a scanned QR location. */
+  /** "" while unknown. Only ever something the student said. */
   location: string;
-  locationSource: "student" | "qr" | "unknown";
+  locationSource: "student" | "unknown";
   /** 0 to 1. A heuristic for the rules engine; the model's own claim, clamped, otherwise. */
   confidence: number;
   missingInformation: ("location" | "detail" | "focus")[];
@@ -41,8 +41,6 @@ export interface AssistantDraft {
 }
 
 export interface AssistOptions {
-  /** A location from a scanned QR code; it outranks anything guessed from text. */
-  presetLocation?: string;
   /** What the student typed when asked where the problem is. */
   locationAnswer?: string;
 }
@@ -173,15 +171,11 @@ export function assistWithRules(rawMessages: unknown, options: AssistOptions = {
   const screened = screenInput(text);
   if (screened) return blank(screened);
 
-  // Where: a scanned code beats a typed answer, which beats a guess from the text.
+  // Where: a typed answer beats a guess from the text.
   let location = "";
   let locationSource: AssistantDraft["locationSource"] = "unknown";
-  const preset = options.presetLocation?.trim();
   const answer = options.locationAnswer ? clean(options.locationAnswer).slice(0, LIMITS.location) : "";
-  if (preset) {
-    location = preset;
-    locationSource = "qr";
-  } else if (answer) {
+  if (answer) {
     // What the student typed is a fact they supplied. Keep it verbatim, so a
     // floor or a landmark ("Block 4, second floor") is not lost to a name match.
     location = answer;
@@ -290,7 +284,7 @@ export function validateModelDraft(raw: unknown, rawMessages: unknown, options: 
   const title =
     typeof m.title === "string" && clean(m.title).length >= 3 && clean(m.title).length <= LIMITS.title ? clean(m.title) : base.title;
 
-  // A location is believed only if the student said it (or a QR code carried it).
+  // A location is believed only if the student said it .
   let location = base.location;
   let locationSource = base.locationSource;
   if (!location && typeof m.location === "string" && m.location.trim()) {

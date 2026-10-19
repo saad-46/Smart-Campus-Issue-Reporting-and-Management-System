@@ -15,7 +15,7 @@ import { dashboardPathForRole } from "@/lib/roles";
 import { cn } from "@/lib/cn";
 
 const PROBLEMS = [
-  ["Report", "A student describes the problem or scans the QR code at the location. A category, priority and team are suggested, and similar open reports are shown first."],
+  ["Report", "A student describes the problem and picks the place. A category, priority and team are suggested, and similar open reports are shown first."],
   ["Resolve", "An administrator assigns a worker from ranked suggestions. Every status change lands on one timeline, against a deadline."],
   ["Understand", "Trends, hotspots, workload and satisfaction come from the same records, so decisions don't depend on memory or spreadsheets."],
 ] as const;
@@ -47,10 +47,10 @@ const FEATURES = [
   },
   {
     id: "map",
-    eyebrow: "Campus map and QR reporting",
+    eyebrow: "Campus map and location reporting",
     title: "The real campus, mapped honestly.",
     text: "The map is drawn from OpenStreetMap geometry of the Mount Pleasant campus: real footprints, roads and gates. Blocks 1 to 5, Ghulam Ahmed Hall, the sports grounds and other places are positioned from the college's own geotagged photographs, and each shows how certain its position is. Nothing is labelled beyond what a public source supports.",
-    points: ["Issue density, incidents, risk and deadline layers", "Every place carries a source and a confidence level", "QR codes carry a stable location id"],
+    points: ["Issue density, incidents, risk and deadline layers", "Every place carries a source and a confidence level", "Every report can name a campus place"],
     visual: <MapPanel />,
   },
   {

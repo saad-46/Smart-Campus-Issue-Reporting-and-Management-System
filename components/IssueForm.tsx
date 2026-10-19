@@ -2,11 +2,10 @@
 
 import React, { useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, ImagePlus, MapPin, Pencil, QrCode, X } from "lucide-react";
+import { Camera, ImagePlus, MapPin, Pencil, X } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
 import { createIssue } from "@/lib/firestore";
 import { analyzeIssueDetails, IssueIntelligence } from "@/services/aiService";
-import { CampusLocation } from "@/types";
 import { DEFAULT_CATEGORY, DEFAULT_PRIORITY, LIMITS, departmentFor } from "@/lib/constants";
 import { CAMPUS_LOCATIONS, VERIFICATION_LABELS, describeLocation, getCanonicalLocation, institutionName } from "@/lib/campus";
 import { getFriendlyErrorMessage, logError } from "@/lib/errors";
@@ -20,13 +19,12 @@ import AnalysisSummary from "@/components/report/AnalysisSummary";
 import DuplicateCheck from "@/components/report/DuplicateCheck";
 import ImageEditor from "@/components/ImageEditor";
 import { useSlowNotice } from "@/hooks/useSlowNotice";
+import { useCampusLocations } from "@/hooks/useCampusLocations";
 import { cn } from "@/lib/cn";
 
 interface IssueFormProps {
   /** Called after the issue is saved. Defaults to opening the new issue. */
   onIssueCreated?: (issueId: string) => void;
-  /** Place scanned from a location QR code. */
-  locationPreset?: CampusLocation | null;
 }
 
 const FALLBACK: IssueIntelligence = {
@@ -51,15 +49,17 @@ function Section({ step, title, description, children }: { step: number; title: 
   );
 }
 
-export default function IssueForm({ onIssueCreated, locationPreset = null }: IssueFormProps) {
+export default function IssueForm({ onIssueCreated }: IssueFormProps) {
   const { userProfile } = useAuthContext();
   const router = useRouter();
   const toast = useToast();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [location, setLocation] = useState(locationPreset ? describeLocation(locationPreset) : "");
-  const [locationId, setLocationId] = useState(locationPreset?.id ?? "");
+  const { locations: managedLocations } = useCampusLocations();
+  const [location, setLocation] = useState("");
+  // The id of an administrator-managed location, when one was chosen from the list.
+  const [locationId, setLocationId] = useState("");
   const [duplicateOf, setDuplicateOf] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
@@ -198,27 +198,25 @@ export default function IssueForm({ onIssueCreated, locationPreset = null }: Iss
           </Section>
 
           <Section step={2} title="Where?" description="Pick a campus place, then add the floor, room or a landmark if you know it.">
-            {locationId ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-brand-subtle-border bg-brand-subtle px-3 py-2.5">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <QrCode className="h-4 w-4 shrink-0 text-brand-fg" aria-hidden="true" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-fg">{locationPreset ? describeLocation(locationPreset) : location}</p>
-                    <p className="text-xs text-fg-subtle">From the QR code you scanned</p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => setLocationId("")}>
-                  Change
-                </Button>
-              </div>
-            ) : (
-              <>
+            <>
               <Select
                 label="Campus place (optional)"
-                value={CAMPUS_LOCATIONS.find((l) => location.startsWith(l.name))?.id ?? ""}
+                value={locationId ? `managed:${locationId}` : (CAMPUS_LOCATIONS.find((l) => location.startsWith(l.name))?.id ?? "")}
                 onChange={(e) => {
-                  const chosen = getCanonicalLocation(e.target.value);
-                  if (chosen) setLocation(chosen.name);
+                  const value = e.target.value;
+                  if (value.startsWith("managed:")) {
+                    const managed = (managedLocations ?? []).find((l) => l.id === value.slice("managed:".length));
+                    if (managed) {
+                      setLocation(describeLocation(managed));
+                      setLocationId(managed.id);
+                    }
+                    return;
+                  }
+                  const chosen = getCanonicalLocation(value);
+                  if (chosen) {
+                    setLocation(chosen.name);
+                    setLocationId("");
+                  }
                 }}
                 hint={(() => {
                   const chosen = CAMPUS_LOCATIONS.find((l) => location.startsWith(l.name));
@@ -234,20 +232,32 @@ export default function IssueForm({ onIssueCreated, locationPreset = null }: Iss
                     {l.name}
                   </option>
                 ))}
+                {managedLocations && managedLocations.length > 0 && (
+                  <optgroup label="Added by administrators">
+                    {managedLocations.map((l) => (
+                      <option key={l.id} value={`managed:${l.id}`}>
+                        {describeLocation(l)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </Select>
               <Input
                 label="Location"
                 placeholder="e.g. Block 4, 2nd floor, near the staircase"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) => {
+                  setLocation(e.target.value);
+                  // Typing over a chosen place makes it free text again.
+                  setLocationId("");
+                }}
                 onBlur={blur("location")}
                 error={show("location")}
                 maxLength={LIMITS.location}
                 icon={<MapPin aria-hidden="true" />}
                 required
               />
-              </>
-            )}
+            </>
           </Section>
 
           <Section step={3} title="Photos" description={`Optional, up to ${LIMITS.maxImages}. You can draw on a photo to point out the problem.`}>

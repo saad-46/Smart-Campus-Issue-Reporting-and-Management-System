@@ -31,7 +31,7 @@ export async function requestAssist(rawMessages: string[], options: AssistOption
     const res = await fetch("/api/report-assist", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify({ messages, presetLocation: options.presetLocation, locationAnswer: options.locationAnswer }),
+      body: JSON.stringify({ messages, locationAnswer: options.locationAnswer }),
       signal: controller.signal,
     });
     if (!res.ok) return { draft: early, degraded: res.status === 429 ? "rate-limited" : "unavailable" };

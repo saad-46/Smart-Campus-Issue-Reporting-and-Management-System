@@ -10,7 +10,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Menu from "@/components/ui/Menu";
 import { IconButton, buttonClasses } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
-import { dashboardPathForRole } from "@/lib/roles";
+import { canReportIssues, dashboardPathForRole } from "@/lib/roles";
 import { logError } from "@/lib/errors";
 import { UserRole } from "@/types";
 import Logo from "./Logo";
@@ -29,13 +29,14 @@ function initials(name: string | undefined) {
  * account menu, and a consistent content width.
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { userProfile, activeRole, availableRoles, switchRole, signOut } = useAuthContext();
+  const { userProfile, activeRole, availableRoles, switchRole, signOut, isAdmin } = useAuthContext();
   const router = useRouter();
   const toast = useToast();
   const [searchOpen, setSearchOpen] = useState(false);
   const [isMac, setIsMac] = useState(false);
 
-  const groups = useMemo(() => navForRole(activeRole), [activeRole]);
+  const canReport = canReportIssues(userProfile, isAdmin);
+  const groups = useMemo(() => navForRole(activeRole, { canReport }), [activeRole, canReport]);
   const pages = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
   useEffect(() => {
@@ -78,7 +79,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         logoHref={dashboardPathForRole(activeRole)}
         logoSubtitle="Campus operations"
         sidebarFooter={
-          activeRole !== "user"
+          activeRole === "admin"
             ? ({ collapsed, onNavigate }) =>
                 collapsed ? (
                   <Link href="/dashboard/report" aria-label="Report an issue" title="Report an issue" className={buttonClasses("secondary", "md", "w-full px-0")}>

@@ -27,7 +27,7 @@ export function validateLocationInput(input: NewLocationInput): NewLocationInput
   return { id, name, buildingId: input.buildingId, floor, room };
 }
 
-/** Shape every location id must have before it is looked up (QR links are untrusted input). */
+/** Shape every location id must have before it is looked up (URL values are untrusted input). */
 export function isLocationIdShape(id: unknown): id is string {
   return typeof id === "string" && /^[a-z0-9-]{1,60}$/.test(id);
 }

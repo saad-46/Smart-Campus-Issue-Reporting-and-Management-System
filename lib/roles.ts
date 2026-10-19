@@ -23,6 +23,17 @@ export function getAvailableRoles(profile: User | null, hasAdminGrant: boolean):
 }
 
 /**
+ * Whether this account may report issues. Mirrors canReport() in
+ * firestore.rules, an allow-list: an administrator (admins/{uid}), or an
+ * account whose stored role is exactly "user". A worker cannot, whichever view
+ * it has switched to, and neither can an account with no profile or an
+ * unrecognised role.
+ */
+export function canReportIssues(profile: User | null, hasAdminGrant: boolean): boolean {
+  return hasAdminGrant || profile?.role === "user";
+}
+
+/**
  * The role the UI should currently present. A stored activeRole the account
  * isn't entitled to (e.g. left over from an older version) is ignored.
  */

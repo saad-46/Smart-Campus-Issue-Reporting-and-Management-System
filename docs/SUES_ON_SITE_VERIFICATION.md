@@ -54,9 +54,7 @@ Approval required:        (name and date of the person allowed to raise the stat
 | `college-of-pharmacy` | Sultan-ul-Uloom College of Pharmacy | 17.427733, 78.443553 (±40) | approximate | Its main entrance and whether the OSM outline (way 737603230) is this college |
 | `sports-grounds` | Sports grounds | 17.4290, 78.4451 (±60) | approximate | Where each court and ground is; the grounds lie outside the mapped college outline, so whether they belong to this campus boundary |
 | `physical-education` | Shuttle court (Physical Education) | 17.4283, 78.4429 (±30) | approximate | The court beside the "Physical Education" sign |
-| `gymnasium` | Gymnasium | 17.4270, 78.4416 (±80) | approximate | The gymnasium's entrance; latitude was printed to three decimals |
 | `garden` | Garden | 17.427552, 78.441702 (±20) | approximate | That the OSM park way 737554364 is the garden operated by the college |
-| `sbi` | State Bank of India (as mapped) | 17.4275672, 78.4422612 (±20) | unverified | Whether the branch is inside the campus, and who may use it |
 
 ## 2. Reportable locations with no known position (6)
 
@@ -81,7 +79,7 @@ For each, also note whether it shares a building with another institution; the d
 | Geotagged photograph inside the hall | 17.4282, 78.4435 | 5 Nov 2022 | `naac-411-c` |
 | Geotagged photograph inside the hall | 17.4270, 78.4416 | 2 Jan 2023 | `naac-411-c` |
 
-To resolve: stand at the hall's main door, record three readings and photograph the name board. Then check whether the 2023 photograph's position is instead the gymnasium (`gymnasium` is geotagged at the same 17.4270, 78.4416) or a second hall or lobby. Record which explanation the evidence supports; do not pick one without it.
+To resolve: stand at the hall's main door, record three readings and photograph the name board. Then check whether the 2023 photograph's position is instead a second hall or lobby. Record which explanation the evidence supports; do not pick one without it.
 
 ## 4. Mapped footprints (6): which building is which
 

@@ -11,6 +11,7 @@ import {
   CAMPUS_GRID,
   CAMPUS_LOCATIONS,
   findCanonicalLocation,
+  getBuilding,
   getCanonicalLocation,
   isInCampusView,
   isValidCoordinate,
@@ -108,7 +109,6 @@ describe("places and locations", () => {
   it("no position is called verified: every one comes from a coarse geotag or a single map source", () => {
     expect(locations.places.filter((p) => p.verificationStatus === "verified")).toEqual([]);
     expect(locations.places.find((p) => p.id === "ghulam-ahmed-hall")?.verificationStatus).toBe("conflicting");
-    expect(locations.places.find((p) => p.id === "sbi")?.verificationStatus).toBe("unverified");
   });
 
   it("distinct places are not stacked on one point", () => {
@@ -148,7 +148,9 @@ describe("places and locations", () => {
     expect(searchCampusLocations("auditorium").map((l) => l.id)).toEqual(["mjcet-ghulam-ahmed-hall"]);
     expect(searchCampusLocations("pharmacy").map((l) => l.id)).toContain("sucp-college");
     expect(searchCampusLocations("12 jubilee hills road")).toEqual([]);
-    expect(findCanonicalLocation("the gym lights are off")?.id).toBe("mjcet-gymnasium");
+    // Places that were removed from the dataset are never matched from free text.
+    expect(findCanonicalLocation("the gym lights are off")).toBeUndefined();
+    expect(findCanonicalLocation("queue at the SBI branch")).toBeUndefined();
     expect(findCanonicalLocation("nothing to see")).toBeUndefined();
   });
 });
@@ -241,9 +243,27 @@ describe("on-site verification checklist", () => {
   });
 
   it("states the counts it was written for, so a changed dataset is noticed", () => {
-    expect(locations.places).toHaveLength(9);
-    expect(locations.locations.filter((l) => !l.placeId)).toHaveLength(6); // the library and five institutions; the unverified bank has a place
+    expect(locations.places).toHaveLength(7);
+    expect(locations.locations.filter((l) => !l.placeId)).toHaveLength(6); // the library and five institutions
     expect(features.filter((f) => f.properties.kind === "gate")).toHaveLength(6);
     expect(features.filter((f) => f.properties.kind === "building")).toHaveLength(6);
+  });
+});
+
+describe("places that are not part of the campus dataset", () => {
+  const BANNED = /gymnasium|\bgym\b|\bsbi\b|state bank/i;
+
+  it("are absent from places, locations, aliases and search", () => {
+    expect(JSON.stringify(locations)).not.toMatch(BANNED);
+    expect(CAMPUS_LOCATIONS.map((l) => `${l.id} ${l.name} ${(l.aliases ?? []).join(" ")}`).join("\n")).not.toMatch(BANNED);
+    expect(BUILDINGS.map((b) => `${b.id} ${b.name} ${b.short}`).join("\n")).not.toMatch(BANNED);
+    for (const q of ["gym", "gymnasium", "sbi", "state bank", "bank"]) expect(searchCampusLocations(q), q).toEqual([]);
+  });
+
+  it("have no id that resolves", () => {
+    for (const id of ["gymnasium", "mjcet-gymnasium", "sbi", "sbi-as-mapped"]) {
+      expect(getCanonicalLocation(id), id).toBeUndefined();
+      expect(getBuilding(id), id).toBeUndefined();
+    }
   });
 });

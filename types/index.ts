@@ -71,7 +71,7 @@ export interface Issue {
   aiConfidence: number | null;
   /** Suggested handling team. */
   aiDepartment: string;
-  /** campusLocations/{id} when the issue was reported through a location QR code. */
+  /** campusLocations/{id} when the issue was reported against a managed location. */
   locationId: string;
   /** Master issue of the incident this report belongs to ("" when standalone). */
   duplicateOf: string;
@@ -179,7 +179,7 @@ export interface Feedback {
   createdAt: Date;
 }
 
-/** An admin-managed reportable place (campusLocations/{id}), used for QR codes. */
+/** An admin-managed reportable place (campusLocations/{id}), offered when reporting. */
 export interface CampusLocation {
   id: string;
   name: string;

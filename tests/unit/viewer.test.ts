@@ -244,7 +244,7 @@ describe("viewer navigation and perspectives", () => {
 
   it("the admin menu mirrors the signed-in admin menu", () => {
     const admin = navForViewerRole("admin").flatMap((g) => g.items.map((i) => i.label));
-    for (const label of ["Overview", "Issues", "Analytics", "Campus map", "Workers", "Finance", "Locations & QR", "Settings"]) expect(admin).toContain(label);
+    for (const label of ["Overview", "Issues", "Analytics", "Campus map", "Workers", "Finance", "Locations", "Settings"]) expect(admin).toContain(label);
   });
 
   it("deep links to role-specific pages switch to that perspective", () => {

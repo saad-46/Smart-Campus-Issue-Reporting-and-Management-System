@@ -44,7 +44,7 @@ function roomOf(location: string): string | null {
   return location.toLowerCase().replace(/\bblocks?\s*\d+\b/g, " ").match(/\b(?:room|lab|hall|restroom|washroom)?\s*(\d{1,4}[a-z]?)\b/)?.[1] ?? null;
 }
 
-/** Group key + label for a place: a QR location, else building + room, else the text itself. */
+/** Group key + label for a place: a managed location, else building + room, else the text itself. */
 function placeOf(issue: IssueSummary, locationBuildings: Map<string, string>, locationNames: Map<string, string>) {
   if (issue.locationId) {
     return {

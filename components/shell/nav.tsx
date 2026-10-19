@@ -35,7 +35,7 @@ export interface NavGroup {
 }
 
 /** Navigation per role. Kept short and grouped; every item is a real page. */
-export function navForRole(role: UserRole): NavGroup[] {
+export function navForRole(role: UserRole, options: { canReport?: boolean } = {}): NavGroup[] {
   if (role === "admin") {
     return [
       {
@@ -58,7 +58,7 @@ export function navForRole(role: UserRole): NavGroup[] {
       {
         label: "Configuration",
         items: [
-          { label: "Locations & QR", href: "/admin/locations", icon: <MapPin /> },
+          { label: "Locations", href: "/admin/locations", icon: <MapPin /> },
           { label: "Settings", href: "/admin/settings", icon: <Settings /> },
         ],
       },
@@ -70,7 +70,6 @@ export function navForRole(role: UserRole): NavGroup[] {
         label: "Work",
         items: [
           { label: "My work", href: "/worker", icon: <HardHat /> },
-          { label: "Report an issue", href: "/dashboard/report", icon: <PlusCircle /> },
           { label: "Search", href: "/search", icon: <Search /> },
         ],
       },
@@ -92,7 +91,7 @@ export function navForRole(role: UserRole): NavGroup[] {
           icon: <Globe2 />,
           match: (p, tab) => p === "/dashboard" && tab === "explore",
         },
-        { label: "Report an issue", href: "/dashboard/report", icon: <PlusCircle /> },
+        ...(options.canReport === false ? [] : [{ label: "Report an issue", href: "/dashboard/report", icon: <PlusCircle /> }]),
         { label: "Search", href: "/search", icon: <Search /> },
       ],
     },

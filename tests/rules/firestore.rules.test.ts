@@ -509,6 +509,180 @@ describe("updating issues as a normal user", () => {
 });
 
 // ------------------------------------------------------------------
+// Reporting is for students and administrators. A worker is an account whose
+// users/{uid}.role is "worker" (only an admin can set that), and the rule does
+// not look at activeRole or at anything the client puts in the issue.
+describe("who may report an issue", () => {
+  it("a student can report a valid issue", async () => {
+    await assertSucceeds(createIssue(ALICE));
+  });
+
+  it("an administrator can report an issue", async () => {
+    await assertSucceeds(createIssue(ADMIN));
+  });
+
+  it("an administrator who also holds the worker role can still report", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "users", ADMIN), profile(ADMIN, "worker"));
+    });
+    await assertSucceeds(createIssue(ADMIN));
+  });
+
+  it("an account that has only asked for worker access is still a student until an admin approves it", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "users", BOB), { ...profile(BOB, "user"), workerRequest: "pending" });
+    });
+    await assertSucceeds(createIssue(BOB));
+  });
+
+  it("a worker cannot report an issue", async () => {
+    await assertFails(createIssue(WENDY));
+    await assertFails(createIssue(WALT, {}, "other-worker"));
+  });
+
+  it("a worker cannot report by writing the issue directly, with or without the rate-limit stamp", async () => {
+    await assertFails(setDoc(doc(dbAs(WENDY), "issues", "direct"), newIssue(WENDY)));
+    await assertFails(addDoc(collection(dbAs(WENDY), "issues"), newIssue(WENDY)));
+    const db = dbAs(WENDY);
+    const batch = writeBatch(db);
+    batch.set(doc(db, "issues", "batched"), newIssue(WENDY));
+    await assertFails(batch.commit());
+    // Nothing was created.
+    const count = (await getDocs(collection(dbAs(ADMIN), "issues"))).size;
+    expect(count).toBe(0);
+  });
+
+  it("a worker cannot get around it by switching to the student view", async () => {
+    // Switching the active view is allowed (it changes what the app shows)...
+    await assertSucceeds(updateDoc(doc(dbAs(WENDY), "users", WENDY), { activeRole: "user" }));
+    // ...but the rule reads the stored role, so reporting is still refused.
+    await assertFails(createIssue(WENDY, {}, "after-switch"));
+  });
+
+  it("a worker cannot change their own role to remove the restriction", async () => {
+    const ref = doc(dbAs(WENDY), "users", WENDY);
+    await assertFails(updateDoc(ref, { role: "user" }));
+    await assertFails(updateDoc(ref, { role: "user", roles: ["user"], activeRole: "user" }));
+    await assertFails(setDoc(ref, profile(WENDY, "user")));
+    await assertFails(createIssue(WENDY, {}, "after-role-edit"));
+  });
+
+  it("a worker cannot report in someone else's name, or by adding role or author fields to the issue", async () => {
+    await assertFails(createIssue(ALICE, {}, "forged", dbAs(WENDY)));
+    await assertFails(createIssue(WENDY, { createdBy: ALICE }, "forged-author"));
+    await assertFails(createIssue(WENDY, { createdByName: "alice" }, "forged-name"));
+    await assertFails(createIssue(WENDY, { role: "user" }, "role-field"));
+    await assertFails(createIssue(WENDY, { activeRole: "user", authorRole: "user" }, "role-fields"));
+    await assertFails(createIssue(WENDY, { reportedBy: ALICE }, "reported-by"));
+  });
+
+  it("the same issue is accepted from a student, so the refusals above are about the author's role", async () => {
+    await assertSucceeds(createIssue(ALICE, { createdByName: "alice" }, "control"));
+  });
+
+  it("a signed-out visitor cannot report", async () => {
+    await assertFails(createIssue("ghost", {}, "anon", dbAnon()));
+    await assertFails(addDoc(collection(dbAnon(), "issues"), newIssue("ghost")));
+  });
+
+  describe("only a recognised profile or an admin grant counts", () => {
+    const GHOST = "ghost"; // signed in, but no profile document
+
+    it("a signed-in account with no profile cannot report", async () => {
+      await assertFails(createIssue(GHOST));
+      await assertFails(createIssue(GHOST, {}, "second-try"));
+    });
+
+    it("an administrator with an admin grant can report even without a profile document", async () => {
+      await seed(async (db) => {
+        await setDoc(doc(db, "admins", GHOST), { grantedAt: new Date() });
+      });
+      await assertSucceeds(createIssue(GHOST));
+    });
+
+    it.each([
+      ["an unrecognised role", { role: "superuser" }],
+      ["an empty role", { role: "" }],
+      ["a differently cased role", { role: "User" }],
+      ["a role with trailing space", { role: "user " }],
+      ["a stored 'admin' role without an admin grant", { role: "admin" }],
+      ["a non-string role", { role: 1 }],
+      ["a role list that says user but a role that does not", { role: "worker", roles: ["user"], activeRole: "user" }],
+    ] as [string, Record<string, unknown>][])("an account with %s cannot report", async (_name, fields) => {
+      await seed(async (db) => {
+        await setDoc(doc(db, "users", GHOST), { ...profile(GHOST, "user"), ...fields });
+      });
+      await assertFails(createIssue(GHOST));
+    });
+
+    it("an account whose profile has no role field at all cannot report", async () => {
+      await seed(async (db) => {
+        const { role, ...withoutRole } = profile(GHOST, "user");
+        void role;
+        await setDoc(doc(db, "users", GHOST), withoutRole);
+      });
+      await assertFails(createIssue(GHOST));
+    });
+
+    it("activeRole cannot stand in for a missing or wrong stored role", async () => {
+      await seed(async (db) => {
+        await setDoc(doc(db, "users", GHOST), { ...profile(GHOST, "user"), role: "superuser", activeRole: "user" });
+      });
+      await assertFails(createIssue(GHOST));
+      // The owner may switch activeRole but cannot repair the stored role.
+      await assertFails(updateDoc(doc(dbAs(GHOST), "users", GHOST), { role: "user" }));
+      await assertFails(createIssue(GHOST, {}, "still-no"));
+    });
+
+    it("registration: a new account cannot report until its profile exists, then can", async () => {
+      const NEWBIE = "newbie";
+      // Authenticated, profile not written yet (registration is mid-way, or was interrupted).
+      await assertFails(createIssue(NEWBIE));
+      // The app writes the profile exactly as the rules require.
+      await assertSucceeds(setDoc(doc(dbAs(NEWBIE), "users", NEWBIE), profile(NEWBIE, "user")));
+      await assertSucceeds(createIssue(NEWBIE, {}, "first-report"));
+    });
+
+    it("registration with a worker-access request: a student until an admin approves", async () => {
+      const APPLICANT = "applicant";
+      await assertSucceeds(setDoc(doc(dbAs(APPLICANT), "users", APPLICANT), { ...profile(APPLICANT, "user"), workerRequest: "pending" }));
+      await assertSucceeds(createIssue(APPLICANT, {}, "while-pending"));
+      // The request cannot be used to promote the account.
+      await assertFails(updateDoc(doc(dbAs(APPLICANT), "users", APPLICANT), { role: "worker" }));
+      // Once an admin approves it the account is a worker and can no longer report.
+      await assertSucceeds(updateDoc(doc(dbAs(ADMIN), "users", APPLICANT), { role: "worker", workerRequest: "approved" }));
+      await assertFails(createIssue(APPLICANT, {}, "after-approval"));
+    });
+
+    it("registration cannot create a worker or an admin profile directly", async () => {
+      await assertFails(setDoc(doc(dbAs("sneak1"), "users", "sneak1"), profile("sneak1", "worker")));
+      await assertFails(setDoc(doc(dbAs("sneak2"), "users", "sneak2"), { ...profile("sneak2", "user"), role: "admin" }));
+      await assertFails(createIssue("sneak1", {}, "no-profile-1"));
+      await assertFails(createIssue("sneak2", {}, "no-profile-2"));
+    });
+  });
+
+  it("a worker's workflow is unaffected: claim, start, resolve and read", async () => {
+    await seedIssue("open", { createdBy: ALICE });
+    await seedIssue("claimed", { createdBy: ALICE, assignedTo: WENDY });
+    await seedIssue("working", { createdBy: ALICE, assignedTo: WENDY, status: "In Progress" });
+    const wendy = dbAs(WENDY);
+    await assertSucceeds(getDoc(doc(wendy, "issues", "open")));
+    await assertSucceeds(updateDoc(doc(wendy, "issues", "open"), { assignedTo: WENDY, updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(wendy, "issues", "claimed"), { status: "In Progress", startedAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(wendy, "issues", "working"), { status: "Resolved", resolvedAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+  });
+
+  it("a student's and an administrator's other issue workflows are unaffected", async () => {
+    await seedIssue("mine", { createdBy: ALICE });
+    await seedIssue("upvote-me", { createdBy: BOB, upvotes: 0, upvotedBy: [] });
+    await assertSucceeds(updateDoc(doc(dbAs(ALICE), "issues", "upvote-me"), { upvotes: 1, upvotedBy: [ALICE] }));
+    await assertSucceeds(updateDoc(doc(dbAs(ADMIN), "issues", "mine"), { priority: "High", updatedAt: serverTimestamp() }));
+    await assertSucceeds(deleteDoc(doc(dbAs(ALICE), "issues", "mine")));
+  });
+});
+
+// ------------------------------------------------------------------
 describe("upvoting", () => {
   beforeEach(async () => {
     await seedIssue("i1", { createdBy: BOB, upvotes: 1, upvotedBy: ["carol"] });

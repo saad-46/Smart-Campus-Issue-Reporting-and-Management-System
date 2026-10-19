@@ -34,7 +34,7 @@ export interface ViewerContextValue {
   workerName: (id: string) => string;
   /** Researched campus locations plus any added during this visit. */
   locations: DemoLocation[];
-  /** A location from an untrusted id (a QR link); undefined unless it is known. */
+  /** A location from an untrusted id (a URL value); undefined unless it is known. */
   findLocation: (id: unknown) => DemoLocation | undefined;
   messagesFor: (issueId: string) => DemoMessage[];
   /** Simulated changes made since the baseline. */
@@ -61,7 +61,7 @@ export interface ViewerContextValue {
   addFunds: (amount: number | string) => string | null;
   addLocation: (input: NewLocationInput) => { id?: string; error?: string };
   deleteLocation: (id: string) => boolean;
-  /** Toast for an action that has no state of its own (exports, QR printing). */
+  /** Toast for an action that has no state of its own (exports). */
   demoToast: (title: string, description?: string) => void;
   // ---- tour and search ----
   openTour: (fromStart?: boolean) => void;

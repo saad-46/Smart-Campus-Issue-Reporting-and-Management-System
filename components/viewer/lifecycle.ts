@@ -6,7 +6,7 @@ export const LIFECYCLE: { title: string; short: string; detail: string; who: str
   {
     title: "Report",
     short: "Students report a campus issue.",
-    detail: "A title, description and location, with up to three photos — or scan a location's QR code so the place is filled in.",
+    detail: "A title, description and location, with up to three photos. Pick the place from the campus list or on the map.",
     who: "Students and staff",
   },
   {

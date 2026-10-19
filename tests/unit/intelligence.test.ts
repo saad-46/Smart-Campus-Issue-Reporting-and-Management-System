@@ -267,7 +267,7 @@ describe("analytics", () => {
   const list = [
     issue({ category: "Electrical", status: "Resolved", priority: "High", createdAt: new Date(NOW.getTime() - 10 * H), resolvedAt: new Date(NOW.getTime() - 8 * H), assignedTo: "w1", location: "Block 1" }),
     issue({ category: "Electrical", status: "Resolved", createdAt: new Date(NOW.getTime() - 10 * H), resolvedAt: new Date(NOW.getTime() - 4 * H), assignedTo: "w1", location: "Block 1" }),
-    issue({ category: "Plumbing", status: "In Progress", assignedTo: "w2", location: "Gymnasium" }),
+    issue({ category: "Plumbing", status: "In Progress", assignedTo: "w2", location: "Shuttle court" }),
     issue({ category: "Plumbing", status: "Open", location: "Unknown" }),
   ];
 
@@ -286,7 +286,7 @@ describe("analytics", () => {
     expect(applyFilters(list, { category: "Plumbing" })).toHaveLength(2);
     expect(applyFilters(list, { status: "Resolved", priority: "High" })).toHaveLength(1);
     expect(applyFilters(list, { workerId: "w1" })).toHaveLength(2);
-    expect(applyFilters(list, { buildingId: "gymnasium" })).toHaveLength(1);
+    expect(applyFilters(list, { buildingId: "physical-education" })).toHaveLength(1);
     expect(applyFilters(list, { department: "Plumbing & Water" })).toHaveLength(2);
   });
 

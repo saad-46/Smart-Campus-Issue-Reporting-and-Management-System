@@ -389,20 +389,3 @@
   .glass-blur { background: var(--surface); }
   .glass-bar::before { background: var(--surface); }
 }
-
-/* Printing a location QR code: only the .print-area is printed. */
-@media print {
-  body:has(.print-area) * {
-    visibility: hidden;
-  }
-  body:has(.print-area) .print-area,
-  body:has(.print-area) .print-area * {
-    visibility: visible;
-  }
-  .print-area {
-    position: fixed;
-    inset: 0;
-    background: #fff;
-    color: #000;
-  }
-}

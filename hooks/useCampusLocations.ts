@@ -6,7 +6,7 @@ import { listCampusLocations } from "@/lib/locations";
 import { describeLocation } from "@/lib/campus";
 import { logError } from "@/lib/errors";
 
-/** Admin-managed QR locations, plus lookups used by the map and analytics. */
+/** Admin-managed locations, plus lookups used by the map and analytics. */
 export function useCampusLocations() {
   const [locations, setLocations] = useState<CampusLocation[] | null>(null);
   const [error, setError] = useState(false);
