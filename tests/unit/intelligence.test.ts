@@ -116,7 +116,8 @@ describe("AI issue intelligence", () => {
 // ------------------------------------------------------------------
 describe("campus layout", () => {
   it("matches buildings from free text", () => {
-    expect(matchBuilding("Block 2, Room 204")?.id).toBe("blocks-1-2-5");
+    expect(matchBuilding("Block 2, Room 204")?.id).toBe("ghulam-ahmed-hall"); // Block 2 and Ghulam Ahmed Hall are one building
+    expect(matchBuilding("Block 1, Room 12")?.id).toBe("blocks-1-2-5");
     expect(matchBuilding("block-4 near the stairs")?.id).toBe("blocks-3-4");
     expect(matchBuilding("Seminar Hall")?.id).toBe("blocks-3-4");
     expect(matchBuilding("Ghulam Ahmed Hall, back row")?.id).toBe("ghulam-ahmed-hall");
@@ -142,6 +143,8 @@ describe("campus layout", () => {
     // Canonical location ids resolve without a map; a known location with no known position is never guessed.
     expect(buildingForIssue({ location: "anything", locationId: "mjcet-block-4" })?.id).toBe("blocks-3-4");
     expect(buildingForIssue({ location: "Block 1", locationId: "mjcet-central-library" })).toBeUndefined();
+    // A retired location (the Shuttle court) stays unplaced: its text is not matched to another building.
+    expect(buildingForIssue({ location: "Shuttle court (Physical Education), Block 1", locationId: "mjcet-shuttle-court" })).toBeUndefined();
   });
 
   it("slugifies and describes locations", () => {
@@ -267,7 +270,7 @@ describe("analytics", () => {
   const list = [
     issue({ category: "Electrical", status: "Resolved", priority: "High", createdAt: new Date(NOW.getTime() - 10 * H), resolvedAt: new Date(NOW.getTime() - 8 * H), assignedTo: "w1", location: "Block 1" }),
     issue({ category: "Electrical", status: "Resolved", createdAt: new Date(NOW.getTime() - 10 * H), resolvedAt: new Date(NOW.getTime() - 4 * H), assignedTo: "w1", location: "Block 1" }),
-    issue({ category: "Plumbing", status: "In Progress", assignedTo: "w2", location: "Shuttle court" }),
+    issue({ category: "Plumbing", status: "In Progress", assignedTo: "w2", location: "Sports Center" }),
     issue({ category: "Plumbing", status: "Open", location: "Unknown" }),
   ];
 
@@ -286,7 +289,7 @@ describe("analytics", () => {
     expect(applyFilters(list, { category: "Plumbing" })).toHaveLength(2);
     expect(applyFilters(list, { status: "Resolved", priority: "High" })).toHaveLength(1);
     expect(applyFilters(list, { workerId: "w1" })).toHaveLength(2);
-    expect(applyFilters(list, { buildingId: "physical-education" })).toHaveLength(1);
+    expect(applyFilters(list, { buildingId: "sports-center" })).toHaveLength(1);
     expect(applyFilters(list, { department: "Plumbing & Water" })).toHaveLength(2);
   });
 

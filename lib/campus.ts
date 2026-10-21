@@ -33,7 +33,7 @@ export const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
 
 export const VERIFICATION_MEANINGS = locationsJson.statusMeanings as Record<VerificationStatus, string>;
 
-export type PlaceType = "academic" | "hall" | "institution" | "sports" | "grounds" | "library";
+export type PlaceType = "academic" | "hall" | "institution" | "sports" | "grounds" | "library" | "worship";
 
 export const PLACE_TYPE_LABELS: Record<PlaceType, string> = {
   academic: "Academic block",
@@ -42,6 +42,7 @@ export const PLACE_TYPE_LABELS: Record<PlaceType, string> = {
   sports: "Sports",
   grounds: "Grounds",
   library: "Library",
+  worship: "Place of worship",
 };
 
 export const CAMPUS = campusJson;
@@ -105,6 +106,8 @@ export interface Building {
   y: number;
   /** How far the true position may be from the marker. */
   precisionMeters: number;
+  /** The OpenStreetMap footprint (geometry.json) this place stands on, when one has been identified. */
+  footprint: string | null;
   verificationStatus: VerificationStatus;
   sourceIds: string[];
   notes: string;
@@ -125,6 +128,7 @@ export const BUILDINGS: Building[] = locationsJson.places.map((p) => {
     x,
     y,
     precisionMeters: p.precisionMeters,
+    footprint: "footprint" in p ? (p.footprint as string) : null,
     verificationStatus: p.verificationStatus as VerificationStatus,
     sourceIds: p.sourceIds,
     notes: p.notes,
@@ -174,6 +178,24 @@ export function getCanonicalLocation(id: string | undefined | null): CampusPlace
   return id ? LOCATION_BY_ID.get(id) : undefined;
 }
 
+/**
+ * Locations that were part of the campus data and have been removed (for example
+ * "Shuttle court"). Reports that name one keep their stored text and are shown as
+ * not placed on the map; they are never moved to another building, and a retired
+ * id is never reused.
+ */
+export interface RetiredLocation {
+  id: string;
+  name: string;
+  reason: string;
+}
+
+export const RETIRED_LOCATIONS: RetiredLocation[] = locationsJson.retiredLocations.map((r) => ({ id: r.id, name: r.name, reason: r.reason }));
+
+export function getRetiredLocation(id: string | undefined | null): RetiredLocation | undefined {
+  return id ? RETIRED_LOCATIONS.find((r) => r.id === id) : undefined;
+}
+
 /** Canonical locations whose name or an alias contains the query (case-insensitive). */
 export function searchCampusLocations(query: string, includeInactive = false): CampusPlace[] {
   const q = query.trim().toLowerCase();
@@ -220,6 +242,8 @@ export function buildingForIssue(
     const canonical = getCanonicalLocation(issue.locationId);
     // A known location with no known position stays unplaced; don't fall back to guessing from its name.
     if (canonical) return getBuilding(canonical.placeId);
+    // A retired location stays unplaced too: its text must not be matched to a different building.
+    if (getRetiredLocation(issue.locationId)) return undefined;
   }
   return matchBuilding(issue.location);
 }

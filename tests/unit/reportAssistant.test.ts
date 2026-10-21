@@ -28,7 +28,7 @@ describe("rules engine: representative campus problems", () => {
     ["The lights in the corridor of Block 3 are flickering", "Electrical", "Block 3"],
     ["The desk in Block 1 is wobbling and the whiteboard is loose", "Furniture", "Block 1"],
     ["The wifi is not working in Block 5", "IT", "Block 5"],
-    ["Garbage is piling up near the shuttle court and it smells", "Cleanliness", "Shuttle court"],
+    ["Garbage is piling up near the Sports Center and it smells", "Cleanliness", "Sports Center"],
   ];
   it.each(cases)("%s", (text, category) => {
     const d = assistWithRules([text]);

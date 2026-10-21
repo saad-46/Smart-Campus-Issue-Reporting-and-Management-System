@@ -17,8 +17,8 @@ How the data was researched, what each source supports and what could not be est
 - Every place and location needs `verificationStatus` and at least one `sourceIds` entry that exists in `research-sources.json`. The meanings of the statuses are in `locations.json` (`statusMeanings`).
 - Do not mark a position `verified` without an official source for both what the place is and where it is. Today no position is.
 - Do not add floors, room numbers, laboratory counts or building uses that a public source does not state. People type those themselves when reporting.
-- Do not name an OpenStreetMap footprint. They stay "Mapped building A–F" until someone confirms on site which block is which.
-- Ids are stable: stored issues and managed locations refer to them. Retire a location with `"isActive": false`; never reuse or rename an id.
+- Do not name an OpenStreetMap footprint on a guess. A place may stand on a footprint (`footprint` on the place) only when the owner or a source has identified it; the six owner identifications are recorded under the `owner-annotation` source. The remaining footprints stay unnamed, and the map draws no letters on any of them.
+- Ids are stable: stored issues and managed locations refer to them. Retire a location with `"isActive": false`, or remove it and list it under `retiredLocations` (as the Shuttle court was); never reuse or rename an id.
 - Coordinates are WGS84. GeoJSON uses `[longitude, latitude]`; `places` use named `latitude` / `longitude` fields.
 - Do not add restricted or security-sensitive places (CCTV, server rooms, guard posts, hostel room lists).
 

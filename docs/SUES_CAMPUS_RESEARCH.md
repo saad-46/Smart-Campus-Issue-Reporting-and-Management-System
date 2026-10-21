@@ -81,28 +81,32 @@ At Mount Pleasant:
 
 Elsewhere, listed but never drawn: Sultan-Ul-Uloom Public Schools, Old City (Syed Ali Chabutra, Golconda, Khazipura, Hafiz Baba Nagar) and the SU Knowledge Hub Foundation.
 
-## Map places (9)
+## Map places (11)
 
 | Place | Position | Within about | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| Blocks 1, 2 and 5 area | 17.4285, 78.4439 | 30 m | Approximate | Photographs captioned Block 1, Block 2 and Block 5 share this geotag |
+| Blocks 1 and 5 area | 17.4285, 78.4439 | 30 m | Approximate | Photographs captioned Block 1 and Block 5 share this geotag (Block 2 shared it too, and now stands at Ghulam Ahmed Hall) |
 | Blocks 3 and 4 area | 17.4277, 78.4420 | 60 m | Approximate | Photographs captioned Block 3 and Block 4, and the seminar hall; longitude printed to three decimals |
-| Ghulam Ahmed Hall | 17.4282, 78.4435 | 60 m | Sources disagree | Two photographs (2018, 2022) here; a third (2023) is geotagged 17.4270, 78.4416, about 240 m away |
+| Ghulam Ahmed Hall (Block 2) | 17.428343, 78.443476 | 20 m | Approximate | Centre of footprint way 340053345, which the owner identified as both the hall and Block 2. Earlier geotags: two photographs at 17.4282, 78.4435, a third 240 m away |
+| Masjid | 17.427629, 78.442472 | 20 m | Approximate | Footprint way 340051389, identified by the owner; no public source |
+| Sports Center | 17.427491, 78.442963 | 20 m | Approximate | Footprint way 775585790, identified by the owner; no public source |
+| College of Business Administration | 17.427848, 78.444211 | 20 m | Approximate | Footprint way 340052921, identified by the owner (MBA) |
+| College of Law | 17.427867, 78.444486 | 20 m | Approximate | Footprint way 340053223, identified by the owner (LAW) |
+| SUPS and SUJC | 17.428287, 78.445168 | 20 m | Approximate | Footprint way 340053098, the building nearest the area the owner marked; shared by both institutions |
 | College of Pharmacy | 17.42773, 78.44355 | 40 m | Approximate | Centre of the OSM outline with that name (way 737603230); one map source |
 | Sports grounds | 17.4290, 78.4451 | 60 m | Approximate | Basketball, volleyball and football photographs; OSM maps grass beside it |
-| Shuttle court (Physical Education) | 17.4283, 78.4429 | 30 m | Approximate | One photograph beside a "Physical Education" sign |
 | Garden | 17.42755, 78.44170 | 20 m | Approximate | OSM park named "Garden", operator MJCET (way 737554364); one map source |
 
-Counts: 0 verified, 0 corroborated, 7 approximate, 1 conflicting, 1 unverified.
+Counts: 0 verified, 0 corroborated, 11 approximate, 0 conflicting, 0 unverified. Six of the 11 positions rest on the owner's annotated map (source `owner-annotation`), not on a public source. The Shuttle court was removed at the owner's direction and is listed under `retiredLocations` in `locations.json`.
 
 The geotags are **camera positions**, not building centres, and a phone's overlay rounds them. Each marker is drawn with a dashed ring of its "within about" radius so the uncertainty is visible.
 
-## Reportable locations (19)
+## Reportable locations (18)
 
-Block 1, Block 2, Block 3, Block 4, Block 5, Seminar Hall (Block 4), Ghulam Ahmed Hall, S.M. Nizamuddin Central Library, Sports grounds, Shuttle court, Garden, and the six other institutions.
+Block 1, Block 2, Block 3, Block 4, Block 5, Seminar Hall (Block 4), Ghulam Ahmed Hall, S.M. Nizamuddin Central Library, Sports grounds, Garden, the Masjid, the Sports Center, and the six other institutions.
 
-- 13 are attached to a map place (11 approximate, 1 conflicting, 1 unverified).
-- **6 have no known position** and no marker: the Central Library, and the Colleges of Law, Business Administration and Education, the Junior College and the Public School. Their existence at Mount Pleasant is supported; where they stand inside the campus is not published. Issues reported there are counted as "not placed on the map" and never guessed onto a marker.
+- 16 are attached to a map place (all approximate).
+- **2 have no known position** and no marker: the Central Library and the College of Education. Their existence at Mount Pleasant is supported; where they stand inside the campus is not published. Issues reported there are counted as "not placed on the map" and never guessed onto a marker.
 
 No floors, room numbers, laboratory lists, canteens, hostels, parking areas or department locations are in the dataset, because no public source read here documents them. A reporter can type those details; the app stores them as the reporter's words.
 
@@ -112,7 +116,7 @@ One Overpass extract, OSM base timestamp 2026-10-09T06:11:06Z, reduced to 197 fe
 
 | Feature | Count | Notes |
 | --- | --- | --- |
-| Campus building footprints | 6 | Ways 340051389, 897374294, 775585790, 340053345, 340053359, 339688893. Unnamed in OSM; labelled "Mapped building A–F, use not verified" |
+| Campus building footprints | 6 | Ways 340051389, 897374294, 775585790, 340053345, 340053359, 339688893. Unnamed in OSM; the map draws no letters on them. Identified by the owner: A the Masjid, C the Sports Center, D Ghulam Ahmed Hall and Block 2 |
 | Mapped college outline | 1 | Way 737548446; incomplete |
 | College of Pharmacy outline | 1 | Way 737603230 |
 | Roads and service roads | 48 | Includes Road No. 3 |

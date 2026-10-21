@@ -372,7 +372,7 @@ test.describe("analytics, theme and interface", () => {
     await expect(page.locator("main")).toContainText("none of these issues happened");
     // Real footprints, never a guessed building name.
     expect(await map.locator("[data-layer=footprints] path, [data-layer=footprints] polygon").count()).toBe(6);
-    expect(await map.locator("[data-place]").count()).toBe(7);
+    expect(await map.locator("[data-place]").count()).toBe(11);
     // Places that are not part of the campus dataset are never drawn.
     await expect(map).not.toContainText(/Gymnasium|SBI|State Bank/);
     await expect(map).not.toContainText(/Computer Science|Block A|Hostel|Canteen/);
@@ -400,7 +400,7 @@ test.describe("analytics, theme and interface", () => {
     await page.getByRole("checkbox", { name: "Campus places" }).uncheck();
     await expect(map.locator("[data-place]")).toHaveCount(0);
     await page.getByRole("checkbox", { name: "Campus places" }).check();
-    await expect(map.locator("[data-place]")).toHaveCount(7);
+    await expect(map.locator("[data-place]")).toHaveCount(11);
 
     const search = page.getByRole("searchbox", { name: "Search the map" }).or(page.getByLabel("Search the map"));
     await search.fill("seminar");
@@ -410,9 +410,9 @@ test.describe("analytics, theme and interface", () => {
     await search.fill("12 jubilee hills road");
     await expect(page.locator("main")).toContainText("No mapped place matches");
     await search.fill("");
-    await page.getByLabel("Verification", { exact: true }).selectOption({ label: "Sources disagree" });
-    await expect(page.locator("main")).toContainText("1 place highlighted.");
-    await expect(page.getByRole("button", { name: /Remove filter: Sources disagree/ })).toBeVisible();
+    await page.getByLabel("Verification", { exact: true }).selectOption({ label: "Approximate position" });
+    await expect(page.locator("main")).toContainText("11 places highlighted.");
+    await expect(page.getByRole("button", { name: /Remove filter: Approximate position/ })).toBeVisible();
   });
 
   test("an old QR-style link opens the normal report form and is otherwise ignored", async ({ page }) => {
@@ -429,7 +429,7 @@ test.describe("analytics, theme and interface", () => {
     await page.getByRole("button", { name: "Pick on the map" }).click();
     await page.getByRole("button", { name: /^Ghulam Ahmed Hall/ }).press("Enter");
     await expect(page.getByLabel("Location", { exact: true })).toHaveValue("mjcet-ghulam-ahmed-hall");
-    await expect(page.getByTestId("location-detail")).toContainText("Sources disagree");
+    await expect(page.getByTestId("location-detail")).toContainText("Approximate position");
   });
 
   test("search palette (Ctrl K), notifications and toasts", async ({ page }) => {

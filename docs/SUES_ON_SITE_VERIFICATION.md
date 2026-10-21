@@ -44,32 +44,32 @@ Reviewer notes:
 Approval required:        (name and date of the person allowed to raise the status)
 ```
 
-## 1. Mapped places (9)
+## 1. Mapped places (11)
 
 | Place ID | Name | Current position (±m) | Status | What to establish |
 | --- | --- | --- | --- | --- |
-| `blocks-1-2-5` | Blocks 1, 2 and 5 area | 17.4285, 78.4439 (±30) | approximate | The exact location of **each** of Blocks 1, 2 and 5, and which mapped footprint each is |
+| `blocks-1-2-5` | Blocks 1 and 5 area (the id is kept from when Block 2 shared it) | 17.4285, 78.4439 (±30) | approximate | The exact location of **each** of Blocks 1 and 5, and which mapped footprint each is |
 | `blocks-3-4` | Blocks 3 and 4 area | 17.4277, 78.4420 (±60) | approximate | Each of Blocks 3 and 4, and the seminar hall; which footprint each is. Longitude was printed to three decimals only |
-| `ghulam-ahmed-hall` | Ghulam Ahmed Hall | 17.4282, 78.4435 (±60) | conflicting | The auditorium's actual position. Official photographs disagree by about 240 m (see section 3) |
+| `ghulam-ahmed-hall` | Ghulam Ahmed Hall (Block 2) | 17.428343, 78.443476 (±20) | approximate | Footprint `way/340053345`, identified by the owner as both Ghulam Ahmed Hall and Block 2. Confirm with the door sign (the official photographs also disagree, see section 3) |
+| `masjid` | Masjid | 17.427629, 78.442472 (±20) | approximate | Footprint `way/340051389`, identified by the owner. Confirm on site |
+| `sports-center` | Sports Center | 17.427491, 78.442963 (±20) | approximate | Footprint `way/775585790`, identified by the owner. Confirm on site |
+| `business-administration` | Amjad Ali Khan College of Business Administration | 17.427848, 78.444211 (±20) | approximate | Footprint `way/340052921`, identified by the owner (MBA). Confirm on site |
+| `college-of-law` | Sultan-Ul-Uloom College of Law | 17.427867, 78.444486 (±20) | approximate | Footprint `way/340053223`, identified by the owner (LAW). Confirm on site |
+| `sups-sujc` | Sultan-ul-Uloom Public School and Junior College | 17.428287, 78.445168 (±20) | approximate | Shared marker on footprint `way/340053098`, the building nearest the area the owner marked; the least certain placement. Confirm that both institutions are there |
 | `college-of-pharmacy` | Sultan-ul-Uloom College of Pharmacy | 17.427733, 78.443553 (±40) | approximate | Its main entrance and whether the OSM outline (way 737603230) is this college |
 | `sports-grounds` | Sports grounds | 17.4290, 78.4451 (±60) | approximate | Where each court and ground is; the grounds lie outside the mapped college outline, so whether they belong to this campus boundary |
-| `physical-education` | Shuttle court (Physical Education) | 17.4283, 78.4429 (±30) | approximate | The court beside the "Physical Education" sign |
 | `garden` | Garden | 17.427552, 78.441702 (±20) | approximate | That the OSM park way 737554364 is the garden operated by the college |
 
-## 2. Reportable locations with no known position (6)
+## 2. Reportable locations with no known position (2)
 
 These have no marker and are counted as "not placed". Do **not** place one at the campus centre or at a nearby footprint. If it is found, record its entrance position and the identifying evidence.
 
 | Location ID | Name | Institution | Find |
 | --- | --- | --- | --- |
 | `mjcet-central-library` | S.M. Nizamuddin Central Library | MJCET | Which block or building holds it, its entrance, its floor |
-| `law-college` | Sultan-Ul-Uloom College of Law | College of Law | Its building and entrance on this campus |
-| `aakcba-college` | Amjad Ali Khan College of Business Administration | College of Business Administration | Its building and entrance |
 | `gacoe-college` | Ghulam Ahmed College of Education | College of Education | Its building and entrance |
-| `sujc-college` | Sultan-Ul-Uloom Junior College | Junior College | Its building and entrance; its own site says only "Banjara Hills", so also confirm it is on this campus |
-| `sups-bh-school` | Sultan-ul-Uloom Public School, Banjara Hills | Public School | Its building and entrance (the CBSE address is Mount Pleasant) |
 
-For each, also note whether it shares a building with another institution; the dataset records one place per location and does not say that.
+Also note whether the College of Education shares a building with another institution. The Shuttle court (`mjcet-shuttle-court`) was removed from the campus map at the owner's direction and is no longer a reportable location.
 
 ## 3. Ghulam Ahmed Hall: conflicting positions
 
@@ -83,7 +83,7 @@ To resolve: stand at the hall's main door, record three readings and photograph 
 
 ## 4. Mapped footprints (6): which building is which
 
-OpenStreetMap names none of these. They are shown as "Mapped building A to F, use not verified". For each: what is it called, what is it used for, which block or institution, and is it the same building as a place above.
+OpenStreetMap names none of these. They are drawn as unlabelled footprints (the letters are internal geometry labels only). The owner has since identified A as the Masjid, C as the Sports Center and D as Ghulam Ahmed Hall and Block 2. For each: what is it called, what is it used for, which block or institution, and is it the same building as a place above.
 
 | Label | OSM way | Approx. position | Name / use (to fill) | Matches place or location |
 | --- | --- | --- | --- | --- |

@@ -111,7 +111,7 @@ const PLACES = [
   // SUES campus places (data/campuses/sues-hyderabad). Rooms and floors are a reporter's own words, as in real use.
   "Block 1, ground floor corridor", "Block 1, near the staircase", "Block 2, classroom at the end", "Block 2 corridor", "Block 3, first floor", "Block 3 washroom",
   "Block 4, second floor", "Block 4, near the lift", "Block 5, lab on the first floor", "Block 5 entrance", "Seminar Hall, Block 4", "Ghulam Ahmed Hall, stage",
-  "Ghulam Ahmed Hall, back rows", "S.M. Nizamuddin Central Library, reading area", "Sports grounds, basketball court", "Shuttle court (Physical Education)",
+  "Ghulam Ahmed Hall, back rows", "S.M. Nizamuddin Central Library, reading area", "Sports grounds, basketball court", "Sports Center, entrance", "Masjid, wudu area",
   "Garden", "Sultan-ul-Uloom College of Pharmacy, corridor", "Amjad Ali Khan College of Business Administration", "Sultan-Ul-Uloom College of Law", "Near the big tree", "Parking area",
 ];
 const CATEGORIES = Object.keys(TEMPLATES);

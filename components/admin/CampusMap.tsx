@@ -225,14 +225,8 @@ export default function CampusMap({
             {layers.footprints && (
               <g data-layer="footprints">
                 {of("building").map((s) => (
-                  <g key={s.osm}>
-                    <path d={s.d} fill="var(--surface)" stroke="var(--fg-subtle)" strokeWidth="1" />
-                    {!compact && (
-                      <text x={s.cx} y={s.cy + 3 * fontScale} fontSize={8 * fontScale} textAnchor="middle" fill="var(--fg-subtle)" fontWeight="600">
-                        {s.label?.replace("Mapped building ", "")}
-                      </text>
-                    )}
-                  </g>
+                  // Footprints carry no letter label: the places standing on them are named by their own markers.
+                  <path key={s.osm} d={s.d} fill="var(--surface)" stroke="var(--fg-subtle)" strokeWidth="1" />
                 ))}
               </g>
             )}
@@ -323,7 +317,7 @@ export default function CampusMap({
         </svg>
 
         {!compact && (
-          <div className="glass-blur absolute right-2 top-2 flex flex-col overflow-hidden rounded-lg">
+          <div className="glass-blur absolute bottom-2 right-2 flex flex-row overflow-hidden rounded-lg sm:bottom-auto sm:top-2 sm:flex-col">
             {[
               { label: "Zoom in", icon: Plus, run: () => zoom(1.5), off: view.k >= 5 },
               { label: "Zoom out", icon: Minus, run: () => zoom(1 / 1.5), off: view.k <= 1 },
@@ -365,7 +359,7 @@ export default function CampusMap({
               <span aria-hidden="true" className="h-2 w-2 rotate-45 bg-warning" />
               Mapped gate
             </span>
-            <span>A–F: building, use not verified</span>
+            <span>Unnamed outlines: buildings, use not verified</span>
           </span>
         )}
       </div>

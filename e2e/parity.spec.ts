@@ -284,14 +284,14 @@ test.describe("filters shared with the signed-in pages", () => {
     await page.goto("/viewer/analytics");
     const reported = page.locator(".glass", { hasText: /^Reported/ }).first();
     const all = await reported.innerText();
-    await page.getByLabel("Campus place").selectOption({ label: "Blocks 1, 2 and 5 area" });
+    await page.getByLabel("Campus place").selectOption({ label: "Blocks 1 and 5 area" });
     await expect(async () => expect(await reported.innerText()).not.toBe(all)).toPass();
     const placed = await reported.innerText();
     await page.getByLabel("Priority", { exact: true }).selectOption("High");
     await expect(async () => expect(await reported.innerText()).not.toBe(placed)).toPass();
     await page.getByLabel("Worker", { exact: true }).selectOption({ label: "Ramesh Kumar" });
     await page.getByLabel("Status", { exact: true }).selectOption("Resolved");
-    for (const chip of [/Blocks 1, 2 and 5 area/, /Priority: High/, /Ramesh Kumar/, /Status: Resolved/]) await expect(page.getByRole("button", { name: chip })).toBeVisible();
+    for (const chip of [/Blocks 1 and 5 area/, /Priority: High/, /Ramesh Kumar/, /Status: Resolved/]) await expect(page.getByRole("button", { name: chip })).toBeVisible();
     await expect(page.locator("body")).not.toContainText("NaN");
   });
 });
@@ -376,11 +376,11 @@ test.describe("campus map labels", () => {
         expect(hits, `zoom step ${step}`).toEqual([]);
         expect(shown).toBeGreaterThanOrEqual(6);
         // Shown or not, every place is a focusable button with its full name.
-        await expect(map.getByRole("button")).toHaveCount(7);
+        await expect(map.getByRole("button")).toHaveCount(11);
         await page.getByRole("button", { name: "Zoom in" }).click();
       }
       await page.getByRole("button", { name: "Reset the map view" }).click();
-      for (const name of [/^Ghulam Ahmed Hall/, /^Blocks 1, 2 and 5 area/, /^Shuttle court/]) await expect(map.getByRole("button", { name })).toHaveCount(1);
+      for (const name of [/^Ghulam Ahmed Hall/, /^Blocks 1 and 5 area/, /^Masjid/]) await expect(map.getByRole("button", { name })).toHaveCount(1);
       // Places that are not part of the campus dataset are never drawn.
       for (const name of [/Gymnasium/, /State Bank|SBI/]) await expect(map.getByRole("button", { name })).toHaveCount(0);
     });
@@ -390,7 +390,7 @@ test.describe("campus map labels", () => {
     await as(page, "admin");
     await page.goto("/viewer/map");
     const map = page.getByRole("group", { name: /^SUES campus map/ });
-    for (const id of ["ghulam-ahmed-hall", "physical-education", "garden"]) {
+    for (const id of ["ghulam-ahmed-hall", "masjid", "garden"]) {
       const marker = map.locator(`[data-place=${id}]`);
       await marker.focus();
       await page.keyboard.press("Enter");
@@ -401,8 +401,8 @@ test.describe("campus map labels", () => {
     await map.locator("[data-place=ghulam-ahmed-hall]").focus();
     await page.keyboard.press("Enter");
     const detail = page.locator(".glass", { has: page.getByRole("heading", { name: "Ghulam Ahmed Hall" }) }).first();
-    await expect(detail).toContainText("Sources disagree");
-    await expect(detail).toContainText("240 m");
+    await expect(detail).toContainText("Approximate position");
+    await expect(detail).toContainText("same building");
     await expect(detail.getByTestId("place-sources")).toContainText("Based on:");
     await expect(detail.getByTestId("place-sources").getByRole("link").first()).toHaveAttribute("href", /^https:\/\/(www\.)?mjcollege\.ac\.in\//);
 

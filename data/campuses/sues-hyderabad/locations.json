@@ -11,8 +11,8 @@
   "places": [
     {
       "id": "blocks-1-2-5",
-      "name": "Blocks 1, 2 and 5 area",
-      "short": "Blocks 1 · 2 · 5",
+      "name": "Blocks 1 and 5 area",
+      "short": "Blocks 1 · 5",
       "type": "academic",
       "institutionId": "mjcet",
       "latitude": 17.4285,
@@ -22,9 +22,9 @@
       "sourceIds": [
         "naac-411-f"
       ],
-      "notes": "Official photographs captioned Block 1, Block 2 and Block 5 all carry this geotag (a camera position printed to four decimals). Which mapped footprint is which block is not established.",
+      "notes": "Official photographs captioned Block 1 and Block 5 carry this geotag (a camera position printed to four decimals; the same geotag also carried Block 2, now placed at Ghulam Ahmed Hall). Which mapped footprint is which block is not established. The id is kept so that existing references stay valid.",
       "patterns": [
-        "\\bblock[\\s-]*(1|2|5|i|ii|v|one|two|five)\\b"
+        "\\bblock[\\s-]*(1|5|i|v|one|five)\\b"
       ]
     },
     {
@@ -49,22 +49,130 @@
     },
     {
       "id": "ghulam-ahmed-hall",
-      "name": "Ghulam Ahmed Hall",
-      "short": "Ghulam Ahmed Hall",
+      "name": "Ghulam Ahmed Hall (Block 2)",
+      "short": "Ghulam Ahmed Hall · Block 2",
       "type": "hall",
       "institutionId": "mjcet",
-      "latitude": 17.4282,
-      "longitude": 78.4435,
-      "precisionMeters": 60,
-      "verificationStatus": "conflicting",
+      "latitude": 17.428343,
+      "longitude": 78.443476,
+      "precisionMeters": 20,
+      "verificationStatus": "approximate",
       "sourceIds": [
         "naac-411-c",
-        "mjcet-home"
+        "mjcet-home",
+        "owner-annotation"
       ],
-      "notes": "The auditorium. Two official photographs (2018, 2022) are geotagged here; a third (2023) is geotagged about 240 m to the south-west at 17.427 N 78.4416 E. The position shown is the one two photographs agree on.",
+      "notes": "Ghulam Ahmed Hall and Block 2 are the same building. Its position is the centre of the mapped footprint OpenStreetMap way/340053345; the identity is the owner's annotation, not OpenStreetMap metadata. The official geotags (17.4282 N 78.4435 E, and a 2023 photograph 240 m to the south-west) are within about 20 m of it or disagree.",
       "patterns": [
         "\\bghulam ahmed hall\\b",
-        "\\bauditorium\\b"
+        "\\bauditorium\\b",
+        "\\bblock[\\s-]*(2|ii|two)\\b"
+      ],
+      "footprint": "way/340053345"
+    },
+    {
+      "id": "masjid",
+      "name": "Masjid",
+      "short": "Masjid",
+      "type": "worship",
+      "institutionId": null,
+      "latitude": 17.427629,
+      "longitude": 78.442472,
+      "precisionMeters": 20,
+      "verificationStatus": "approximate",
+      "footprint": "way/340051389",
+      "sourceIds": [
+        "owner-annotation"
+      ],
+      "notes": "The campus masjid. Its identity is the owner's annotation of the mapped footprint OpenStreetMap way/340051389; no public source names it.",
+      "patterns": [
+        "\\bmasjid\\b",
+        "\\bmosque\\b",
+        "\\bprayer (hall|room)\\b"
+      ]
+    },
+    {
+      "id": "sports-center",
+      "name": "Sports Center",
+      "short": "Sports Center",
+      "type": "sports",
+      "institutionId": null,
+      "latitude": 17.427491,
+      "longitude": 78.442963,
+      "precisionMeters": 20,
+      "verificationStatus": "approximate",
+      "footprint": "way/775585790",
+      "sourceIds": [
+        "owner-annotation"
+      ],
+      "notes": "The sports center. Its identity is the owner's annotation of the mapped footprint OpenStreetMap way/775585790; no public source names it.",
+      "patterns": [
+        "\\bsports? cent(er|re)\\b"
+      ]
+    },
+    {
+      "id": "business-administration",
+      "name": "Amjad Ali Khan College of Business Administration",
+      "short": "Business Administration",
+      "type": "institution",
+      "institutionId": "aakcba",
+      "latitude": 17.427848,
+      "longitude": 78.444211,
+      "precisionMeters": 20,
+      "verificationStatus": "approximate",
+      "footprint": "way/340052921",
+      "sourceIds": [
+        "owner-annotation"
+      ],
+      "notes": "Placed on OpenStreetMap way/340052921 as the owner annotated it (MBA); no public source identifies the building.",
+      "patterns": [
+        "\\bamjad ali khan\\b",
+        "\\bbusiness administration\\b",
+        "\\bmba\\b",
+        "\\baakcba\\b"
+      ]
+    },
+    {
+      "id": "college-of-law",
+      "name": "Sultan-Ul-Uloom College of Law",
+      "short": "College of Law",
+      "type": "institution",
+      "institutionId": "law",
+      "latitude": 17.427867,
+      "longitude": 78.444486,
+      "precisionMeters": 20,
+      "verificationStatus": "approximate",
+      "footprint": "way/340053223",
+      "sourceIds": [
+        "owner-annotation"
+      ],
+      "notes": "Placed on OpenStreetMap way/340053223 as the owner annotated it (LAW); no public source identifies the building.",
+      "patterns": [
+        "\\bcollege of law\\b",
+        "\\blaw college\\b",
+        "\\bsulaw\\b"
+      ]
+    },
+    {
+      "id": "sups-sujc",
+      "name": "Sultan-ul-Uloom Public School and Junior College",
+      "short": "SUPS · SUJC",
+      "type": "institution",
+      "institutionId": null,
+      "latitude": 17.428287,
+      "longitude": 78.445168,
+      "precisionMeters": 20,
+      "verificationStatus": "approximate",
+      "footprint": "way/340053098",
+      "sourceIds": [
+        "owner-annotation"
+      ],
+      "notes": "SUPS and SUJC share this marker, on OpenStreetMap way/340053098, the large building nearest the area the owner annotated. The footprint is the least certain of the owner's placements.",
+      "patterns": [
+        "\\bsups\\b",
+        "\\bsujc\\b",
+        "\\bpublic school\\b",
+        "\\bjunior college\\b"
       ]
     },
     {
@@ -109,26 +217,6 @@
         "\\bbasket\\s?ball\\b",
         "\\bvolley\\s?ball\\b",
         "\\bcricket\\b"
-      ]
-    },
-    {
-      "id": "physical-education",
-      "name": "Shuttle court (Physical Education)",
-      "short": "Shuttle court",
-      "type": "sports",
-      "institutionId": "mjcet",
-      "latitude": 17.4283,
-      "longitude": 78.4429,
-      "precisionMeters": 30,
-      "verificationStatus": "approximate",
-      "sourceIds": [
-        "naac-411-d"
-      ],
-      "notes": "Official photograph of the shuttle court beside a 'Physical Education' sign.",
-      "patterns": [
-        "\\bshuttle\\b",
-        "\\bbadminton\\b",
-        "\\bphysical education\\b"
       ]
     },
     {
@@ -177,7 +265,7 @@
       ],
       "type": "academic",
       "institutionId": "mjcet",
-      "placeId": "blocks-1-2-5",
+      "placeId": "ghulam-ahmed-hall",
       "verificationStatus": "approximate",
       "sourceIds": [
         "naac-411-f"
@@ -261,9 +349,41 @@
       "institutionId": "mjcet",
       "placeId": "ghulam-ahmed-hall",
       "description": "Auditorium for cultural and extra-curricular events.",
-      "verificationStatus": "conflicting",
+      "verificationStatus": "approximate",
       "sourceIds": [
         "naac-411-c"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-masjid",
+      "name": "Masjid",
+      "aliases": [
+        "Mosque",
+        "Prayer hall"
+      ],
+      "type": "worship",
+      "institutionId": null,
+      "placeId": "masjid",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "owner-annotation"
+      ],
+      "isActive": true
+    },
+    {
+      "id": "mjcet-sports-center",
+      "name": "Sports Center",
+      "aliases": [
+        "Sports centre",
+        "Indoor sports"
+      ],
+      "type": "sports",
+      "institutionId": null,
+      "placeId": "sports-center",
+      "verificationStatus": "approximate",
+      "sourceIds": [
+        "owner-annotation"
       ],
       "isActive": true
     },
@@ -300,22 +420,6 @@
       "sourceIds": [
         "naac-411-d",
         "mjcet-sports"
-      ],
-      "isActive": true
-    },
-    {
-      "id": "mjcet-shuttle-court",
-      "name": "Shuttle court (Physical Education)",
-      "aliases": [
-        "Badminton court",
-        "Physical Education department"
-      ],
-      "type": "sports",
-      "institutionId": "mjcet",
-      "placeId": "physical-education",
-      "verificationStatus": "approximate",
-      "sourceIds": [
-        "naac-411-d"
       ],
       "isActive": true
     },
@@ -359,12 +463,12 @@
       ],
       "type": "institution",
       "institutionId": "law",
-      "placeId": null,
-      "description": "On the society campus; its building was not identified in any public source.",
-      "verificationStatus": "unverified",
+      "placeId": "college-of-law",
+      "verificationStatus": "approximate",
       "sourceIds": [
         "law",
-        "mjcet-other-institutions"
+        "mjcet-other-institutions",
+        "owner-annotation"
       ],
       "isActive": true
     },
@@ -378,12 +482,12 @@
       ],
       "type": "institution",
       "institutionId": "aakcba",
-      "placeId": null,
-      "description": "On the society campus; its building was not identified in any public source.",
-      "verificationStatus": "unverified",
+      "placeId": "business-administration",
+      "verificationStatus": "approximate",
       "sourceIds": [
         "aakcba",
-        "mjcet-other-institutions"
+        "mjcet-other-institutions",
+        "owner-annotation"
       ],
       "isActive": true
     },
@@ -413,12 +517,12 @@
       ],
       "type": "institution",
       "institutionId": "sujc",
-      "placeId": null,
-      "description": "In Banjara Hills according to its website; its building was not identified in any public source.",
-      "verificationStatus": "unverified",
+      "placeId": "sups-sujc",
+      "verificationStatus": "approximate",
       "sourceIds": [
         "sujc",
-        "mjcet-other-institutions"
+        "mjcet-other-institutions",
+        "owner-annotation"
       ],
       "isActive": true
     },
@@ -431,14 +535,22 @@
       ],
       "type": "institution",
       "institutionId": "sups-bh",
-      "placeId": null,
-      "description": "Shares the Mount Pleasant address; its building was not identified in any public source.",
-      "verificationStatus": "unverified",
+      "placeId": "sups-sujc",
+      "verificationStatus": "approximate",
       "sourceIds": [
         "cbse-saras",
-        "mjcet-other-institutions"
+        "mjcet-other-institutions",
+        "owner-annotation"
       ],
       "isActive": true
+    }
+  ],
+  "retiredLocations": [
+    {
+      "id": "mjcet-shuttle-court",
+      "name": "Shuttle court (Physical Education)",
+      "retiredPlaceId": "physical-education",
+      "reason": "Removed from the campus map at the owner's direction (2026-10). Existing reports keep their stored text and show as not placed on the map; they are never moved to another building."
     }
   ]
 }

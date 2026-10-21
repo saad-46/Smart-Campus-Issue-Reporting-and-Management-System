@@ -265,9 +265,13 @@ export default function ViewerMapPage() {
                           .map((s, k) => (
                             <React.Fragment key={s.id}>
                               {k > 0 && "; "}
-                              <a href={s.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-fg">
-                                {s.title}
-                              </a>
+                              {s.url ? (
+                                <a href={s.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-fg">
+                                  {s.title}
+                                </a>
+                              ) : (
+                                s.title
+                              )}
                             </React.Fragment>
                           ))}
                         .

@@ -151,7 +151,10 @@ function ReportForm({ viewer }: { viewer: ReadyViewer }) {
                   unplaced={0}
                   selectedId={place?.buildingId || null}
                   onSelect={(id) => {
-                    const first = viewer.locations.find((l) => l.buildingId === id);
+                    // A place can hold several locations (Block 2 and Ghulam Ahmed Hall share a building): prefer the one the marker is named for.
+                    const here = viewer.locations.filter((l) => l.buildingId === id);
+                    const placeName = getBuilding(id)?.name.toLowerCase() ?? "";
+                    const first = here.find((l) => placeName.startsWith(l.name.toLowerCase())) ?? here[0];
                     if (first) setLocationId(first.id);
                   }}
                 />

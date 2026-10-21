@@ -109,7 +109,9 @@ describe("parseChatMessage", () => {
     expect((await parseChatMessage("The WiFi is not working in the library reading room since morning")).location).toBe("S.M. Nizamuddin Central Library");
     expect(extractLocation("projector broken in lab 204")).toBe("lab 204");
     expect(extractLocation("mic not working in the auditorium")).toBe("Ghulam Ahmed Hall");
-    expect(extractLocation("net is torn at the badminton court")).toBe("Shuttle court (Physical Education)");
+    expect(extractLocation("the fan is broken in the Sports Center")).toBe("Sports Center");
+    expect(extractLocation("the mat is torn in the Masjid")).toBe("Masjid");
+    expect(extractLocation("net is torn at the badminton court")).toBe("Unknown"); // the Shuttle court is no longer a campus place
     expect(extractLocation("leak near block the stairs")).toBe("Unknown");
     expect(extractLocation("Block B toilet")).toBe("Block B");
     expect(extractLocation("Block 4 toilet")).toBe("Block 4");

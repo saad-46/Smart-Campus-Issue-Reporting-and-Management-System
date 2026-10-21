@@ -108,7 +108,8 @@ describe("places and locations", () => {
 
   it("no position is called verified: every one comes from a coarse geotag or a single map source", () => {
     expect(locations.places.filter((p) => p.verificationStatus === "verified")).toEqual([]);
-    expect(locations.places.find((p) => p.id === "ghulam-ahmed-hall")?.verificationStatus).toBe("conflicting");
+    // Ghulam Ahmed Hall and Block 2 are one building; its position is the owner-identified footprint, no longer a conflicting geotag.
+    expect(locations.places.find((p) => p.id === "ghulam-ahmed-hall")?.verificationStatus).toBe("approximate");
   });
 
   it("distinct places are not stacked on one point", () => {
@@ -223,7 +224,7 @@ describe("research sources", () => {
       ...locations.locations.flatMap((l) => l.sourceIds),
     ]);
     for (const s of sources.sources) {
-      expect(s.url).toMatch(/^https?:\/\//);
+      if (s.kind !== "owner") expect(s.url).toMatch(/^https?:\/\//); // the owner's own annotation has no web address
       expect(s.supports.length).toBeGreaterThan(20);
       if (!["sues-site", "mjcet-sues-history"].includes(s.id)) expect(used.has(s.id), `${s.id} is cited`).toBe(true);
     }
@@ -243,8 +244,8 @@ describe("on-site verification checklist", () => {
   });
 
   it("states the counts it was written for, so a changed dataset is noticed", () => {
-    expect(locations.places).toHaveLength(7);
-    expect(locations.locations.filter((l) => !l.placeId)).toHaveLength(6); // the library and five institutions
+    expect(locations.places).toHaveLength(11);
+    expect(locations.locations.filter((l) => !l.placeId)).toHaveLength(2); // the library and the College of Education
     expect(features.filter((f) => f.properties.kind === "gate")).toHaveLength(6);
     expect(features.filter((f) => f.properties.kind === "building")).toHaveLength(6);
   });
