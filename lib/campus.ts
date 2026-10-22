@@ -65,7 +65,7 @@ export function researchSource(id: string): { id: string; title: string; kind: s
  * owner marked as not belonging on the map (2026-10-22): the two on the far side of
  * the road, by the Garden. Hiding is by OSM node id, never by style.
  */
-export const REMOVED_GATES: readonly string[] = ["node/11038449765", "node/11039495994"];
+export const REMOVED_GATES: readonly string[] = ["node/10803590216", "node/11038449765", "node/11039495994"];
 
 // ---------- Projection ----------
 // A flat local projection of the documented viewport, in metres from its

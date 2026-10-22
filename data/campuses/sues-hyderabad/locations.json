@@ -55,15 +55,15 @@
       "short": "Block 3",
       "type": "academic",
       "institutionId": "mjcet",
-      "latitude": 17.4277,
-      "longitude": 78.442,
-      "precisionMeters": 60,
+      "latitude": 17.4281,
+      "longitude": 78.4419,
+      "precisionMeters": 35,
       "verificationStatus": "approximate",
       "sourceIds": [
         "naac-411-f",
         "naac-411-e"
       ],
-      "notes": "Official photographs captioned Block 3 carry this geotag (the same geotag also carried Block 4 and the seminar hall, now placed in the combined Blocks 1 and 4 building). The longitude is printed to three decimals only. The id is kept so that existing references stay valid.",
+      "notes": "Marker repositioned to the approximate centre of the rectangular Block 3 area indicated by the campus owner on the annotated map (2026-10-22). The rectangle is owner-identified; its exact footprint is not established. The older official geotag is too coarse to locate this building precisely.",
       "patterns": [
         "\\bblock[\\s-]*(3|iii|three)\\b"
       ]
