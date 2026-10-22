@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Inbox, Play, Wallet } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Inbox, Play, Receipt, Wallet } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
 import IssueRow from "@/components/IssueCard";
 import BillSubmissionForm from "@/components/BillSubmissionForm";
@@ -12,6 +13,7 @@ import { Tabs, tabId } from "@/components/ui/Tabs";
 import { payoutLabel } from "@/lib/claims";
 import { PAYMENT_METHOD_LABELS } from "@/lib/financeRules";
 import { StatStrip, TableWrap, td, th, trHover } from "@/components/ui/Data";
+import Badge from "@/components/ui/Badge";
 import { EmptyState, ErrorState, Notice, SkeletonRows } from "@/components/ui/States";
 import { useToast } from "@/components/ui/Toast";
 import { Issue, Transaction } from "@/types";
@@ -25,6 +27,8 @@ import { computeSla } from "@/lib/intelligence/sla";
 import { formatDate, greeting } from "@/lib/dates";
 import { getFriendlyErrorMessage, logError } from "@/lib/errors";
 
+const CLAIM_TONE = { pending: "warning", approved: "success", rejected: "danger" } as const;
+const CLAIM_LABEL = { pending: "Awaiting review", approved: "Approved and paid", rejected: "Rejected" } as const;
 const currency = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 export default function WorkerPage() {
@@ -38,7 +42,7 @@ export default function WorkerPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loadError, setLoadError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
-  const [tab, setTab] = useState<"tasks" | "pool" | "payouts">("tasks");
+  const [tab, setTab] = useState<"tasks" | "pool" | "claims" | "payouts">("tasks");
   const [resolvingIssue, setResolvingIssue] = useState<Issue | null>(null);
   const [busyId, setBusyId] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
@@ -84,6 +88,7 @@ export default function WorkerPage() {
   const escalated = active.filter((x) => x.issue.escalated).length;
   const attention = active.filter((x) => x.issue.escalated || x.sla.state === "approaching" || x.sla.state === "breached").length;
 
+  const claimed = mine.filter((i) => i.status === "Resolved" && !!i.claimStatus);
   const pendingClaims = mine.filter((i) => i.status === "Resolved" && i.claimStatus === "pending");
   const pendingAmount = pendingClaims.reduce((sum, i) => sum + (i.claimAmount || 0), 0);
   const resolvedCount = mine.filter((i) => i.status === "Resolved").length;
@@ -179,6 +184,7 @@ export default function WorkerPage() {
                 options={[
                   { value: "tasks", label: "My tasks", count: myIssues ? active.length : undefined },
                   { value: "pool", label: "Open pool", count: poolIssues ? pool.length : undefined },
+                  { value: "claims", label: "Expense claims", count: myIssues ? claimed.length : undefined },
                   { value: "payouts", label: "Payouts" },
                 ]}
               />
@@ -235,6 +241,29 @@ export default function WorkerPage() {
                             </Button>
                           }
                         />
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : tab === "claims" ? (
+                claimed.length === 0 ? (
+                  <EmptyState icon={<Receipt />} title="No expense claims yet" description="When you resolve a task and submit what you spent, the claim and its review status are listed here." />
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {claimed.map((i) => (
+                      <li key={i.id} className="flex items-start justify-between gap-3 px-4 py-3 sm:px-5">
+                        <div className="min-w-0">
+                          <Link href={`/issues/${i.id}`} className="block truncate text-sm font-medium text-fg hover:text-brand-fg">
+                            {i.title}
+                          </Link>
+                          {i.claimDescription && <p className="text-[13px] text-fg-subtle">{i.claimDescription}</p>}
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="tabular text-sm font-semibold text-fg">{currency(i.claimAmount ?? 0)}</p>
+                          <Badge tone={CLAIM_TONE[i.claimStatus!]} dot>
+                            {CLAIM_LABEL[i.claimStatus!]}
+                          </Badge>
+                        </div>
                       </li>
                     ))}
                   </ul>

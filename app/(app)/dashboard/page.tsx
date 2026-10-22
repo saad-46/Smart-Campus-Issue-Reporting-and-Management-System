@@ -122,8 +122,9 @@ function DashboardContent() {
 
       {!exploring && (
         <StatStrip
-          className="mb-6 lg:grid-cols-3"
+          className="mb-6 lg:grid-cols-4"
           stats={[
+            { label: "My reports", value: mine.length, loading: myIssues === null, hint: "All time" },
             { label: "Open", value: counts.open, loading: myIssues === null, hint: "Waiting to be picked up" },
             { label: "In progress", value: counts.progress, loading: myIssues === null, hint: "A worker is on it" },
             { label: "Resolved", value: counts.resolved, loading: myIssues === null, hint: "Marked as fixed" },

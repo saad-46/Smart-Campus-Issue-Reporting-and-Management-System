@@ -29,7 +29,7 @@ async function openMap(page: Page) {
 
 test.describe("campus map corrections", () => {
   for (const [name, width, height] of SIZES) {
-    test(`${name} (${width}px): one Blocks 1 & 4 marker, SUCL and MBA, four gates, labels clear`, async ({ page }) => {
+    test(`${name} (${width}px): one Blocks 1 & 4 marker, SUCL and MBA, three gates, labels clear`, async ({ page }) => {
       const seen = watch(page);
       await page.setViewportSize({ width, height });
       await openMap(page);
@@ -51,8 +51,8 @@ test.describe("campus map corrections", () => {
       // (the full names live in the accessible names and tooltips, not in the drawn labels)
       expect((await m.locator("text[data-label]").allTextContents()).join("|")).not.toMatch(/College of Law|Business Administration/);
 
-      // The two roadside gates are gone; the other four stay, and the legend still explains them.
-      await expect(m.locator("[data-layer=gates] rect")).toHaveCount(4);
+      // Three roadside gates are gone; the other three stay, and the legend still explains them.
+      await expect(m.locator("[data-layer=gates] rect")).toHaveCount(3);
       await expect(page.getByText("Mapped gate", { exact: true }).first()).toBeVisible();
 
       // Those three labels are shown and no two shown labels overlap.
