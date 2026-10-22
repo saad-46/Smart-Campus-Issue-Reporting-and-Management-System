@@ -95,7 +95,7 @@ export function AnalyticsPanel() {
   );
 }
 
-const SAMPLE_OPEN: Record<string, number> = { "blocks-1-2-5": 5, "blocks-3-4": 3, "ghulam-ahmed-hall": 1, "college-of-pharmacy": 2, "sports-grounds": 2, garden: 1 };
+const SAMPLE_OPEN: Record<string, number> = { "blocks-1-4": 4, "blocks-1-2-5": 5, "blocks-3-4": 3, "ghulam-ahmed-hall": 1, "college-of-pharmacy": 2, "sports-grounds": 2, garden: 1 };
 
 export function MapPanel() {
   const hotspots: Hotspot[] = BUILDINGS.map((b) => ({

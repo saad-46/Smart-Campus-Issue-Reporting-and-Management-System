@@ -10,9 +10,31 @@
   },
   "places": [
     {
+      "id": "blocks-1-4",
+      "name": "Blocks 1 and 4",
+      "short": "Blocks 1 & 4",
+      "type": "academic",
+      "institutionId": "mjcet",
+      "latitude": 17.428238,
+      "longitude": 78.442895,
+      "precisionMeters": 20,
+      "verificationStatus": "approximate",
+      "footprint": "way/897374294",
+      "sourceIds": [
+        "naac-411-f",
+        "naac-411-e",
+        "owner-annotation"
+      ],
+      "notes": "Blocks 1 and 4 are one physical building, as the campus owner annotated the map (2026-10-22). Its position is the centre of the mapped footprint OpenStreetMap way/897374294; the identity is the owner's annotation, not OpenStreetMap metadata. The Seminar Hall is reported as part of Block 4 and so is placed here too. The older official geotags for Blocks 1 and 4 (a shared camera position printed to three or four decimals) are no longer used for them.",
+      "patterns": [
+        "\\bblock[\\s-]*(1|4|i|iv|one|four)\\b",
+        "\\bseminar hall\\b"
+      ]
+    },
+    {
       "id": "blocks-1-2-5",
-      "name": "Blocks 1 and 5 area",
-      "short": "Blocks 1 · 5",
+      "name": "Block 5",
+      "short": "Block 5",
       "type": "academic",
       "institutionId": "mjcet",
       "latitude": 17.4285,
@@ -22,15 +44,15 @@
       "sourceIds": [
         "naac-411-f"
       ],
-      "notes": "Official photographs captioned Block 1 and Block 5 carry this geotag (a camera position printed to four decimals; the same geotag also carried Block 2, now placed at Ghulam Ahmed Hall). Which mapped footprint is which block is not established. The id is kept so that existing references stay valid.",
+      "notes": "Official photographs captioned Block 5 carry this geotag (a camera position printed to four decimals; the same geotag also carried Block 1, now placed in the combined Blocks 1 and 4 building, and Block 2, now placed at Ghulam Ahmed Hall). Which mapped footprint is Block 5 is not established. The id is kept so that existing references stay valid.",
       "patterns": [
-        "\\bblock[\\s-]*(1|5|i|v|one|five)\\b"
+        "\\bblock[\\s-]*(5|v|five)\\b"
       ]
     },
     {
       "id": "blocks-3-4",
-      "name": "Blocks 3 and 4 area",
-      "short": "Blocks 3 · 4",
+      "name": "Block 3",
+      "short": "Block 3",
       "type": "academic",
       "institutionId": "mjcet",
       "latitude": 17.4277,
@@ -41,10 +63,9 @@
         "naac-411-f",
         "naac-411-e"
       ],
-      "notes": "Official photographs captioned Block 3 and Block 4, and the seminar hall (a banner reads 'Seminar Hall, Block-4'), carry this geotag. The longitude is printed to three decimals only.",
+      "notes": "Official photographs captioned Block 3 carry this geotag (the same geotag also carried Block 4 and the seminar hall, now placed in the combined Blocks 1 and 4 building). The longitude is printed to three decimals only. The id is kept so that existing references stay valid.",
       "patterns": [
-        "\\bblock[\\s-]*(3|4|iii|iv|three|four)\\b",
-        "\\bseminar hall\\b"
+        "\\bblock[\\s-]*(3|iii|three)\\b"
       ]
     },
     {
@@ -113,7 +134,7 @@
     {
       "id": "business-administration",
       "name": "Amjad Ali Khan College of Business Administration",
-      "short": "Business Administration",
+      "short": "MBA",
       "type": "institution",
       "institutionId": "aakcba",
       "latitude": 17.427848,
@@ -135,7 +156,7 @@
     {
       "id": "college-of-law",
       "name": "Sultan-Ul-Uloom College of Law",
-      "short": "College of Law",
+      "short": "SUCL",
       "type": "institution",
       "institutionId": "law",
       "latitude": 17.427867,
@@ -150,7 +171,8 @@
       "patterns": [
         "\\bcollege of law\\b",
         "\\blaw college\\b",
-        "\\bsulaw\\b"
+        "\\bsulaw\\b",
+        "\\bsucl\\b"
       ]
     },
     {
@@ -249,7 +271,7 @@
       ],
       "type": "academic",
       "institutionId": "mjcet",
-      "placeId": "blocks-1-2-5",
+      "placeId": "blocks-1-4",
       "verificationStatus": "approximate",
       "sourceIds": [
         "naac-411-f"
@@ -297,7 +319,7 @@
       ],
       "type": "academic",
       "institutionId": "mjcet",
-      "placeId": "blocks-3-4",
+      "placeId": "blocks-1-4",
       "verificationStatus": "approximate",
       "sourceIds": [
         "naac-411-f"
@@ -329,7 +351,7 @@
       ],
       "type": "hall",
       "institutionId": "mjcet",
-      "placeId": "blocks-3-4",
+      "placeId": "blocks-1-4",
       "description": "Main seminar hall, 150 seats.",
       "verificationStatus": "approximate",
       "sourceIds": [

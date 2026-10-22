@@ -159,7 +159,7 @@ test.describe("administrator actions", () => {
     await add.getByRole("button", { name: "Add location (demo)" }).click();
     await expect(add).toContainText("Give the location a name");
     await add.getByLabel("Name").fill("Staff room");
-    await add.getByLabel("Map place").selectOption({ label: "Blocks 3 and 4 area" });
+    await add.getByLabel("Map place").selectOption({ label: "Block 3" });
     await add.getByLabel("Room (optional)").fill("12");
     await add.getByRole("button", { name: "Add location (demo)" }).click();
 
@@ -173,7 +173,7 @@ test.describe("administrator actions", () => {
     await roleButton(page, "Student").click();
     await nav(page, "Report an issue").click();
     await page.getByLabel("Location", { exact: true }).selectOption({ label: "Staff room" });
-    await expect(page.getByTestId("location-detail")).toContainText("Blocks 3 and 4 area");
+    await expect(page.getByTestId("location-detail")).toContainText("Block 3");
     await expect(page.getByTestId("location-detail")).toContainText("Approximate position");
     await page.getByLabel("Title").fill("Broken chair in the staff room");
     await page.getByLabel("What is wrong?").fill("One of the chairs has a cracked leg and is unsafe to sit on.");
@@ -270,11 +270,11 @@ test.describe("filters shared with the signed-in pages", () => {
   test("the issues table filters by campus place and the result follows the map's count", async ({ page }) => {
     await as(page, "admin");
     await page.goto("/viewer/issues");
-    await page.getByLabel("Campus place").selectOption({ label: "Blocks 3 and 4 area" });
-    await expect(page.getByRole("button", { name: /Remove filter: Blocks 3 and 4 area/ })).toBeVisible();
+    await page.getByLabel("Campus place").selectOption({ label: "Block 3" });
+    await expect(page.getByRole("button", { name: /Remove filter: Block 3/ })).toBeVisible();
     const rows = page.locator("tbody tr");
     await expect(rows.first()).toBeVisible();
-    for (const text of await rows.allInnerTexts()) expect(text).toMatch(/Block 3|Block 4|Seminar Hall/);
+    for (const text of await rows.allInnerTexts()) expect(text).toMatch(/Block 3/);
     await page.getByLabel("Status", { exact: true }).selectOption("Open");
     for (const text of await rows.allInnerTexts()) expect(text).toContain("Open");
   });
@@ -284,14 +284,14 @@ test.describe("filters shared with the signed-in pages", () => {
     await page.goto("/viewer/analytics");
     const reported = page.locator(".glass", { hasText: /^Reported/ }).first();
     const all = await reported.innerText();
-    await page.getByLabel("Campus place").selectOption({ label: "Blocks 1 and 5 area" });
+    await page.getByLabel("Campus place").selectOption({ label: "Blocks 1 and 4" });
     await expect(async () => expect(await reported.innerText()).not.toBe(all)).toPass();
     const placed = await reported.innerText();
     await page.getByLabel("Priority", { exact: true }).selectOption("High");
     await expect(async () => expect(await reported.innerText()).not.toBe(placed)).toPass();
     await page.getByLabel("Worker", { exact: true }).selectOption({ label: "Ramesh Kumar" });
     await page.getByLabel("Status", { exact: true }).selectOption("Resolved");
-    for (const chip of [/Blocks 1 and 5 area/, /Priority: High/, /Ramesh Kumar/, /Status: Resolved/]) await expect(page.getByRole("button", { name: chip })).toBeVisible();
+    for (const chip of [/Blocks 1 and 4/, /Priority: High/, /Ramesh Kumar/, /Status: Resolved/]) await expect(page.getByRole("button", { name: chip })).toBeVisible();
     await expect(page.locator("body")).not.toContainText("NaN");
   });
 });
@@ -376,11 +376,11 @@ test.describe("campus map labels", () => {
         expect(hits, `zoom step ${step}`).toEqual([]);
         expect(shown).toBeGreaterThanOrEqual(6);
         // Shown or not, every place is a focusable button with its full name.
-        await expect(map.getByRole("button")).toHaveCount(11);
+        await expect(map.getByRole("button")).toHaveCount(12);
         await page.getByRole("button", { name: "Zoom in" }).click();
       }
       await page.getByRole("button", { name: "Reset the map view" }).click();
-      for (const name of [/^Ghulam Ahmed Hall/, /^Blocks 1 and 5 area/, /^Masjid/]) await expect(map.getByRole("button", { name })).toHaveCount(1);
+      for (const name of [/^Ghulam Ahmed Hall/, /^Blocks 1 and 4/, /^Block 5/, /^Block 3/, /^Masjid/, /^Sultan-Ul-Uloom College of Law/, /^Amjad Ali Khan College of Business/]) await expect(map.getByRole("button", { name })).toHaveCount(1);
       // Places that are not part of the campus dataset are never drawn.
       for (const name of [/Gymnasium/, /State Bank|SBI/]) await expect(map.getByRole("button", { name })).toHaveCount(0);
     });

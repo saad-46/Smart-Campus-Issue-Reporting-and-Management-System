@@ -60,6 +60,13 @@ export function researchSource(id: string): { id: string; title: string; kind: s
   return s ? { id: s.id, title: s.title, kind: s.kind, url: s.url } : undefined;
 }
 
+/**
+ * Mapped gates (geometry.json is OpenStreetMap data and stays as imported) that the
+ * owner marked as not belonging on the map (2026-10-22): the two on the far side of
+ * the road, by the Garden. Hiding is by OSM node id, never by style.
+ */
+export const REMOVED_GATES: readonly string[] = ["node/11038449765", "node/11039495994"];
+
 // ---------- Projection ----------
 // A flat local projection of the documented viewport, in metres from its
 // north-west corner. Accurate to well under a metre over a 600 m wide area.

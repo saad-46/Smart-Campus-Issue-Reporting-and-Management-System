@@ -244,7 +244,7 @@ describe("on-site verification checklist", () => {
   });
 
   it("states the counts it was written for, so a changed dataset is noticed", () => {
-    expect(locations.places).toHaveLength(11);
+    expect(locations.places).toHaveLength(12);
     expect(locations.locations.filter((l) => !l.placeId)).toHaveLength(2); // the library and the College of Education
     expect(features.filter((f) => f.properties.kind === "gate")).toHaveLength(6);
     expect(features.filter((f) => f.properties.kind === "building")).toHaveLength(6);

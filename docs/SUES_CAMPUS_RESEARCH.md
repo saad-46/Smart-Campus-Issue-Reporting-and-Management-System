@@ -81,12 +81,13 @@ At Mount Pleasant:
 
 Elsewhere, listed but never drawn: Sultan-Ul-Uloom Public Schools, Old City (Syed Ali Chabutra, Golconda, Khazipura, Hafiz Baba Nagar) and the SU Knowledge Hub Foundation.
 
-## Map places (11)
+## Map places (12)
 
 | Place | Position | Within about | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| Blocks 1 and 5 area | 17.4285, 78.4439 | 30 m | Approximate | Photographs captioned Block 1 and Block 5 share this geotag (Block 2 shared it too, and now stands at Ghulam Ahmed Hall) |
-| Blocks 3 and 4 area | 17.4277, 78.4420 | 60 m | Approximate | Photographs captioned Block 3 and Block 4, and the seminar hall; longitude printed to three decimals |
+| Blocks 1 and 4 | 17.428238, 78.442895 | 20 m | Approximate | One building, identified by the owner (2026-10-22); centre of footprint way 897374294. Includes the seminar hall ("Seminar Hall, Block-4"). The official geotags that carried Block 1 and Block 4 are no longer used for them |
+| Block 5 | 17.4285, 78.4439 | 30 m | Approximate | Photographs captioned Block 5 (and formerly Blocks 1 and 2) share this geotag; footprint not established |
+| Block 3 | 17.4277, 78.4420 | 60 m | Approximate | Photographs captioned Block 3 (and formerly Block 4 and the seminar hall); longitude printed to three decimals |
 | Ghulam Ahmed Hall (Block 2) | 17.428343, 78.443476 | 20 m | Approximate | Centre of footprint way 340053345, which the owner identified as both the hall and Block 2. Earlier geotags: two photographs at 17.4282, 78.4435, a third 240 m away |
 | Masjid | 17.427629, 78.442472 | 20 m | Approximate | Footprint way 340051389, identified by the owner; no public source |
 | Sports Center | 17.427491, 78.442963 | 20 m | Approximate | Footprint way 775585790, identified by the owner; no public source |

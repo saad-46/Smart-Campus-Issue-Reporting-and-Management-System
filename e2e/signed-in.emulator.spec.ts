@@ -138,7 +138,7 @@ test("admin: assigns a worker, escalates, and both persist across a reload", asy
 
   // The same place is counted on the real campus map.
   await page.goto("/admin/map");
-  const marker = page.getByRole("group", { name: /^SUES campus map/ }).locator("[data-place=blocks-3-4]");
+  const marker = page.getByRole("group", { name: /^SUES campus map/ }).locator("[data-place=blocks-1-4]");
   await expect(marker).toHaveAttribute("aria-label", /: [1-9]/, { timeout: 30_000 });
   expect(errors).toEqual([]);
 });

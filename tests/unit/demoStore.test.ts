@@ -81,7 +81,7 @@ describe("issue lifecycle, end to end", () => {
     expect(stats(s).total).toBe(before.total + 1);
     expect(stats(s).openCount).toBe(before.openCount + 1);
     expect(stats(s).unassigned).toBe(before.unassigned + 1);
-    expect(stats(s).map.buildings.find((b) => b.buildingId === "blocks-3-4")!.open).toBe(before.map.buildings.find((b) => b.buildingId === "blocks-3-4")!.open + 1);
+    expect(stats(s).map.buildings.find((b) => b.buildingId === "blocks-1-4")!.open).toBe(before.map.buildings.find((b) => b.buildingId === "blocks-1-4")!.open + 1);
     expect(s.notifications.admin[0]).toMatchObject({ issueId: "SC-1146", read: false });
     expect(s.notifications.student[0].title).toBe("Report received");
 

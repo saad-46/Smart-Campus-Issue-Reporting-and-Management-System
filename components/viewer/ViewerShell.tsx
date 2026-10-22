@@ -76,8 +76,9 @@ export function PerspectiveSwitcher({ variant = "sidebar", navigate = true, onCh
       aria-label="Choose a perspective"
       data-tour="role-switcher"
       className={cn(
-        "rounded-lg border border-glass-border bg-surface-2/70 p-0.5",
-        collapsed ? "flex flex-col gap-0.5" : "grid grid-cols-3",
+        "border border-glass-border bg-surface-2/70",
+        // The collapsed rail keeps its compact icon-only size (it sits above the rail's own toggle).
+        collapsed ? "flex flex-col gap-0.5 rounded-lg p-0.5" : "grid grid-cols-3 gap-1 rounded-xl p-1",
         hero && "w-full max-w-md bg-surface/70"
       )}
     >
@@ -95,14 +96,17 @@ export function PerspectiveSwitcher({ variant = "sidebar", navigate = true, onCh
               onChange?.();
             }}
             className={cn(
-              "flex items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-[background-color,color,box-shadow] duration-150",
+              // Each role is its own cell: min-w-0 lets the label shrink instead of spilling into its neighbour, and the
+              // sidebar stacks the icon over the label so three roles fit its width at any font size.
+              "flex min-w-0 items-center justify-center rounded-lg font-medium transition-[background-color,color,box-shadow] duration-150",
+              "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand",
               "[&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0",
-              collapsed ? "h-8 w-full" : hero ? "h-10 px-3" : "h-8 px-1.5 text-[13px]",
-              active ? "bg-surface text-fg shadow-sm ring-1 ring-brand-subtle-border" : "text-fg-subtle hover:text-fg"
+              collapsed ? "h-8 w-full" : hero ? "h-14 flex-col gap-1 px-1 text-xs sm:h-11 sm:flex-row sm:gap-2 sm:px-2 sm:text-sm" : "h-14 flex-col gap-1 px-1 text-xs",
+              active ? "bg-surface text-fg shadow-sm ring-1 ring-brand-subtle-border focus-visible:ring-2 focus-visible:ring-brand" : "text-fg-subtle hover:bg-surface/50 hover:text-fg"
             )}
           >
             <ViewerNavIcon icon={p.icon} />
-            {!collapsed && p.label}
+            {!collapsed && <span className="max-w-full truncate leading-none">{p.label}</span>}
           </button>
         );
       })}

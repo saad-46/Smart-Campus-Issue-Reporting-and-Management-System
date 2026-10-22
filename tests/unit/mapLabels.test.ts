@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { BUILDINGS, CAMPUS_GRID } from "@/lib/campus";
-import { LabelMarker, labelCollisions, labelWidth, layoutLabels } from "@/lib/mapLabels";
+import { LabelMarker, labelCollisions, labelWidth, layoutLabels, mapSizing } from "@/lib/mapLabels";
 
 const bounds = { width: CAMPUS_GRID.width, height: CAMPUS_GRID.height };
 
 /** The markers exactly as CampusMap builds them at a zoom level, with sample counts. */
-function markers(zoom: number, selectedId: string | null = null, counts: Record<string, number> = { "blocks-1-2-5": 8, "blocks-3-4": 4, "sports-grounds": 2, "ghulam-ahmed-hall": 1, "college-of-pharmacy": 1, garden: 1 }): { list: LabelMarker[]; font: number } {
-  const scale = 1 / Math.sqrt(zoom);
+function markers(zoom: number, selectedId: string | null = null, counts: Record<string, number> = { "blocks-1-4": 8, "blocks-1-2-5": 6, "blocks-3-4": 4, "sports-grounds": 2, "ghulam-ahmed-hall": 1, "college-of-pharmacy": 1, garden: 1 }, svgWidth = 700): { list: LabelMarker[]; font: number } {
+  const sizing = mapSizing(svgWidth, bounds.width, 1 / Math.sqrt(zoom));
   const max = Math.max(0, ...Object.values(counts));
   return {
-    font: 8.5 * scale,
-    list: BUILDINGS.map((b) => ({ id: b.id, x: b.x, y: b.y, r: (10 + (max ? ((counts[b.id] ?? 0) / max) * 9 : 0)) * scale, text: b.short, pinned: selectedId === b.id, priority: counts[b.id] ?? 0 })),
+    font: sizing.labelSize,
+    list: BUILDINGS.map((b) => ({ id: b.id, x: b.x, y: b.y, r: sizing.radius(max ? (counts[b.id] ?? 0) / max : 0), text: b.short, pinned: selectedId === b.id, priority: counts[b.id] ?? 0 })),
   };
 }
 
@@ -39,7 +39,30 @@ describe("campus map label placement", () => {
     expect(at(3.4)).toBe(BUILDINGS.length);
   });
 
-  it("the Ghulam Ahmed Hall and Blocks 1, 2 and 5 labels no longer collide", () => {
+  it.each([1000, 700, 340])("labels do not overlap or cover a marker when the map is %s px wide", (svgWidth) => {
+    const { list, font } = markers(1, null, undefined, svgWidth);
+    const labels = layoutLabels(list, font, bounds);
+    expect(labelCollisions(labels)).toEqual([]);
+    for (const l of labels.filter((x) => x.visible)) for (const m of list) if (m.id !== l.id) expect(l.box.x0 < m.x + m.r && l.box.x1 > m.x - m.r && l.box.y0 < m.y + m.r && l.box.y1 > m.y - m.r, `${l.id} over ${m.id}`).toBe(false);
+    // The combined building, SUCL and MBA keep their labels at every width.
+    for (const id of ["blocks-1-4", "college-of-law", "business-administration"]) expect(labels.find((x) => x.id === id)!.visible, id).toBe(true);
+  });
+
+  it("markers are small but legible, and keep a touch target of at least 26 px across", () => {
+    for (const width of [1000, 700, 340]) {
+      const s = mapSizing(width, bounds.width, 1);
+      const px = (units: number) => units / s.u;
+      expect(px(s.radius(0))).toBeCloseTo(8);
+      expect(px(s.radius(1))).toBeCloseTo(12);
+      expect(px(s.labelSize)).toBeGreaterThanOrEqual(10);
+      expect(px(s.labelSize)).toBeLessThanOrEqual(14);
+      expect(px(s.touchRadius) * 2).toBeGreaterThanOrEqual(26);
+      expect(px(s.radius(1))).toBeLessThan(px(s.touchRadius));
+    }
+    expect(mapSizing(700, bounds.width, 1, true).radius(0)).toBeLessThan(mapSizing(700, bounds.width, 1).radius(0));
+  });
+
+  it("the Ghulam Ahmed Hall and Block 5 labels no longer collide", () => {
     const { list, font } = markers(1);
     const labels = layoutLabels(list, font, bounds);
     const hall = labels.find((l) => l.id === "ghulam-ahmed-hall")!;

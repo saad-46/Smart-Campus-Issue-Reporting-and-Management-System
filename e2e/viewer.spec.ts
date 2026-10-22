@@ -235,7 +235,7 @@ test.describe("issues", () => {
     await page.getByLabel("Title").fill("Water leaking near the staircase");
     await page.getByLabel("What is wrong?").fill("Water is dripping from a ceiling pipe and the corridor is slippery.");
     await page.getByLabel("Location", { exact: true }).selectOption({ label: "Block 4" });
-    await expect(page.getByTestId("location-detail")).toContainText("Blocks 3 and 4 area");
+    await expect(page.getByTestId("location-detail")).toContainText("Blocks 1 and 4");
     await page.getByLabel("Where exactly? (optional)").fill("second floor, near the staircase");
     await expect(page.getByLabel("aside, Suggestions").or(page.locator("[data-tour=report-ai]"))).toContainText("Plumbing");
     await page.getByRole("button", { name: "Submit report (demo)" }).click();
@@ -372,18 +372,18 @@ test.describe("analytics, theme and interface", () => {
     await expect(page.locator("main")).toContainText("none of these issues happened");
     // Real footprints, never a guessed building name.
     expect(await map.locator("[data-layer=footprints] path, [data-layer=footprints] polygon").count()).toBe(6);
-    expect(await map.locator("[data-place]").count()).toBe(11);
+    expect(await map.locator("[data-place]").count()).toBe(12);
     // Places that are not part of the campus dataset are never drawn.
     await expect(map).not.toContainText(/Gymnasium|SBI|State Bank/);
     await expect(map).not.toContainText(/Computer Science|Block A|Hostel|Canteen/);
 
     await page.getByRole("radio", { name: /SLA hotspots/ }).check();
     await expect(map).toHaveAttribute("aria-label", /deadline alert/);
-    const blocks = map.getByRole("button", { name: /^Blocks 3 and 4 area/ });
+    const blocks = map.getByRole("button", { name: /^Block 3/ });
     await blocks.press("Enter");
     await expect(blocks).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("heading", { name: "Blocks 3 and 4 area" })).toBeVisible();
-    const detail = page.locator(".glass", { has: page.getByRole("heading", { name: "Blocks 3 and 4 area" }) }).first();
+    await expect(page.getByRole("heading", { name: "Block 3" })).toBeVisible();
+    const detail = page.locator(".glass", { has: page.getByRole("heading", { name: "Block 3" }) }).first();
     await expect(detail).toContainText("Approximate position");
     await expect(detail).toContainText("17.4277, 78.4420");
   });
@@ -400,7 +400,7 @@ test.describe("analytics, theme and interface", () => {
     await page.getByRole("checkbox", { name: "Campus places" }).uncheck();
     await expect(map.locator("[data-place]")).toHaveCount(0);
     await page.getByRole("checkbox", { name: "Campus places" }).check();
-    await expect(map.locator("[data-place]")).toHaveCount(11);
+    await expect(map.locator("[data-place]")).toHaveCount(12);
 
     const search = page.getByRole("searchbox", { name: "Search the map" }).or(page.getByLabel("Search the map"));
     await search.fill("seminar");
@@ -411,7 +411,7 @@ test.describe("analytics, theme and interface", () => {
     await expect(page.locator("main")).toContainText("No mapped place matches");
     await search.fill("");
     await page.getByLabel("Verification", { exact: true }).selectOption({ label: "Approximate position" });
-    await expect(page.locator("main")).toContainText("11 places highlighted.");
+    await expect(page.locator("main")).toContainText("12 places highlighted.");
     await expect(page.getByRole("button", { name: /Remove filter: Approximate position/ })).toBeVisible();
   });
 
