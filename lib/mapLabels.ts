@@ -12,6 +12,22 @@
 // markers and the zoom level, never on the pan offset, so labels do not
 // jitter while the map is dragged.
 
+/**
+ * Marker and label sizes in map units. They are specified in screen pixels so the map reads the same on a
+ * phone and a desktop: a small marker (8-12 px radius, 6 px when compact), a 10-14 px label, and a touch
+ * target of at least 13 px radius (see CampusMap). `u` is map units per pixel at the current zoom.
+ */
+export function mapSizing(svgWidth: number, gridWidth: number, zoomScale: number, compact = false) {
+  const u = (zoomScale * gridWidth) / svgWidth;
+  return {
+    u,
+    /** Radius for a marker holding `fraction` (0-1) of the highest value. */
+    radius: (fraction: number) => ((compact ? 6 : 8) + fraction * 4) * u,
+    labelSize: Math.min(14, Math.max(10, (svgWidth / gridWidth) * 8.5)) * u,
+    touchRadius: 13 * u,
+  };
+}
+
 export interface LabelMarker {
   id: string;
   x: number;

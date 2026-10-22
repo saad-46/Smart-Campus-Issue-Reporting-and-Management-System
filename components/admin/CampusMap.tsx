@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import geometry from "@/data/campuses/sues-hyderabad/geometry.json";
-import { BUILDINGS, CAMPUS_GRID, project, VERIFICATION_LABELS } from "@/lib/campus";
+import { BUILDINGS, CAMPUS_GRID, project, REMOVED_GATES, VERIFICATION_LABELS } from "@/lib/campus";
 import { Hotspot } from "@/lib/intelligence/analytics";
 import { cn } from "@/lib/cn";
-import { layoutLabels } from "@/lib/mapLabels";
+import { layoutLabels, mapSizing } from "@/lib/mapLabels";
 
 type Metric = "open" | "total";
 
@@ -56,7 +56,7 @@ const SHAPES = FEATURES.map((f) => {
   return { ...f.properties, d: "", cx, cy };
 });
 
-const of = (kind: string) => SHAPES.filter((s) => s.kind === kind);
+const of = (kind: string) => SHAPES.filter((s) => s.kind === kind && !(s.osm && REMOVED_GATES.includes(s.osm)));
 
 /** Sequential indigo scale (theme-aware); 0 = neutral. */
 function heatLevel(value: number, max: number): number {
@@ -108,8 +108,19 @@ export default function CampusMap({
 
   // Zoom and pan by changing the viewBox; nothing is re-projected.
   const [view, setView] = useState({ k: 1, x: W / 2, y: H / 2 });
-  const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
+  // A drag that started on a marker must not also select it when the pointer is released.
+  const justDragged = useRef(false);
   const svgRef = useRef<SVGSVGElement>(null);
+  // Markers and labels are sized in screen pixels so they stay readable on every width.
+  const [width, setWidth] = useState(640);
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth || 640));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const clamp = (v: { k: number; x: number; y: number }) => {
     const k = Math.min(5, Math.max(1, v.k));
     const hw = W / k / 2;
@@ -123,17 +134,27 @@ export default function CampusMap({
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (compact || view.k === 1) return;
-    drag.current = { px: e.clientX, py: e.clientY, x: view.x, y: view.y };
+    drag.current = { px: e.clientX, py: e.clientY, x: view.x, y: view.y, moved: false };
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
     const el = svgRef.current;
     if (!d || !el) return;
+    if (!d.moved && Math.abs(e.clientX - d.px) + Math.abs(e.clientY - d.py) < 5) return;
+    d.moved = true;
     const scale = vw / el.clientWidth;
     setView((v) => clamp({ ...v, x: d.x - (e.clientX - d.px) * scale, y: d.y - (e.clientY - d.py) * scale }));
   };
   const endDrag = () => {
+    justDragged.current = !!drag.current?.moved;
     drag.current = null;
+  };
+  const choose = (id: string, selected: boolean) => {
+    if (justDragged.current) {
+      justDragged.current = false;
+      return;
+    }
+    onSelect?.(selected ? null : id);
   };
   // Keyboard: + and - zoom, 0 resets, arrow keys pan a zoomed map (focus is on a marker or the zoom buttons).
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -151,8 +172,9 @@ export default function CampusMap({
   const roadNames = of("road").filter((r) => r.name === "Road No. 3").slice(0, 1);
 
   // Marker sizes and collision-free label positions (see lib/mapLabels.ts).
-  const radiusOf = (id: string) => ((compact ? 9 : 10) + (max > 0 ? (valueOf(byId.get(id)) / max) * 9 : 0)) * fontScale;
-  const labelSize = 8.5 * fontScale;
+  // Sized in screen pixels (u map units per pixel): a small marker, a larger invisible touch target, and a label of 10-14 px.
+  const { u, radius, labelSize, touchRadius } = mapSizing(width, W, fontScale, compact);
+  const radiusOf = (id: string) => radius(max > 0 ? valueOf(byId.get(id)) / max : 0);
   const labels = new Map(
     layoutLabels(
       BUILDINGS.map((b) => ({
@@ -260,7 +282,8 @@ export default function CampusMap({
                     aria-label={label}
                     aria-pressed={interactive ? selected : undefined}
                     data-place={b.id}
-                    onClick={interactive ? () => onSelect(selected ? null : b.id) : undefined}
+                    data-selected={selected ? "true" : undefined}
+                    onClick={interactive ? () => choose(b.id, selected) : undefined}
                     onKeyDown={
                       interactive
                         ? (e) => {
@@ -272,21 +295,31 @@ export default function CampusMap({
                         : undefined
                     }
                     opacity={dimmed ? 0.3 : 1}
-                    className={cn("group/place transition-opacity", interactive && "cursor-pointer outline-none [&:focus-visible>circle.marker]:stroke-[var(--fg)] [&:hover>circle.marker]:stroke-[var(--fg)]")}
+                    className={cn("group/place transition-opacity", interactive && "cursor-pointer outline-none [&:focus-visible>circle.focus-ring]:opacity-100 [&:focus-visible>circle.marker]:stroke-[var(--fg)] [&:hover>circle.marker]:stroke-[var(--fg)]")}
                   >
                     <title>{label}</title>
                     {/* How far the true position may be from the marker. */}
-                    <circle cx={b.x} cy={b.y} r={b.precisionMeters} fill="var(--brand)" fillOpacity={selected ? 0.12 : 0.04} stroke="var(--brand-fg)" strokeOpacity="0.35" strokeWidth="0.8" strokeDasharray="3 3" />
+                    <circle cx={b.x} cy={b.y} r={b.precisionMeters} fill="var(--brand)" fillOpacity={selected ? 0.1 : 0.03} stroke="var(--brand-fg)" strokeOpacity={selected ? 0.4 : 0.22} strokeWidth="0.7" strokeDasharray="3 3" className="transition-[fill-opacity,stroke-opacity] duration-200" />
+                    {/* A larger invisible target, so a small marker is still easy to tap. */}
+                    {interactive && <circle cx={b.x} cy={b.y} r={Math.max(r, touchRadius)} fill="transparent" />}
+                    {selected && (
+                      <>
+                        {/* The pulse plays once each time the marker is selected; reduced motion keeps only the static ring. */}
+                        <circle className="map-pulse" cx={b.x} cy={b.y} r={r + 3 * u} fill="none" stroke="var(--brand-fg)" strokeWidth={1.5 * u} aria-hidden="true" pointerEvents="none" />
+                        <circle cx={b.x} cy={b.y} r={r + 3.5 * u} fill="none" stroke="var(--brand-fg)" strokeOpacity="0.55" strokeWidth={1.2 * u} aria-hidden="true" pointerEvents="none" />
+                      </>
+                    )}
+                    <circle className="focus-ring opacity-0 transition-opacity" cx={b.x} cy={b.y} r={r + 5 * u} fill="none" stroke="var(--brand)" strokeWidth={2 * u} aria-hidden="true" pointerEvents="none" />
                     <circle
-                      className="marker transition-[stroke]"
+                      className="marker map-marker"
                       cx={b.x}
                       cy={b.y}
                       r={r}
                       fill={`var(--heat-${level})`}
                       stroke={selected ? "var(--fg)" : "var(--brand-fg)"}
-                      strokeWidth={selected ? 2.2 : 1}
+                      strokeWidth={(selected ? 2 : 1) * u}
                     />
-                    <text x={b.x} y={b.y + 4 * fontScale} textAnchor="middle" fontSize={11 * fontScale} fontWeight="700" fill={`var(--heat-ink-${level})`} aria-hidden="true">
+                    <text x={b.x} y={b.y + 3.5 * u} textAnchor="middle" fontSize={10 * u} fontWeight="700" fill={`var(--heat-ink-${level})`} aria-hidden="true">
                       {value > 0 ? value : ""}
                     </text>
                     {!compact && (
@@ -298,7 +331,7 @@ export default function CampusMap({
                         fontWeight={selected ? "700" : "600"}
                         fill="var(--fg)"
                         stroke="var(--surface-2)"
-                        strokeWidth={2.4 * fontScale}
+                        strokeWidth={2.4 * u}
                         paintOrder="stroke"
                         aria-hidden="true"
                         data-label={b.id}

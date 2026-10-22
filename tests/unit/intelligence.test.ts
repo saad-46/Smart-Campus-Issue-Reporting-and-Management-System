@@ -117,9 +117,11 @@ describe("AI issue intelligence", () => {
 describe("campus layout", () => {
   it("matches buildings from free text", () => {
     expect(matchBuilding("Block 2, Room 204")?.id).toBe("ghulam-ahmed-hall"); // Block 2 and Ghulam Ahmed Hall are one building
-    expect(matchBuilding("Block 1, Room 12")?.id).toBe("blocks-1-2-5");
-    expect(matchBuilding("block-4 near the stairs")?.id).toBe("blocks-3-4");
-    expect(matchBuilding("Seminar Hall")?.id).toBe("blocks-3-4");
+    expect(matchBuilding("Block 1, Room 12")?.id).toBe("blocks-1-4"); // Blocks 1 and 4 are one building
+    expect(matchBuilding("block-4 near the stairs")?.id).toBe("blocks-1-4");
+    expect(matchBuilding("Seminar Hall")?.id).toBe("blocks-1-4");
+    expect(matchBuilding("Block 5 entrance")?.id).toBe("blocks-1-2-5");
+    expect(matchBuilding("Block 3 washroom")?.id).toBe("blocks-3-4");
     expect(matchBuilding("Ghulam Ahmed Hall, back row")?.id).toBe("ghulam-ahmed-hall");
     expect(matchBuilding("Sultan-ul-Uloom College of Pharmacy, lab")?.id).toBe("college-of-pharmacy");
     expect(matchBuilding("football ground")?.id).toBe("sports-grounds");
@@ -139,9 +141,9 @@ describe("campus layout", () => {
   it("prefers the QR location's building over the text", () => {
     const map = new Map([["qr-101", "garden"]]);
     expect(buildingForIssue({ location: "Block 1", locationId: "qr-101" }, map)?.id).toBe("garden");
-    expect(buildingForIssue({ location: "Block 1", locationId: "unknown-id" }, map)?.id).toBe("blocks-1-2-5");
+    expect(buildingForIssue({ location: "Block 1", locationId: "unknown-id" }, map)?.id).toBe("blocks-1-4");
     // Canonical location ids resolve without a map; a known location with no known position is never guessed.
-    expect(buildingForIssue({ location: "anything", locationId: "mjcet-block-4" })?.id).toBe("blocks-3-4");
+    expect(buildingForIssue({ location: "anything", locationId: "mjcet-block-4" })?.id).toBe("blocks-1-4");
     expect(buildingForIssue({ location: "Block 1", locationId: "mjcet-central-library" })).toBeUndefined();
     // A retired location (the Shuttle court) stays unplaced: its text is not matched to another building.
     expect(buildingForIssue({ location: "Shuttle court (Physical Education), Block 1", locationId: "mjcet-shuttle-court" })).toBeUndefined();
@@ -150,7 +152,7 @@ describe("campus layout", () => {
   it("slugifies and describes locations", () => {
     expect(slugifyLocation("Block B — Room 204!")).toBe("block-b-room-204");
     expect(describeLocation({ name: "Physics Lab", buildingId: "blocks-3-4", floor: "2", room: "204" })).toBe(
-      "Physics Lab, Blocks 3 and 4 area, Floor 2, Room 204"
+      "Physics Lab, Block 3, Floor 2, Room 204"
     );
   });
 });
@@ -303,7 +305,7 @@ describe("analytics", () => {
   it("aggregates hotspots and counts unplaced issues separately", () => {
     const { buildings, unplaced } = hotspots(list);
     expect(unplaced).toBe(1);
-    expect(buildings.find((b) => b.buildingId === "blocks-1-2-5")).toMatchObject({ total: 2, open: 0, resolved: 2, topCategory: "Electrical" });
+    expect(buildings.find((b) => b.buildingId === "blocks-1-4")).toMatchObject({ total: 2, open: 0, resolved: 2, topCategory: "Electrical" });
     expect(buildings.find((b) => b.buildingId === "garden")).toMatchObject({ total: 0, topCategory: null, averageResolutionHours: null });
   });
 
@@ -347,8 +349,8 @@ describe("maintenance risk indicator", () => {
     const r = maintenanceRisk([...hot, ...calm], NOW);
     expect(r.sufficient).toBe(true);
     if (!r.sufficient) return;
-    expect(r.indicators[0]).toMatchObject({ level: "High", repeatedCategory: "Plumbing", issuesLast30Days: 8, buildingId: "blocks-3-4" });
-    expect(r.indicators[0].label).toBe("Blocks 3 and 4 area — 2"); // the block number is not taken for the room
+    expect(r.indicators[0]).toMatchObject({ level: "High", repeatedCategory: "Plumbing", issuesLast30Days: 8, buildingId: "blocks-1-4" });
+    expect(r.indicators[0].label).toBe("Blocks 1 and 4 — 2"); // the block number is not taken for the room
     const library = r.indicators.find((i) => i.buildingId === "garden");
     expect(library?.level).toBe("Low");
     expect(library?.repeatedCategory).toBeNull();
@@ -414,7 +416,7 @@ describe("factual insights", () => {
 
   it("names the building with the most unresolved issues", () => {
     const list = Array.from({ length: 3 }, () => issue({ location: "Block 4" }));
-    expect(generateInsights(list, 30, DEFAULT_SLA_CONFIG, NOW).find((i) => i.id === "building")?.text).toBe("Blocks 3 and 4 area has the most unresolved issues (3).");
+    expect(generateInsights(list, 30, DEFAULT_SLA_CONFIG, NOW).find((i) => i.id === "building")?.text).toBe("Blocks 1 and 4 has the most unresolved issues (3).");
   });
 });
 

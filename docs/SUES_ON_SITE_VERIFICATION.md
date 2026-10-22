@@ -44,12 +44,13 @@ Reviewer notes:
 Approval required:        (name and date of the person allowed to raise the status)
 ```
 
-## 1. Mapped places (11)
+## 1. Mapped places (12)
 
 | Place ID | Name | Current position (±m) | Status | What to establish |
 | --- | --- | --- | --- | --- |
-| `blocks-1-2-5` | Blocks 1 and 5 area (the id is kept from when Block 2 shared it) | 17.4285, 78.4439 (±30) | approximate | The exact location of **each** of Blocks 1 and 5, and which mapped footprint each is |
-| `blocks-3-4` | Blocks 3 and 4 area | 17.4277, 78.4420 (±60) | approximate | Each of Blocks 3 and 4, and the seminar hall; which footprint each is. Longitude was printed to three decimals only |
+| `blocks-1-4` | Blocks 1 and 4 | 17.428238, 78.442895 (±20) | approximate | One building, as the owner annotated (2026-10-22): footprint `way/897374294`. The Seminar Hall ("Seminar Hall, Block 4") is placed here with Block 4. Confirm both block signs and the seminar hall on site |
+| `blocks-1-2-5` | Block 5 (the id is kept from when Blocks 1 and 2 shared it) | 17.4285, 78.4439 (±30) | approximate | Which mapped footprint is Block 5 (no footprint is assigned yet) |
+| `blocks-3-4` | Block 3 (the id is kept from when Block 4 shared it) | 17.4277, 78.4420 (±60) | approximate | Which mapped footprint is Block 3. Longitude was printed to three decimals only |
 | `ghulam-ahmed-hall` | Ghulam Ahmed Hall (Block 2) | 17.428343, 78.443476 (±20) | approximate | Footprint `way/340053345`, identified by the owner as both Ghulam Ahmed Hall and Block 2. Confirm with the door sign (the official photographs also disagree, see section 3) |
 | `masjid` | Masjid | 17.427629, 78.442472 (±20) | approximate | Footprint `way/340051389`, identified by the owner. Confirm on site |
 | `sports-center` | Sports Center | 17.427491, 78.442963 (±20) | approximate | Footprint `way/775585790`, identified by the owner. Confirm on site |
@@ -98,7 +99,7 @@ Also record which of Blocks 1 to 5 stand in which footprint, using the block sig
 
 ## 5. Gates (6 mapped barrier nodes)
 
-The dataset draws these as "mapped gates"; none is confirmed as an entrance in use.
+The dataset draws these as "mapped gates"; none is confirmed as an entrance in use. Two of them (`node/11038449765` and `node/11039495994`, the pair on the far side of the road by the Garden) are not drawn: the owner marked them for removal on 2026-10-22. They stay in `geometry.json` (OpenStreetMap data, unedited) and are hidden by `REMOVED_GATES` in `lib/campus.ts`.
 
 | OSM node | Position | Is it a gate? | Open to pedestrians / vehicles | Main entrance? | Signage text |
 | --- | --- | --- | --- | --- | --- |

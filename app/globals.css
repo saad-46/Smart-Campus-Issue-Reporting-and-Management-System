@@ -368,6 +368,12 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }
+/* Campus map: a selected marker settles (scale) and sends out one halo; both are short and play once. */
+.map-marker { transform-box: fill-box; transform-origin: center; transition: stroke 160ms var(--ease-standard), stroke-width 160ms var(--ease-standard); }
+[data-selected="true"] > .map-marker { animation: map-marker-settle 280ms var(--ease-standard) both; transform: scale(1.12); }
+.map-pulse { transform-box: fill-box; transform-origin: center; animation: map-halo 520ms var(--ease-standard) both; }
+@keyframes map-marker-settle { 0% { transform: scale(1); } 45% { transform: scale(1.28); } 100% { transform: scale(1.12); } }
+@keyframes map-halo { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.1); opacity: 0; } }
 /* Horizontal scrollers (filter chips, tabs) without a visible scrollbar. */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -381,6 +387,9 @@
     scroll-behavior: auto !important;
   }
   .skeleton { animation: none; }
+  /* Selected stays obvious without movement: the thicker outline, the static ring and the 1.12 scale remain. */
+  .map-pulse { display: none; }
+  [data-selected="true"] > .map-marker { animation: none; }
   .lift:hover { transform: none; }
   .tilt-3d, .stage-3d:hover .tilt-3d { transform: none; }
 }
