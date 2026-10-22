@@ -31,6 +31,7 @@ import { useNow } from "@/hooks/useNow";
 import { useCampusLocations } from "@/hooks/useCampusLocations";
 import { useChartTheme } from "@/hooks/useChartTheme";
 import CampusMap from "@/components/admin/CampusMap";
+import DashboardQueues from "@/components/admin/DashboardQueues";
 import { formatHours } from "@/components/admin/Kpi";
 import PageHeader from "@/components/ui/PageHeader";
 import Card, { CardBody, CardHeader } from "@/components/ui/Card";
@@ -316,6 +317,11 @@ export default function AdminOverviewPage() {
                       </Badge>
                       <PriorityBadge priority={a.issue.priority} />
                       {!a.issue.assignedTo && <Badge>Unassigned</Badge>}
+                      {!a.issue.assignedTo && (
+                        <Link href={`/issues/${a.issue.id}`} className={buttonClasses("tertiary", "sm", "h-6 px-1.5 text-xs")} aria-label={`Assign “${a.issue.title}”`}>
+                          Assign
+                        </Link>
+                      )}
                       {a.issue.escalated ? (
                         <Badge tone="danger" icon={<Siren aria-hidden="true" />}>
                           Escalated
@@ -473,6 +479,8 @@ export default function AdminOverviewPage() {
           </CardBody>
         </Card>
       </div>
+
+      {adminId && <DashboardQueues adminId={adminId} />}
 
       <ConfirmDialog
         open={!!pendingCluster}

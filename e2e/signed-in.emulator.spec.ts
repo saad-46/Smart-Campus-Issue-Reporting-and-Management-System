@@ -175,6 +175,104 @@ test("worker: starts, resolves with an expense claim; a second action on the fin
   await expect(page.getByRole("button", { name: new RegExp(`Start.*${STAMP}`) })).toHaveCount(0);
 });
 
+test("worker: the Expense claims tab lists the claim as awaiting review", async ({ page }) => {
+  test.skip(!issuePath, "needs the issue from the first test");
+  const errors = hasConsoleErrors(page);
+  await signIn(page, "worker1@unifix.test");
+  await page.goto("/worker");
+  await page.getByRole("tab", { name: /^Expense claims/ }).click();
+  const row = page.getByRole("tabpanel").locator("li", { hasText: STAMP });
+  await expect(row).toContainText("₹120.5", { timeout: 30_000 });
+  await expect(row).toContainText("Awaiting review");
+  expect(errors).toEqual([]);
+});
+
+test("admin: the overview lists the claim to review and the worker access queue, and links to Finance", async ({ page }) => {
+  test.skip(!issuePath, "needs the issue from the first test");
+  const errors = hasConsoleErrors(page);
+  await signIn(page, "admin@unifix.test");
+  await page.goto("/admin");
+  const claims = page.getByRole("heading", { name: "Claims to review" }).locator("xpath=ancestor::div[contains(@class,'glass')][1]");
+  await expect(claims.locator("li", { hasText: STAMP })).toContainText("TEST fan capacitor", { timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Worker access requests" })).toBeVisible();
+  await claims.getByRole("link", { name: new RegExp(`Review.*${STAMP}`) }).click();
+  await expect(page).toHaveURL(/\/admin\/finance/);
+  expect(errors).toEqual([]);
+});
+
+test("admin: worker access requests are decided from the overview, with a confirmation, and take effect", async ({ page }) => {
+  const accounts = [
+    { name: `TEST Approve ${STAMP}`, email: `approve-${STAMP}@unifix.test` },
+    { name: `TEST Decline ${STAMP}`, email: `decline-${STAMP}@unifix.test` },
+  ];
+  for (const a of accounts) {
+    await page.goto("/register");
+    await page.getByLabel("Full name").fill(a.name);
+    await page.getByLabel("Email").fill(a.email);
+    await page.getByLabel(/-digit PIN/).fill("123456");
+    await page.getByRole("radio", { name: /Resolve issues/ }).click();
+    await page.getByRole("button", { name: "Create account" }).click();
+    await page.waitForURL((u) => !u.pathname.startsWith("/register"), { timeout: 60_000 });
+    await signOut(page);
+  }
+
+  await signIn(page, "admin@unifix.test");
+  await page.goto("/admin");
+  const card = page.getByRole("heading", { name: "Worker access requests" }).locator("xpath=ancestor::div[contains(@class,'glass')][1]");
+  await expect(card.locator("li", { hasText: accounts[0].name })).toBeVisible({ timeout: 30_000 });
+
+  // Cancelling the confirmation changes nothing.
+  await card.getByRole("button", { name: `Approve ${accounts[0].name}` }).click();
+  const confirm = page.getByRole("alertdialog");
+  await expect(confirm).toContainText("worker access");
+  await confirm.getByRole("button", { name: "Cancel" }).click();
+  await expect(card.locator("li", { hasText: accounts[0].name })).toBeVisible();
+
+  await card.getByRole("button", { name: `Approve ${accounts[0].name}` }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(card.locator("li", { hasText: accounts[0].name })).toHaveCount(0, { timeout: 30_000 });
+  await card.getByRole("button", { name: `Decline ${accounts[1].name}` }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Decline", exact: true }).click();
+  await expect(card.locator("li", { hasText: accounts[1].name })).toHaveCount(0, { timeout: 30_000 });
+  await signOut(page);
+
+  // The approved account is a worker; the declined one is not.
+  await page.goto("/login");
+  await page.getByLabel("Email").first().fill(accounts[0].email);
+  await page.getByLabel("Password").first().fill("123456");
+  await page.getByRole("button", { name: /^(Sign in|Log in)$/ }).first().click();
+  await page.waitForURL(/\/worker/, { timeout: 60_000 });
+  await signOut(page);
+  await page.goto("/login");
+  await page.getByLabel("Email").first().fill(accounts[1].email);
+  await page.getByLabel("Password").first().fill("123456");
+  await page.getByRole("button", { name: /^(Sign in|Log in)$/ }).first().click();
+  await page.waitForURL(/\/dashboard/, { timeout: 60_000 });
+  await page.goto("/worker");
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
+});
+
+test("admin: Assign on an unassigned alert opens that issue's Manage panel", async ({ page }) => {
+  await signIn(page, "admin@unifix.test");
+  await page.goto("/admin");
+  const assign = page.getByRole("link", { name: /^Assign “/ }).first();
+  await expect(assign).toBeVisible({ timeout: 30_000 });
+  await assign.click();
+  await expect(page).toHaveURL(/\/issues\/[A-Za-z0-9]+$/);
+  await expect(page.getByRole("region", { name: "Manage issue" }).getByRole("button", { name: "Assign" })).toBeVisible({ timeout: 30_000 });
+});
+
+test("student: My reports counts every report, and the staff-only queues are not reachable", async ({ page }) => {
+  await signIn(page, "student1@unifix.test");
+  await page.goto("/dashboard");
+  const tab = page.getByRole("tab", { name: /^My issues/ });
+  await expect(tab).toHaveText(/\d/, { timeout: 30_000 });
+  const count = Number(/(\d+)/.exec((await tab.textContent()) ?? "")?.[1]);
+  expect(count).toBeGreaterThan(0);
+  await expect(page.locator("main")).toContainText(new RegExp(`My reports(?:${count}){1,2}All time`)); // the figure is announced alongside its animated copy
+  await expect(page.getByRole("heading", { name: "Claims to review" })).toHaveCount(0);
+});
+
 test("admin: pays the claim exactly once; a worker cannot reach finance; the student is notified", async ({ page }) => {
   test.skip(!issuePath, "needs the issue from the first test");
   await signIn(page, "admin@unifix.test");

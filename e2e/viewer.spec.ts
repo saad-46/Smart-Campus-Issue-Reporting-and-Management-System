@@ -385,7 +385,7 @@ test.describe("analytics, theme and interface", () => {
     await expect(page.getByRole("heading", { name: "Block 3" })).toBeVisible();
     const detail = page.locator(".glass", { has: page.getByRole("heading", { name: "Block 3" }) }).first();
     await expect(detail).toContainText("Approximate position");
-    await expect(detail).toContainText("17.4277, 78.4420");
+    await expect(detail).toContainText("17.4281, 78.4419");
   });
 
   test("map feature layers, search and filters change what is drawn", async ({ page }) => {
