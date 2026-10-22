@@ -139,12 +139,12 @@ describe("campus map corrections", () => {
 describe("the two roadside gates are not drawn", () => {
   const gates = geometry.features.filter((f) => f.properties.kind === "gate");
 
-  it("names exactly the two gates beside the Garden, by OSM id, and both exist in the geometry", () => {
+  it("names the two Garden-side gates and the additional owner-crossed gate by OSM id, and all exist in the geometry", () => {
     expect([...REMOVED_GATES].sort()).toEqual(["node/10803590216", "node/11038449765", "node/11039495994"]);
     for (const id of REMOVED_GATES) expect(gates.some((g) => g.properties.osm === id), id).toBe(true);
   });
 
-  it("leaves the other four gates, and the imported geometry, untouched", () => {
+  it("leaves the other three gates, and the imported geometry, untouched", () => {
     expect(gates).toHaveLength(6);
     const kept = gates.filter((g) => !REMOVED_GATES.includes(g.properties.osm as string));
     expect(kept.map((g) => g.properties.osm).sort()).toEqual(["node/11039323503", "node/11039323504", "node/7682407084"]);
