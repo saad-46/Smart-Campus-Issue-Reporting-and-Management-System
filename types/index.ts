@@ -23,6 +23,16 @@ export interface User {
   earnings?: number; // Total money earned by the worker
   /** Set when the account asked for worker access; only an admin can resolve it. */
   workerRequest?: WorkerRequestStatus;
+  /** Student details; undefined until the account has filled them in. */
+  student?: StudentProfile;
+}
+
+/** Who a student is, shown on their dashboard. Set together; absent on older accounts. */
+export interface StudentProfile {
+  college: string;
+  rollNumber: string;
+  academicYear: string;
+  branch: string;
 }
 
 export type WorkerRequestStatus = "pending" | "approved" | "rejected";

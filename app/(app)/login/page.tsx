@@ -15,9 +15,19 @@ import { dashboardPathForRole } from "@/lib/roles";
 import { safeRedirectPath } from "@/lib/navigation";
 import { isValidEmail } from "@/lib/validation";
 import { sendPasswordReset } from "@/lib/auth";
+import { UserRole } from "@/types";
+
+// The role chosen on /sign-in. It only picks the wording and what to verify:
+// the account must really hold this role, or it is signed out again.
+const WANTED_ROLES: Record<string, UserRole> = { student: "user", worker: "worker", admin: "admin" };
+const NOT_GRANTED: Record<UserRole, string> = {
+  user: "This account can't sign in as a Student.",
+  worker: "This account doesn't have worker access. If you asked for it, an administrator has to approve the request first.",
+  admin: "This account isn't an administrator account.",
+};
 
 export default function LoginPage() {
-  const { signIn, userProfile, loading, activeRole, isAuthenticated, profileError, reloadProfile } = useAuthContext();
+  const { signIn, signOut, switchRole, availableRoles, userProfile, loading, activeRole, isAuthenticated, profileError, reloadProfile } = useAuthContext();
   const router = useRouter();
 
   const [mode, setMode] = useState<"signin" | "reset">("signin");
@@ -42,8 +52,11 @@ export default function LoginPage() {
   const [justSignedIn, setJustSignedIn] = useState(false);
   // Where to go after signing in (only same-site paths are accepted).
   const [next, setNext] = useState<string | null>(null);
+  const [wanted, setWanted] = useState<UserRole | null>(null);
   useEffect(() => {
-    setNext(safeRedirectPath(new URLSearchParams(window.location.search).get("next")));
+    const params = new URLSearchParams(window.location.search);
+    setNext(safeRedirectPath(params.get("next")));
+    setWanted(WANTED_ROLES[params.get("role") ?? ""] ?? null);
   }, []);
 
   useEffect(() => {
@@ -56,8 +69,26 @@ export default function LoginPage() {
       }
       return;
     }
+    if (wanted && !availableRoles.includes(wanted)) {
+      // Choosing a role proves nothing: this account does not hold it.
+      setJustSignedIn(false);
+      setIsLoading(false);
+      setError(NOT_GRANTED[wanted]);
+      signOut().catch((err) => logError("signOut", err));
+      return;
+    }
+    if (wanted && activeRole !== wanted) {
+      switchRole(wanted)
+        .then(() => router.push(next ?? dashboardPathForRole(wanted)))
+        .catch((err) => {
+          logError("switchRole", err);
+          setError(getFriendlyErrorMessage(err, "Couldn't open that view. Please try again."));
+          setIsLoading(false);
+        });
+      return;
+    }
     router.push(next ?? dashboardPathForRole(activeRole));
-  }, [loading, userProfile, justSignedIn, activeRole, isAuthenticated, profileError, router, next]);
+  }, [loading, userProfile, justSignedIn, activeRole, isAuthenticated, profileError, router, next, wanted, availableRoles, signOut, switchRole]);
 
   const show = (field: "email" | "password") => touched[field] || submitted;
   const emailError = !email.trim() ? "Enter your email address." : !isValidEmail(email.trim().toLowerCase()) ? "That email address doesn't look right." : "";
@@ -106,7 +137,7 @@ export default function LoginPage() {
   };
 
   // Already signed in — offer to continue instead of showing the form.
-  if (!loading && userProfile && !justSignedIn) {
+  if (!loading && userProfile && !justSignedIn && !error) {
     return (
       <AuthLayout title="You're signed in" description={`${userProfile.email} · ${ROLE_LABELS[activeRole]}`}>
         <div className="space-y-2">
@@ -165,13 +196,21 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Welcome back"
-      description="Sign in to report and track campus issues."
+      title={wanted ? `Sign in as ${ROLE_LABELS[wanted]}` : "Welcome back"}
+      description={wanted === "admin" ? "Administrator accounts are granted by the campus team." : wanted === "worker" ? "Maintenance staff with approved worker access." : "Sign in to report and track campus issues."}
       footer={
         <>
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="font-medium text-brand-fg hover:underline">
-            Create one
+          {wanted !== "admin" && (
+            <>
+              Don&apos;t have an account?{" "}
+              <Link href="/register" className="font-medium text-brand-fg hover:underline">
+                Create one
+              </Link>
+              <span aria-hidden="true"> · </span>
+            </>
+          )}
+          <Link href="/sign-in" className="font-medium text-brand-fg hover:underline">
+            {wanted ? "Choose another role" : "Sign in by role"}
           </Link>
         </>
       }

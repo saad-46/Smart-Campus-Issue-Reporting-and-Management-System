@@ -215,6 +215,10 @@ export function normalizeCampusLocation(id: string, data: Doc | undefined | null
 export function normalizeUser(id: string, data: Doc | undefined | null): User {
   const d = data ?? {};
   const baseRole = role(d.role);
+  const student =
+    str(d.college) && str(d.rollNumber) && str(d.academicYear) && str(d.branch)
+      ? { college: str(d.college), rollNumber: str(d.rollNumber), academicYear: str(d.academicYear), branch: str(d.branch) }
+      : undefined;
   return {
     id,
     name: str(d.name) || "Unnamed user",
@@ -226,6 +230,7 @@ export function normalizeUser(id: string, data: Doc | undefined | null): User {
     workerRequest: ["pending", "approved", "rejected"].includes(d.workerRequest as string)
       ? (d.workerRequest as WorkerRequestStatus)
       : undefined,
+    student,
   };
 }
 

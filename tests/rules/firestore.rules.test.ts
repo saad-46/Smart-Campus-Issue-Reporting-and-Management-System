@@ -338,6 +338,53 @@ describe("role escalation", () => {
 });
 
 // ------------------------------------------------------------------
+describe("student profile fields", () => {
+  const student = { college: "Sultan-ul-Uloom College", rollNumber: "1604-21-001", academicYear: "3rd year", branch: "Computer Science" };
+
+  it("a new student account may store all four fields with its profile", async () => {
+    await assertSucceeds(setDoc(doc(dbAs("newstudent"), "users", "newstudent"), { ...profile("newstudent", "user"), ...student }));
+  });
+
+  it("rejects a partial, mistyped or oversized set at creation", async () => {
+    const { branch: _omit, ...partial } = student;
+    void _omit;
+    await assertFails(setDoc(doc(dbAs("p1"), "users", "p1"), { ...profile("p1", "user"), ...partial }));
+    await assertFails(setDoc(doc(dbAs("p2"), "users", "p2"), { ...profile("p2", "user"), ...student, academicYear: "9th year" }));
+    await assertFails(setDoc(doc(dbAs("p3"), "users", "p3"), { ...profile("p3", "user"), ...student, college: "x".repeat(121) }));
+    await assertFails(setDoc(doc(dbAs("p4"), "users", "p4"), { ...profile("p4", "user"), ...student, rollNumber: 12345 }));
+    await assertFails(setDoc(doc(dbAs("p5"), "users", "p5"), { ...profile("p5", "user"), ...student, branch: "" }));
+  });
+
+  it("an existing account can complete its own profile, and nothing else in the same write", async () => {
+    await assertSucceeds(updateDoc(doc(dbAs(ALICE), "users", ALICE), student));
+    await assertSucceeds(updateDoc(doc(dbAs(ALICE), "users", ALICE), { ...student, branch: "Civil" }));
+    await assertFails(updateDoc(doc(dbAs(ALICE), "users", ALICE), { ...student, role: "admin" }));
+    await assertFails(updateDoc(doc(dbAs(ALICE), "users", ALICE), { ...student, name: "Someone Else" }));
+    await assertFails(updateDoc(doc(dbAs(ALICE), "users", ALICE), { ...student, earnings: 9999 }));
+    // An account with no details yet cannot save just one of the four.
+    await assertFails(updateDoc(doc(dbAs(BOB), "users", BOB), { college: "Only one field" }));
+  });
+
+  it("nobody else can write another person's student details", async () => {
+    await assertFails(updateDoc(doc(dbAs(BOB), "users", ALICE), student));
+    await assertFails(updateDoc(doc(dbAs(WENDY), "users", ALICE), student));
+    await assertFails(updateDoc(doc(dbAs(ADMIN), "users", ALICE), student));
+    await assertFails(updateDoc(doc(dbAnon(), "users", ALICE), student));
+  });
+
+  it("a worker account cannot use this path to change its own profile", async () => {
+    await assertFails(updateDoc(doc(dbAs(WENDY), "users", WENDY), student));
+  });
+
+  it("the details stay as private as the rest of the profile", async () => {
+    await updateDoc(doc(dbAs(ALICE), "users", ALICE), student);
+    await assertSucceeds(getDoc(doc(dbAs(ALICE), "users", ALICE)));
+    await assertFails(getDoc(doc(dbAs(BOB), "users", ALICE)));
+    await assertFails(getDoc(doc(dbAs(WENDY), "users", ALICE)));
+    await assertSucceeds(getDoc(doc(dbAs(ADMIN), "users", ALICE)));
+  });
+});
+
 describe("profile privacy", () => {
   it("users read their own profile but not other people's", async () => {
     await assertSucceeds(getDoc(doc(dbAs(ALICE), "users", ALICE)));

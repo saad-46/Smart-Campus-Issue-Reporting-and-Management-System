@@ -27,6 +27,8 @@ function stop() {
   unsubscribe?.();
   unsubscribe = null;
   ownerId = null;
+  // Nothing from the previous account may be shown to the next one.
+  state = { items: [], loading: true, error: false };
 }
 
 export function useNotifications(userId: string | undefined): State & { unread: number } {

@@ -10,10 +10,11 @@ import AuthLayout from "@/components/shell/AuthLayout";
 import { Input } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import { Notice } from "@/components/ui/States";
+import StudentFields, { EMPTY_STUDENT, StudentDraft } from "@/components/StudentFields";
 import { LIMITS } from "@/lib/constants";
 import { getFriendlyErrorMessage } from "@/lib/errors";
 import { dashboardPathForRole } from "@/lib/roles";
-import { cleanText, getPasswordError, isValidEmail, sanitizePinInput, validateRegistration } from "@/lib/validation";
+import { cleanText, getPasswordError, isValidEmail, sanitizePinInput, studentProfileErrors, validateRegistration } from "@/lib/validation";
 import { cn } from "@/lib/cn";
 
 const ROLES: { value: UserRole; icon: React.ReactNode; title: string; desc: string }[] = [
@@ -29,6 +30,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("user");
+  const [student, setStudent] = useState<StudentDraft>(EMPTY_STUDENT);
   const [touched, setTouched] = useState({ name: false, email: false, password: false });
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -52,13 +54,15 @@ export default function RegisterPage() {
   const nameError = !cleanText(name) ? "Enter your full name." : "";
   const emailError = !email.trim() ? "Enter your email address." : !isValidEmail(email.trim().toLowerCase()) ? "That email address doesn't look right." : "";
   const passwordError = getPasswordError(password) ?? "";
+  // Student details are required for a student account; a worker request does not collect them.
+  const studentErrors = role === "user" ? studentProfileErrors(student) : {};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
     setSubmitted(true);
     setError("");
-    if (nameError || emailError || passwordError) return;
+    if (nameError || emailError || passwordError || Object.keys(studentErrors).length > 0) return;
     try {
       validateRegistration({ name, email, password, role });
     } catch (err) {
@@ -68,7 +72,7 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       justSignedUp.current = true;
-      await signUp(email, password, name, role);
+      await signUp(email, password, name, role, role === "user" ? student : undefined);
       // Redirect happens once the profile loads.
     } catch (err: unknown) {
       justSignedUp.current = false;
@@ -158,6 +162,8 @@ export default function RegisterPage() {
               : "Administrator access is granted by the campus team, not chosen at sign-up."}
           </p>
         </fieldset>
+
+        {role === "user" && <StudentFields value={student} onChange={setStudent} errors={studentErrors} showErrors={submitted} />}
 
         {error && <Notice tone="danger">{error}</Notice>}
 

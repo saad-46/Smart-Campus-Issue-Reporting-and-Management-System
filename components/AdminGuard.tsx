@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { isSessionEnding } from "@/lib/sessionEnd";
 import { useAuthContext } from "./AuthProvider";
 import ProfileUnavailable from "./ProfileUnavailable";
 import StatusScreen, { ShellSkeleton } from "./shell/StatusScreen";
@@ -16,6 +17,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (loading) return;
     if (!isAuthenticated) {
+      if (isSessionEnding()) return; // signing out: AppShell sends the person home
       router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }

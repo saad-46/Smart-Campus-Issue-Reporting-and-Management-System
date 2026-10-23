@@ -15,6 +15,9 @@ export const USER_ROLES: UserRole[] = ["user", "worker", "admin"];
  */
 export const SELF_ASSIGNABLE_ROLES: UserRole[] = ["user", "worker"];
 
+/** Selectable academic years for a student profile (also enforced in firestore.rules). */
+export const ACADEMIC_YEARS = ["1st year", "2nd year", "3rd year", "4th year", "5th year"] as const;
+
 export const ISSUE_STATUSES: IssueStatus[] = ["Open", "In Progress", "Resolved"];
 
 export const PRIORITIES: Priority[] = ["Low", "Medium", "High"];
@@ -102,6 +105,10 @@ export const LIMITS = {
   /** Registration PIN: exactly this many digits (kept as a string, so leading zeros survive). */
   pinLength: 6,
   maxImages: 3,
+  /** Student profile text fields (also enforced in firestore.rules). */
+  college: 120,
+  rollNumber: 30,
+  branch: 80,
   /** Max size of a file the user may pick before compression. */
   uploadMb: 5,
   /** Max length of a stored base64 data URL. Each full-size image is its

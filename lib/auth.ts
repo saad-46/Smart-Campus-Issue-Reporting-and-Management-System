@@ -15,11 +15,11 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { User, UserRole } from "@/types";
+import { StudentProfile, User, UserRole } from "@/types";
 import { LIMITS } from "./constants";
 import { logError } from "./errors";
 import { normalizeUser } from "./models";
-import { cleanText, validateRegistration } from "./validation";
+import { cleanText, validateRegistration, validateStudentProfile } from "./validation";
 
 const USERS_COLLECTION = "users";
 const ADMINS_COLLECTION = "admins";
@@ -28,7 +28,8 @@ const ADMINS_COLLECTION = "admins";
 async function createProfile(
   firebaseUser: FirebaseUser,
   name: string,
-  requestWorkerAccess: boolean
+  requestWorkerAccess: boolean,
+  student?: StudentProfile
 ): Promise<User> {
   const createdAt = new Date();
   // Use the address Firebase Auth recorded: the security rules require the
@@ -46,6 +47,7 @@ async function createProfile(
     activeRole: "user",
     createdAt: createdAt.toISOString(),
     ...(requestWorkerAccess ? { workerRequest: "pending" } : {}),
+    ...(student ?? {}),
   });
 
   return {
@@ -57,6 +59,7 @@ async function createProfile(
     createdAt,
     earnings: 0,
     workerRequest: requestWorkerAccess ? "pending" : undefined,
+    student,
   };
 }
 
@@ -70,17 +73,31 @@ export async function signUp(
   email: string,
   password: string,
   name: string,
-  role: UserRole = "user"
+  role: UserRole = "user",
+  studentInput?: Partial<Record<keyof StudentProfile, string>>
 ): Promise<User> {
   const input = validateRegistration({ email, password, name, role });
+  // Student details are required for a student account and not collected for a worker request.
+  const student = role === "user" ? validateStudentProfile(studentInput ?? {}) : undefined;
 
   const credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
   await updateProfile(credential.user, { displayName: input.name });
-  const profile = await createProfile(credential.user, input.name, input.role === "worker");
+  const profile = await createProfile(credential.user, input.name, input.role === "worker", student);
 
   // Best effort: a failed email must not undo a successful registration.
   sendEmailVerification(credential.user).catch((err) => logError("sendEmailVerification", err));
   return profile;
+}
+
+/**
+ * Save the signed-in student's own details (also used to complete the profile of
+ * an account created before these fields existed). firestore.rules lets only the
+ * owner write exactly these four fields, together.
+ */
+export async function saveStudentProfile(uid: string, input: Partial<Record<keyof StudentProfile, string>>): Promise<StudentProfile> {
+  const student = validateStudentProfile(input);
+  await updateDoc(doc(db, USERS_COLLECTION, uid), { ...student });
+  return student;
 }
 
 /** Send the verification email again to the signed-in user. */

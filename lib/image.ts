@@ -14,6 +14,9 @@ const QUALITIES = [0.8, 0.65, 0.5];
 
 /** Validate a picked file's type and size. Throws ValidationError. */
 export function assertImageFile(file: File): void {
+  if (file.size === 0) {
+    throw new ValidationError("That image is empty. Please choose another.");
+  }
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     throw new ValidationError("Only JPG, PNG or WebP images are allowed.");
   }

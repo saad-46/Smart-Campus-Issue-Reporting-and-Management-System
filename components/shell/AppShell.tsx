@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 import { ChevronsUpDown, LogOut, PlusCircle, Search } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
 import NotificationBell from "@/components/NotificationBell";
+import { useNotifications } from "@/hooks/useNotifications";
 import ThemeToggle from "@/components/ThemeToggle";
 import Menu from "@/components/ui/Menu";
 import { IconButton, buttonClasses } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { canReportIssues, dashboardPathForRole } from "@/lib/roles";
 import { logError } from "@/lib/errors";
+import { beginSessionEnd, finishSessionEnd } from "@/lib/sessionEnd";
 import { UserRole } from "@/types";
 import Logo from "./Logo";
 import CommandPalette from "./CommandPalette";
@@ -36,7 +38,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [isMac, setIsMac] = useState(false);
 
   const canReport = canReportIssues(userProfile, isAdmin);
-  const groups = useMemo(() => navForRole(activeRole, { canReport }), [activeRole, canReport]);
+  const { unread } = useNotifications(userProfile?.id);
+  const groups = useMemo(() => navForRole(activeRole, { canReport, unread }), [activeRole, canReport, unread]);
   const pages = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
   useEffect(() => {
@@ -62,13 +65,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Sign out always ends on the public home page. If Firebase refuses, the person
+  // stays signed in and is told so, instead of being sent home still signed in.
   const handleSignOut = async () => {
+    beginSessionEnd();
     try {
       await signOut();
     } catch (err) {
       logError("signOut", err);
+      finishSessionEnd(0);
+      toast.error("Couldn't sign you out", "Please check your connection and try again.");
+      return;
     }
     router.replace("/");
+    finishSessionEnd();
   };
 
   return (

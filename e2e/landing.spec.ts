@@ -10,7 +10,7 @@ test.describe("landing page", () => {
     // The only link that leaves the site is the map data attribution its licence requires.
     const OSM = "https://www.openstreetmap.org/copyright";
     expect(hrefs).toContain(OSM);
-    for (const h of hrefs.filter((x) => x !== OSM)) expect(h).toMatch(/^(#[a-z-]+|\/(viewer(\/[a-z-]+)?|login|register)?)$/);
+    for (const h of hrefs.filter((x) => x !== OSM)) expect(h).toMatch(/^(#[a-z-]+|\/(viewer(\/[a-z-]+)?|login|register|sign-in)?)$/);
     await expect(page.locator("main")).toContainText("Sultan-ul-Uloom Education Society");
     await expect(page.locator("main")).toContainText(/not an official product/i);
     // Every in-page anchor has a target.
@@ -22,7 +22,10 @@ test.describe("landing page", () => {
   test("Sign in, Register and the logo go to the right places", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("banner").getByRole("link", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page.getByRole("link", { name: "Sign in as Student" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in as Worker" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in as Admin" })).toBeVisible();
     await page.goBack();
     await page.getByRole("contentinfo").getByRole("link", { name: "Create account" }).click();
     await expect(page).toHaveURL(/\/register$/);

@@ -1,5 +1,6 @@
 "use client";
 
+import { isSessionEnding } from "@/lib/sessionEnd";
 import { useAuthContext } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -13,6 +14,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
+      if (isSessionEnding()) return; // signing out: AppShell sends the person home
       // Come back here after signing in (e.g. a shared report link).
       const here = `${window.location.pathname}${window.location.search}`;
       router.replace(here === "/" ? "/login" : `/login?next=${encodeURIComponent(here)}`);

@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import CameraCapture from "@/components/CameraCapture";
+import { CameraSupport, detectCameraSupport } from "@/lib/camera";
+import React, { useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, X } from "lucide-react";
 import Button from "./ui/Button";
 import Dialog from "./ui/Dialog";
@@ -43,11 +45,21 @@ export default function BillSubmissionForm({ open, issueId, issueTitle, onSucces
     amountError = getFriendlyErrorMessage(err);
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [camera, setCamera] = useState<CameraSupport>({ live: false, nativeCapture: false });
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const uploadRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    setCamera(detectCameraSupport({ isSecureContext: window.isSecureContext, mediaDevices: navigator.mediaDevices, coarsePointer: window.matchMedia("(pointer: coarse)").matches }));
+  }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
     const file = input.files?.[0];
     input.value = "";
-    if (!file) return;
+    if (file) void addFile(file);
+  };
+
+  const addFile = async (file: File) => {
     setError("");
     try {
       setImage(await fileToCompressedDataUrl(file, LIMITS.receiptChars));
@@ -176,12 +188,19 @@ export default function BillSubmissionForm({ open, issueId, issueTitle, onSucces
                 <div className="flex flex-wrap gap-2">
                   <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface px-3 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand-subtle focus-within:outline-2 focus-within:outline-brand">
                     <ImagePlus className="h-4 w-4 text-fg-subtle" aria-hidden="true" /> Upload receipt
-                    <input type="file" onChange={handleFileChange} accept="image/jpeg,image/png,image/webp" className="sr-only" />
+                    <input ref={uploadRef} type="file" onChange={handleFileChange} accept="image/jpeg,image/png,image/webp" className="sr-only" />
                   </label>
-                  <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface px-3 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand-subtle focus-within:outline-2 focus-within:outline-brand sm:hidden">
-                    <Camera className="h-4 w-4 text-fg-subtle" aria-hidden="true" /> Take photo
-                    <input type="file" onChange={handleFileChange} accept="image/*" capture="environment" className="sr-only" />
-                  </label>
+                  {camera.nativeCapture && (
+                    <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface px-3 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand-subtle focus-within:outline-2 focus-within:outline-brand">
+                      <Camera className="h-4 w-4 text-fg-subtle" aria-hidden="true" /> Take photo
+                      <input type="file" onChange={handleFileChange} accept="image/*" capture="environment" className="sr-only" />
+                    </label>
+                  )}
+                  {camera.live && !camera.nativeCapture && (
+                    <button type="button" onClick={() => setCameraOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface px-3 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand-subtle focus-visible:outline-2 focus-visible:outline-brand">
+                      <Camera className="h-4 w-4 text-fg-subtle" aria-hidden="true" /> Take photo
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -190,6 +209,7 @@ export default function BillSubmissionForm({ open, issueId, issueTitle, onSucces
 
         {error && <Notice tone="danger">{error}</Notice>}
       </div>
+      <CameraCapture open={cameraOpen} onClose={() => setCameraOpen(false)} onCapture={(file) => void addFile(file)} onUploadInstead={() => uploadRef.current?.click()} />
     </Dialog>
   );
 }

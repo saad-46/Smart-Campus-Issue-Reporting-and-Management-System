@@ -319,7 +319,7 @@ export default function LandingPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">Account</p>
               <ul className="mt-3 space-y-2 text-sm">
                 <li>
-                  <Link href="/login" className="text-fg-muted hover:text-fg">
+                  <Link href="/sign-in" className="text-fg-muted hover:text-fg">
                     Sign in
                   </Link>
                 </li>
