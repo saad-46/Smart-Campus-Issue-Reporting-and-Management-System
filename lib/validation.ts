@@ -4,8 +4,9 @@
 // Client-side validation gives fast feedback; firestore.rules enforces the
 // same constraints server-side, since a client can always be bypassed.
 
-import { CreateIssueData, IssueImage, Priority, UserRole } from "@/types";
+import { CreateIssueData, IssueImage, Priority, StudentProfile, UserRole } from "@/types";
 import {
+  ACADEMIC_YEARS,
   DEFAULT_CATEGORY,
   DEFAULT_PRIORITY,
   ISSUE_CATEGORIES,
@@ -81,6 +82,43 @@ export function validateRegistration(input: RegistrationInput): RegistrationInpu
   }
 
   return { name, email, password: input.password, role: input.role };
+}
+
+export type StudentProfileErrors = Partial<Record<keyof StudentProfile, string>>;
+
+/** Letters, digits and a few separators: enough for any roll-number scheme, nothing that could be markup. */
+const ROLL_NUMBER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ./_-]*$/;
+
+/** Normalised copy of a student profile (trimmed, control characters removed, roll number upper-cased). */
+export function normalizeStudentProfile(input: Partial<Record<keyof StudentProfile, unknown>>): StudentProfile {
+  return {
+    college: cleanText(input.college),
+    rollNumber: cleanText(input.rollNumber).toUpperCase(),
+    academicYear: cleanText(input.academicYear),
+    branch: cleanText(input.branch),
+  };
+}
+
+/** Field-by-field problems with a student profile; empty when it is acceptable. */
+export function studentProfileErrors(input: Partial<Record<keyof StudentProfile, unknown>>): StudentProfileErrors {
+  const p = normalizeStudentProfile(input);
+  const errors: StudentProfileErrors = {};
+  if (p.college.length < 2) errors.college = "Enter your college or institution name.";
+  else if (p.college.length > LIMITS.college) errors.college = `Keep this to ${LIMITS.college} characters or fewer.`;
+  if (p.rollNumber.length < 2) errors.rollNumber = "Enter your roll number.";
+  else if (p.rollNumber.length > LIMITS.rollNumber) errors.rollNumber = `Keep this to ${LIMITS.rollNumber} characters or fewer.`;
+  else if (!ROLL_NUMBER_PATTERN.test(p.rollNumber)) errors.rollNumber = "Use letters, numbers and - / . _ only.";
+  if (!(ACADEMIC_YEARS as readonly string[]).includes(p.academicYear)) errors.academicYear = "Choose your academic year.";
+  if (p.branch.length < 2) errors.branch = "Enter your branch or department.";
+  else if (p.branch.length > LIMITS.branch) errors.branch = `Keep this to ${LIMITS.branch} characters or fewer.`;
+  return errors;
+}
+
+/** Throws a ValidationError naming the first problem; otherwise returns the normalised profile. */
+export function validateStudentProfile(input: Partial<Record<keyof StudentProfile, unknown>>): StudentProfile {
+  const first = Object.values(studentProfileErrors(input))[0];
+  if (first) throw new ValidationError(first);
+  return normalizeStudentProfile(input);
 }
 
 export function validateIssueInput(input: CreateIssueData): CreateIssueData {

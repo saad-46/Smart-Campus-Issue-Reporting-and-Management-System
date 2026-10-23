@@ -107,11 +107,26 @@ service cloud.firestore {
     // ============================================================
     match /users/{userId} {
 
+      // Student details shown on the dashboard. All four are set together,
+      // as plain bounded text and a fixed list of years, by the account owner.
+      function studentFields() {
+        return ['college', 'rollNumber', 'academicYear', 'branch'];
+      }
+
+      function validStudentInfo(d) {
+        return d.keys().hasAll(studentFields())
+          && d.college is string && d.college.size() >= 2 && d.college.size() <= 120
+          && d.rollNumber is string && d.rollNumber.size() >= 2 && d.rollNumber.size() <= 30
+          && d.academicYear in ['1st year', '2nd year', '3rd year', '4th year', '5th year']
+          && d.branch is string && d.branch.size() >= 2 && d.branch.size() <= 80;
+      }
+
       function validNewProfile() {
         let d = request.resource.data;
         return d.keys().hasOnly(['id', 'name', 'email', 'role', 'roles', 'activeRole',
-                                 'createdAt', 'workerRequest'])
+                                 'createdAt', 'workerRequest'].concat(studentFields()))
           && d.keys().hasAll(['id', 'name', 'email', 'role', 'activeRole', 'createdAt'])
+          && (!d.keys().hasAny(studentFields()) || validStudentInfo(d))
           && d.id == userId
           && d.name is string && d.name.size() >= 1 && d.name.size() <= 80
           && d.email is string && d.email == request.auth.token.email
@@ -133,6 +148,14 @@ service cloud.firestore {
               || (role == 'admin' && isAdmin()));
       }
 
+      // A plain account fills in (or corrects) its own student details.
+      // Nothing else on the profile can change in the same write.
+      function ownerProfileUpdate() {
+        return changedKeys().hasOnly(studentFields())
+          && resource.data.role == 'user'
+          && validStudentInfo(request.resource.data);
+      }
+
       function adminUpdate() {
         let d = request.resource.data;
         return changedKeys().hasOnly(['name', 'role', 'roles', 'activeRole', 'earnings', 'workerRequest'])
@@ -146,7 +169,7 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if signedIn() && request.auth.uid == userId && validNewProfile();
       allow update: if signedIn()
-        && ((request.auth.uid == userId && ownerUpdate()) || (isAdmin() && adminUpdate()));
+        && ((request.auth.uid == userId && (ownerUpdate() || ownerProfileUpdate())) || (isAdmin() && adminUpdate()));
       allow delete: if false;
     }
 

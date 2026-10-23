@@ -90,8 +90,10 @@ Demo ids are recognisable on sight: issues are `SC-<number>`, ledger entries `TX
 | `/admin/locations` | `/viewer/locations` | Same |
 | `/admin/settings` | `/viewer/settings` | Same |
 | `/search`, header search | `/viewer/search`, header search | Same |
-| Notification bell | Bell and `/viewer/notifications` | Same |
-| — | `/viewer/timeline`, `/viewer/how-it-works`, guided tour | Explore only |
+| `/notifications`, bell | `/viewer/notifications`, bell | Same page layout: All / Unread, mark all read |
+| `/timeline` | `/viewer/timeline` | Same layout and filters; see differences below |
+| `/sign-in` (Student / Worker / Admin) | "Explore as" switch | The chooser only picks a sign-in form; the account's real roles decide access |
+| — | `/viewer/how-it-works`, guided tour | Explore only. "How it works" is deliberately not in the signed-in menus |
 
 ### Actions
 
@@ -131,6 +133,9 @@ Demo ids are recognisable on sight: issues are `SC-<number>`, ledger entries `TX
 
 | Area | Difference | Why |
 | --- | --- | --- |
+| Timeline | Signed-in entries are reported / linked / started / resolved, taken only from timestamps stored on each issue, over the newest 100 issues. Explore also lists assignment, claim and rating events from its sample data. A student sees other students' reports as "another student" and follows only their own issues' progress | The per-issue event log is not readable as one campus-wide feed under the rules, and nothing on the page may be estimated |
+| Photos | Signed-in **Take photo** uses the phone's camera app, or a live preview on desktop; Explore attaches a generated illustration (unchanged) | See `docs/CAMERA_PHOTOS.md` |
+| Student details | Signed-in students store college, roll number, year and branch on their profile and see them on the dashboard; Explore shows its sample student's department and year | See `docs/STUDENT_PROFILE.md` |
 | Accounts | No registration, verification, password reset or sign-out in Explore | Explore has no accounts; the role switch replaces them |
 | Photos | Signed-in uploads up to three photos and can draw on them. Explore attaches a generated sample image | No visitor file is read, stored or shown in a public demo |
 | Receipts | Signed-in claims carry a private receipt photo. Explore shows a generated receipt | No real receipt is ever exposed |

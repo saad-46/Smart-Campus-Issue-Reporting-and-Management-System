@@ -9,6 +9,7 @@ import { canReportIssues } from "@/lib/roles";
 import IssueRow from "@/components/IssueCard";
 import { useUnreadChats } from "@/hooks/useUnreadChats";
 import AccountNotices from "@/components/AccountNotices";
+import StudentProfileCard from "@/components/StudentProfileCard";
 import FeedbackRequests from "@/components/FeedbackRequests";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
@@ -29,7 +30,7 @@ type Tab = "my-issues" | "explore";
 const LOAD_ERROR = "We couldn't load issues right now. Please check your connection and try again.";
 
 function DashboardContent() {
-  const { userProfile, isAdmin } = useAuthContext();
+  const { userProfile, isAdmin, activeRole } = useAuthContext();
   // A worker who views the student pages can follow issues but not report them.
   const canReport = canReportIssues(userProfile, isAdmin);
   const unreadChats = useUnreadChats(userProfile?.id);
@@ -117,6 +118,8 @@ function DashboardContent() {
       />
 
       <AccountNotices />
+
+      {!exploring && activeRole === "user" && <StudentProfileCard />}
 
       {!exploring && userProfile && myIssues && <FeedbackRequests userId={userProfile.id} myIssues={myIssues} />}
 

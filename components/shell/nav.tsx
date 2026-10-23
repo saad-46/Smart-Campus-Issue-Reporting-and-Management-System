@@ -1,6 +1,8 @@
 import React from "react";
 import {
   BarChart3,
+  Bell,
+  History,
   ClipboardList,
   Globe2,
   HardHat,
@@ -34,8 +36,21 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+/** The same three activity pages for every role, as in Explore. */
+function activityGroup(unread: number): NavGroup {
+  return {
+    label: "Activity",
+    items: [
+      { label: "Notifications", href: "/notifications", icon: <Bell />, count: unread || undefined },
+      { label: "Search", href: "/search", icon: <Search /> },
+      { label: "Timeline", href: "/timeline", icon: <History /> },
+    ],
+  };
+}
+
 /** Navigation per role. Kept short and grouped; every item is a real page. */
-export function navForRole(role: UserRole, options: { canReport?: boolean } = {}): NavGroup[] {
+export function navForRole(role: UserRole, options: { canReport?: boolean; unread?: number } = {}): NavGroup[] {
+  const activity = activityGroup(options.unread ?? 0);
   if (role === "admin") {
     return [
       {
@@ -62,6 +77,7 @@ export function navForRole(role: UserRole, options: { canReport?: boolean } = {}
           { label: "Settings", href: "/admin/settings", icon: <Settings /> },
         ],
       },
+      activity,
     ];
   }
   if (role === "worker") {
@@ -70,9 +86,9 @@ export function navForRole(role: UserRole, options: { canReport?: boolean } = {}
         label: "Work",
         items: [
           { label: "My work", href: "/worker", icon: <HardHat /> },
-          { label: "Search", href: "/search", icon: <Search /> },
         ],
       },
+      activity,
     ];
   }
   return [
@@ -92,9 +108,9 @@ export function navForRole(role: UserRole, options: { canReport?: boolean } = {}
           match: (p, tab) => p === "/dashboard" && tab === "explore",
         },
         ...(options.canReport === false ? [] : [{ label: "Report an issue", href: "/dashboard/report", icon: <PlusCircle /> }]),
-        { label: "Search", href: "/search", icon: <Search /> },
       ],
     },
+    activity,
   ];
 }
 

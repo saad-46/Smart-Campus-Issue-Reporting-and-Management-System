@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useDeferredValue, useMemo, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, MapPin, Pencil, X } from "lucide-react";
 import { useAuthContext } from "@/components/AuthProvider";
 import { createIssue } from "@/lib/firestore";
 import { analyzeIssueDetails, IssueIntelligence } from "@/services/aiService";
 import { DEFAULT_CATEGORY, DEFAULT_PRIORITY, LIMITS, departmentFor } from "@/lib/constants";
-import { CAMPUS_LOCATIONS, VERIFICATION_LABELS, describeLocation, getCanonicalLocation, institutionName } from "@/lib/campus";
+import { CAMPUS_LOCATIONS, VERIFICATION_LABELS, describeLocation, getBuilding, getCanonicalLocation, institutionName } from "@/lib/campus";
+import CampusMap from "@/components/admin/CampusMap";
 import { getFriendlyErrorMessage, logError } from "@/lib/errors";
 import { compressDataUrl, fileToCompressedDataUrl, makeThumbnail } from "@/lib/image";
 import { cleanText } from "@/lib/validation";
@@ -18,6 +19,8 @@ import { useToast } from "@/components/ui/Toast";
 import AnalysisSummary from "@/components/report/AnalysisSummary";
 import DuplicateCheck from "@/components/report/DuplicateCheck";
 import ImageEditor from "@/components/ImageEditor";
+import CameraCapture from "@/components/CameraCapture";
+import { CameraSupport, detectCameraSupport } from "@/lib/camera";
 import { useSlowNotice } from "@/hooks/useSlowNotice";
 import { useCampusLocations } from "@/hooks/useCampusLocations";
 import { cn } from "@/lib/cn";
@@ -71,6 +74,14 @@ export default function IssueForm({ onIssueCreated }: IssueFormProps) {
   const [error, setError] = useState("");
 
   const canAddImage = images.length < LIMITS.maxImages;
+  const [camera, setCamera] = useState<CameraSupport>({ live: false, nativeCapture: false });
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const uploadRef = useRef<HTMLInputElement>(null);
+  // Detected after mount: server and first client render agree, then the right control appears.
+  useEffect(() => {
+    setCamera(detectCameraSupport({ isSecureContext: window.isSecureContext, mediaDevices: navigator.mediaDevices, coarsePointer: window.matchMedia("(pointer: coarse)").matches }));
+  }, []);
   const submitIsSlow = useSlowNotice(isSubmitting);
 
   // ── Live suggestion (deterministic and cheap; deferred while typing) ──
@@ -97,12 +108,16 @@ export default function IssueForm({ onIssueCreated }: IssueFormProps) {
   const blur = (field: keyof typeof touched) => () => setTouched((t) => ({ ...t, [field]: true }));
 
   // ── Photos ──
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setImageError("");
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
     const file = input.files?.[0];
     input.value = ""; // allow picking the same file again
-    if (!file) return;
+    if (file) void addFile(file);
+  };
+
+  // One path for a chosen file and a captured frame: same checks, same compression.
+  const addFile = async (file: File) => {
+    setImageError("");
     if (!canAddImage) {
       setImageError(`You can attach at most ${LIMITS.maxImages} photos.`);
       return;
@@ -242,6 +257,31 @@ export default function IssueForm({ onIssueCreated }: IssueFormProps) {
                   </optgroup>
                 )}
               </Select>
+              <div className="mb-4">
+                <Button type="button" variant="secondary" size="sm" aria-expanded={mapOpen} onClick={() => setMapOpen((o) => !o)}>
+                  {mapOpen ? "Hide the map" : "Pick on the map"}
+                </Button>
+                {mapOpen && (
+                  <div className="mt-3">
+                    <CampusMap
+                      hotspots={[]}
+                      unplaced={0}
+                      selectedId={getCanonicalLocation(CAMPUS_LOCATIONS.find((l) => location.startsWith(l.name))?.id)?.placeId ?? null}
+                      onSelect={(id) => {
+                        // A building can hold several places (Block 2 and Ghulam Ahmed Hall): prefer the one the marker is named for.
+                        const here = CAMPUS_LOCATIONS.filter((l) => l.isActive && l.placeId === id);
+                        const buildingName = getBuilding(id)?.name.toLowerCase() ?? "";
+                        const first = here.find((l) => buildingName.startsWith(l.name.toLowerCase())) ?? here[0];
+                        if (first) {
+                          setLocation(first.name);
+                          setLocationId("");
+                        }
+                      }}
+                    />
+                    <p className="mt-1 text-xs text-fg-subtle">Selecting a marker chooses the first place there; refine it in the list above.</p>
+                  </div>
+                )}
+              </div>
               <Input
                 label="Location"
                 placeholder="e.g. Block 4, 2nd floor, near the staircase"
@@ -301,18 +341,31 @@ export default function IssueForm({ onIssueCreated }: IssueFormProps) {
                 >
                   <ImagePlus className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
                   {isProcessingImage ? "Processing…" : "Add photo"}
-                  <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleImageChange} disabled={isProcessingImage} className="sr-only" />
+                  <input ref={uploadRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleImageChange} disabled={isProcessingImage} className="sr-only" />
                 </label>
-                <label
-                  className={cn(
-                    "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface px-3.5 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand-subtle focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand sm:hidden",
-                    isProcessingImage && "pointer-events-none opacity-60"
-                  )}
-                >
-                  <Camera className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
-                  Take photo
-                  <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} disabled={isProcessingImage} className="sr-only" />
-                </label>
+                {camera.nativeCapture && (
+                  <label
+                    className={cn(
+                      "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface px-3.5 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand-subtle focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand",
+                      isProcessingImage && "pointer-events-none opacity-60"
+                    )}
+                  >
+                    <Camera className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
+                    Take photo
+                    <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} disabled={isProcessingImage} className="sr-only" />
+                  </label>
+                )}
+                {camera.live && !camera.nativeCapture && (
+                  <button
+                    type="button"
+                    onClick={() => setCameraOpen(true)}
+                    disabled={isProcessingImage}
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface px-3.5 text-sm font-medium text-fg transition-colors hover:border-brand hover:bg-brand-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:pointer-events-none disabled:opacity-60"
+                  >
+                    <Camera className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
+                    Take photo
+                  </button>
+                )}
               </div>
             )}
             {imageError && (
@@ -346,6 +399,8 @@ export default function IssueForm({ onIssueCreated }: IssueFormProps) {
       <aside className="sticky top-20 hidden lg:block">
         <AnalysisSummary analysis={analysis} unavailable={unavailable} empty={!analysis} />
       </aside>
+
+      <CameraCapture open={cameraOpen} onClose={() => setCameraOpen(false)} onCapture={(file) => void addFile(file)} onUploadInstead={() => uploadRef.current?.click()} />
 
       {editingImageIndex !== null && (
         <ImageEditor imageUrl={images[editingImageIndex]} onSave={handleEditorSave} onCancel={() => setEditingImageIndex(null)} />

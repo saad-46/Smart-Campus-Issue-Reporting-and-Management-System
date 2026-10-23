@@ -36,7 +36,7 @@ export default function LandingNav() {
         </nav>
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <ThemeToggle />
-          <Link href="/login" className={buttonClasses("ghost", "md", "px-3 max-[420px]:px-2")}>
+          <Link href="/sign-in" className={buttonClasses("ghost", "md", "px-3 max-[420px]:px-2")}>
             Sign in
           </Link>
           <Link href="/viewer" className={buttonClasses("primary", "md", "px-3.5 max-[420px]:px-3")}>

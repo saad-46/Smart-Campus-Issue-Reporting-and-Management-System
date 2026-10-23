@@ -11,10 +11,11 @@ import {
   hasAdminGrant,
   createMissingProfile,
   setActiveRole,
+  saveStudentProfile,
 } from "@/lib/auth";
 import { ValidationError, logError } from "@/lib/errors";
 import { getAvailableRoles, resolveActiveRole } from "@/lib/roles";
-import { User, UserRole } from "@/types";
+import { StudentProfile, User, UserRole } from "@/types";
 
 /** How long to wait for Firebase Auth's first state before telling the user. */
 const AUTH_INIT_TIMEOUT_MS = 12000;
@@ -95,10 +96,10 @@ export function useAuth() {
   }, []);
 
   const signUp = useCallback(
-    async (email: string, password: string, name: string, role: UserRole) => {
+    async (email: string, password: string, name: string, role: UserRole, student?: Partial<Record<keyof StudentProfile, string>>) => {
       signingUp.current = true;
       try {
-        const profile = await authSignUp(email, password, name, role);
+        const profile = await authSignUp(email, password, name, role, student);
         setUserProfile(profile);
         setAdminGrant(false);
         setProfileError(false);
@@ -115,6 +116,16 @@ export function useAuth() {
     setUserProfile(null);
     setAdminGrant(false);
   }, []);
+
+  /** Save this account's student details and show them straight away. Throws on failure. */
+  const updateStudentProfile = useCallback(
+    async (input: Partial<Record<keyof StudentProfile, string>>) => {
+      if (!firebaseUser) throw new ValidationError("Your session has expired. Please sign in again.");
+      const student = await saveStudentProfile(firebaseUser.uid, input);
+      setUserProfile((prev) => (prev ? { ...prev, student } : null));
+    },
+    [firebaseUser]
+  );
 
   /** Retry loading the profile after a failure (e.g. the network dropped). */
   const reloadProfile = useCallback(async () => {
@@ -156,6 +167,7 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
+    updateStudentProfile,
     switchRole,
     activeRole,
     availableRoles,
