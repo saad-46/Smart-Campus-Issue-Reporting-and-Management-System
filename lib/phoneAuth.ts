@@ -52,6 +52,13 @@ function friendly(err: unknown): ValidationError {
 /** Send the SMS. `container` is the id of an empty element for the invisible reCAPTCHA. */
 export async function sendPhoneOtp(phoneE164: string, container: string): Promise<ConfirmationResult> {
   if (!phoneOtpEnabled) throw new ValidationError("Phone verification isn't available yet. Please verify your email instead.");
+  // Firebase's documented way to exercise a fictional test number from automation: skip app
+  // verification for that number only. Firebase's servers accept the skipped check for numbers
+  // configured as test numbers in the project and refuse it for any other number, so this
+  // cannot verify a real phone; the list is empty (and this a no-op) outside test builds.
+  const settings = auth.settings;
+  const previous = settings.appVerificationDisabledForTesting;
+  if (isLabelledTestNumber(phoneE164)) settings.appVerificationDisabledForTesting = true;
   try {
     resetVerifier();
     verifier = new RecaptchaVerifier(auth, container, { size: "invisible" });
@@ -59,6 +66,8 @@ export async function sendPhoneOtp(phoneE164: string, container: string): Promis
   } catch (err) {
     resetVerifier();
     throw friendly(err);
+  } finally {
+    settings.appVerificationDisabledForTesting = previous;
   }
 }
 
