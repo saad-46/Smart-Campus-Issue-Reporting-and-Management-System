@@ -96,6 +96,16 @@ Accounts created earlier are unaffected (their profiles exist). An account whose
 5. Administrator: register as Manage campus, sign in as Admin (waiting message), approve from the overview as an existing administrator, sign in.
 6. Confirm no OTP appears in Vercel logs; confirm rate-limit responses (429) after repeated sends.
 
+## Preview / test environment (free)
+
+Preview deployments of the branch `feat/registration-roles-otp` use the separate Firebase project `unifix-otp-test`, never production.
+
+- **Isolation.** Branch-scoped Preview variables (names only): `NEXT_PUBLIC_FIREBASE_*` (the test project's web app), `FIREBASE_SERVICE_ACCOUNT_JSON` (a key for `unifix-test-admin-sdk`, roles `datastore.user` and `firebaseauth.admin` only), `OTP_SECRET`, `OTP_EMAIL_PROVIDER=resend`, `OTP_EMAIL_FROM`, `RESEND_API_KEY`, `NEXT_PUBLIC_PHONE_OTP_ENABLED=true`, `NEXT_PUBLIC_TEST_PHONE_NUMBERS`. Production variables are separate entries. `lib/server/admin.ts` refuses to start if the service account's project differs from `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and there is no fallback to other credentials.
+- **Email.** Resend's shared test sender `onboarding@resend.dev` only delivers to the email address of the Resend account that owns the API key, so register with that address. No domain is needed and nothing is charged. Code generation, expiry, attempts and single use are the production code.
+- **Phone.** The Phone provider is enabled in the test project with one fictional number (listed in `NEXT_PUBLIC_TEST_PHONE_NUMBERS`, code in the Firebase console under Authentication > Sign-in method > Phone). No SMS is sent for it. The test code works only for that number, only in that project; the SMS region allowlist is empty, so real numbers cannot be sent texts, and the project has no billing. The variable only adds a label in the UI; it grants nothing.
+- **Authorised domains.** Add the Preview hostname under Authentication > Settings > Authorised domains of the test project (needed by reCAPTCHA).
+- **Not verified here:** real SMS delivery (needs billing, deliberately not enabled).
+
 ## Known limits
 
 - Delivery depends on the provider; a code that cannot be sent voids its challenge and the person can retry.

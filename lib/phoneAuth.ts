@@ -15,6 +15,11 @@ import { ValidationError } from "./errors";
 
 export const phoneOtpEnabled = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
 
+// Display only. Firebase test numbers are defined in the (test) Firebase project, which is
+// what makes them work; this list just labels them in the UI, and is unset in production.
+const TEST_NUMBERS = (process.env.NEXT_PUBLIC_TEST_PHONE_NUMBERS ?? "").split(",").map((n) => n.trim()).filter(Boolean);
+export const isLabelledTestNumber = (e164: string | null) => !!e164 && TEST_NUMBERS.includes(e164);
+
 let verifier: RecaptchaVerifier | null = null;
 
 function resetVerifier() {

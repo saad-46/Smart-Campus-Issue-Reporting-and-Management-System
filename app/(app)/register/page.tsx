@@ -12,7 +12,7 @@ import { Input, Select } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import { Notice } from "@/components/ui/States";
 import { useEmailOtp, usePhoneOtp } from "@/hooks/useContactOtp";
-import { abandonPhoneSession, phoneOtpEnabled } from "@/lib/phoneAuth";
+import { abandonPhoneSession, isLabelledTestNumber, phoneOtpEnabled } from "@/lib/phoneAuth";
 import { DEPARTMENTS, LIMITS } from "@/lib/constants";
 import { getFriendlyErrorMessage } from "@/lib/errors";
 import { normalizePhone, phoneError as phoneErrorFor } from "@/lib/phone";
@@ -199,6 +199,9 @@ export default function RegisterPage() {
             required
           />
           <OtpPanel otp={phoneOtp} noun="phone" contactValid={!phoneError} idPrefix="phone" unavailableNote={phoneOtpEnabled ? undefined : "Text-message verification isn't available yet. Verify your email instead."} />
+          {isLabelledTestNumber(normalizePhone(phone)) && (
+            <p className="mt-2 text-[13px] text-fg-subtle">Test phone number: no text message is sent. Use the test code set up for it in the test Firebase project.</p>
+          )}
           <div id={PHONE_CONTAINER} />
         </div>
 

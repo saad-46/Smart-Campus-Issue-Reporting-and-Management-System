@@ -26,7 +26,11 @@ function app(): App {
   const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!json) throw new AdminNotConfigured();
   try {
-    return initializeApp({ credential: cert(JSON.parse(json)), projectId });
+    const account = JSON.parse(json);
+    // The server key and the browser config must belong to the same project, so a
+    // Preview build can never mix test and production Firebase projects.
+    if (!projectId || account.project_id !== projectId) throw new AdminNotConfigured();
+    return initializeApp({ credential: cert(account), projectId });
   } catch {
     throw new AdminNotConfigured();
   }
