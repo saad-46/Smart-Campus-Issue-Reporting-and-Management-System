@@ -30,7 +30,7 @@ export default function ProfileUnavailable() {
     <StatusScreen
       tone="danger"
       title="We couldn't load your account"
-      description="Please check your connection and try again."
+      description="Please check your connection and try again. If you never finished creating this account, sign out and register again with the same email and PIN to finish it."
       actions={
         <>
           <Button variant="secondary" onClick={handleSignOut} disabled={retrying}>

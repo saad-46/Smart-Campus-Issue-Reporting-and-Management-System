@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Receipt, UserCheck } from "lucide-react";
+import { ArrowRight, Receipt, ShieldCheck, UserCheck } from "lucide-react";
 import Card, { CardHeader } from "@/components/ui/Card";
 import Button, { buttonClasses } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/Dialog";
@@ -10,7 +10,8 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/States";
 import { useToast } from "@/components/ui/Toast";
 import { Issue, User } from "@/types";
 import { subscribeToPendingClaims } from "@/lib/firestore";
-import { setWorkerAccess, subscribeToWorkerRequests } from "@/lib/finance";
+import { setWorkerAccess, subscribeToAdminRequests, subscribeToWorkerRequests } from "@/lib/finance";
+import { decideAdminAccess } from "@/lib/otpClient";
 import { getFriendlyErrorMessage, logError } from "@/lib/errors";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -31,6 +32,9 @@ export default function DashboardQueues({ adminId }: { adminId: string }) {
   const [requestsError, setRequestsError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
   const [pending, setPending] = useState<{ user: User; decision: "approve" | "reject" } | null>(null);
+  const [adminRequests, setAdminRequests] = useState<User[] | null>(null);
+  const [adminError, setAdminError] = useState("");
+  const [pendingAdmin, setPendingAdmin] = useState<{ user: User; decision: "approve" | "reject" } | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -49,6 +53,14 @@ export default function DashboardQueues({ adminId }: { adminId: string }) {
     });
   }, [retryKey]);
 
+  useEffect(() => {
+    setAdminError("");
+    return subscribeToAdminRequests(setAdminRequests, (err) => {
+      logError("subscribeToAdminRequests", err);
+      setAdminError(getFriendlyErrorMessage(err, "Administrator requests couldn't be loaded."));
+    });
+  }, [retryKey]);
+
   const waiting = useMemo(() => (claims ?? []).filter((i) => (i.claimAmount ?? 0) > 0), [claims]);
   const total = waiting.reduce((sum, i) => sum + (i.claimAmount ?? 0), 0);
 
@@ -62,6 +74,22 @@ export default function DashboardQueues({ adminId }: { adminId: string }) {
     } catch (err) {
       logError("setWorkerAccess", err);
       toast.error("Couldn't update that account", getFriendlyErrorMessage(err, "Please try again."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decideAdmin = async () => {
+    if (!pendingAdmin || busy) return;
+    setBusy(true);
+    try {
+      // Decided on the server, which checks the caller really is an administrator.
+      await decideAdminAccess(pendingAdmin.user.id, pendingAdmin.decision);
+      toast.success(pendingAdmin.decision === "approve" ? `${pendingAdmin.user.name} is now an administrator` : "Request declined", pendingAdmin.decision === "approve" ? "They can open the admin pages next time they sign in as Admin." : "Their account stays a regular account.");
+      setPendingAdmin(null);
+    } catch (err) {
+      logError("decideAdminAccess", err);
+      toast.error("Couldn't update that request", getFriendlyErrorMessage(err, "Please try again."));
     } finally {
       setBusy(false);
     }
@@ -140,6 +168,57 @@ export default function DashboardQueues({ adminId }: { adminId: string }) {
           )}
         </div>
       </Card>
+
+      <Card className="lg:col-span-2">
+        <CardHeader title="Administrator access requests" description="Granting access gives full control of campus data. Check you know who is asking." />
+        <div className="mt-3 border-t border-border">
+          {adminError ? (
+            <ErrorState title="Couldn't load requests" description={adminError} onRetry={() => setRetryKey((k) => k + 1)} />
+          ) : adminRequests === null ? (
+            <SkeletonRows rows={2} label="Loading administrator requests" />
+          ) : adminRequests.length === 0 ? (
+            <EmptyState compact icon={<ShieldCheck />} title="No administrator requests" />
+          ) : (
+            <ul className={LIST}>
+              {adminRequests.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-fg">{r.name}</span>
+                    <span className="block truncate text-[13px] text-fg-subtle">
+                      {r.email} · {r.phone ?? "no phone"} · verified by {r.verifiedVia ?? "unknown"}
+                    </span>
+                  </span>
+                  <span className="flex gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => setPendingAdmin({ user: r, decision: "reject" })} aria-label={`Decline administrator request from ${r.name}`}>
+                      Decline
+                    </Button>
+                    <Button size="sm" onClick={() => setPendingAdmin({ user: r, decision: "approve" })} aria-label={`Approve administrator request from ${r.name}`}>
+                      Approve
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Card>
+
+      <ConfirmDialog
+        open={!!pendingAdmin}
+        title={pendingAdmin?.decision === "approve" ? "Make this person an administrator?" : "Decline this request?"}
+        description={
+          pendingAdmin
+            ? pendingAdmin.decision === "approve"
+              ? `${pendingAdmin.user.name} (${pendingAdmin.user.email}) will be able to see and change all campus data, finance and worker access. Only continue if you know who they are.`
+              : `${pendingAdmin.user.name} stays a regular account.`
+            : undefined
+        }
+        confirmLabel={pendingAdmin?.decision === "approve" ? "Make administrator" : "Decline"}
+        tone={pendingAdmin?.decision === "approve" ? "danger" : "primary"}
+        busy={busy}
+        onConfirm={decideAdmin}
+        onCancel={() => setPendingAdmin(null)}
+      />
 
       <ConfirmDialog
         open={!!pending}

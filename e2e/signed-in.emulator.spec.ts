@@ -1,4 +1,5 @@
 import { expect, Page, test } from "@playwright/test";
+import { fillRegistration } from "./otpHelpers";
 
 // Signed-in workflows against the LOCAL Firebase emulators with seeded test
 // accounts. These never run against production:
@@ -206,11 +207,9 @@ test("admin: worker access requests are decided from the overview, with a confir
     { name: `TEST Decline ${STAMP}`, email: `decline-${STAMP}@unifix.test` },
   ];
   for (const a of accounts) {
-    await page.goto("/register");
-    await page.getByLabel("Full name").fill(a.name);
-    await page.getByLabel("Email").fill(a.email);
-    await page.getByLabel(/-digit PIN/).fill("123456");
-    await page.getByRole("radio", { name: /Resolve issues/ }).click();
+    // Registration needs a verified email: the code is read from the local emulator capture.
+    await page.route("**/api/otp/email/send", (route) => route.continue({ headers: { ...route.request().headers(), "x-otp-test-ip": `queues-${a.email}` } }));
+    await fillRegistration(page, { kind: "worker", name: a.name, email: a.email });
     await page.getByRole("button", { name: "Create account" }).click();
     await page.waitForURL((u) => !u.pathname.startsWith("/register"), { timeout: 60_000 });
     await signOut(page);

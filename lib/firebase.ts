@@ -71,6 +71,8 @@ const db: Firestore = getFirestore(app);
 // Suite instead of the real project. Guarded so hot reloads don't reconnect.
 if (useEmulators && !alreadyInitialized) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  // The emulator never sends real SMS, so the reCAPTCHA check is skipped (emulator only).
+  auth.settings.appVerificationDisabledForTesting = true;
   connectFirestoreEmulator(db, "127.0.0.1", 8080);
 }
 

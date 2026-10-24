@@ -9,7 +9,9 @@ const port = 3220;
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
-  expect: { timeout: 10_000 },
+  // The signed-in (emulator) specs run against `next dev`, which recompiles a page it has evicted after
+  // a quiet spell; give those runs more room. Normal runs use a production build.
+  expect: { timeout: process.env.E2E_EMULATOR === "1" ? 30_000 : 10_000 },
   fullyParallel: true,
   workers: process.env.CI ? 2 : 4,
   reporter: [["list"]],

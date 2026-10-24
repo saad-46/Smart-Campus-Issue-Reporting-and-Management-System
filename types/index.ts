@@ -25,6 +25,14 @@ export interface User {
   workerRequest?: WorkerRequestStatus;
   /** Student details; undefined until the account has filled them in. */
   student?: StudentProfile;
+  /** Contact number in E.164, given at registration. */
+  phone?: string;
+  /** Which contact proved ownership at registration. Set once, checked by firestore.rules. */
+  verifiedVia?: "email" | "phone";
+  /** The maintenance team a worker covers (one of DEPARTMENTS). */
+  workArea?: string;
+  /** Set when the account asked for administrator access; only an existing administrator can resolve it. */
+  adminRequest?: WorkerRequestStatus;
 }
 
 /** Who a student is, shown on their dashboard. Set together; absent on older accounts. */

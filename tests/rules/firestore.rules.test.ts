@@ -41,7 +41,9 @@ const IMG = "data:image/png;base64,iVBORw0KGgo=";
 let env: RulesTestEnvironment;
 
 const dbAs = (uid: string) =>
-  env.authenticatedContext(uid, { email: `${uid}@example.com` }).firestore();
+  env.authenticatedContext(uid, { email: `${uid}@example.com`, contactVerified: "email" }).firestore();
+/** An account with the given token claims (no verification proof unless the claims carry it). */
+const dbWith = (uid: string, claims: Record<string, unknown>) => env.authenticatedContext(uid, { email: `${uid}@example.com`, ...claims }).firestore();
 const dbAnon = () => env.unauthenticatedContext().firestore();
 
 function profile(uid: string, role: "user" | "worker") {
@@ -54,6 +56,18 @@ function profile(uid: string, role: "user" | "worker") {
     activeRole: role,
     createdAt: new Date().toISOString(),
   };
+}
+
+const STUDENT_DETAILS = { college: "Sultan-ul-Uloom College", rollNumber: "1604-21-001", academicYear: "3rd year", branch: "Computer Science" };
+const PHONE = "+919876543210";
+
+/** A valid NEW account document, as the registration page writes it. */
+function registration(uid: string, kind: "student" | "worker" | "admin" = "student", over: Record<string, unknown> = {}) {
+  const base: Record<string, unknown> = { ...profile(uid, "user"), roles: ["user"], phone: PHONE, verifiedVia: "email" };
+  if (kind === "student") Object.assign(base, STUDENT_DETAILS);
+  if (kind === "worker") Object.assign(base, { workerRequest: "pending", workArea: "Electrical Maintenance" });
+  if (kind === "admin") Object.assign(base, { adminRequest: "pending" });
+  return { ...base, ...over };
 }
 
 function newIssue(uid: string, overrides: Record<string, unknown> = {}) {
@@ -213,18 +227,18 @@ describe("public visitors (Viewer Mode)", () => {
 // ------------------------------------------------------------------
 describe("role escalation", () => {
   it("a new account registers as a plain user, optionally requesting worker access", async () => {
-    await assertSucceeds(setDoc(doc(dbAs("newbie"), "users", "newbie"), profile("newbie", "user")));
+    await assertSucceeds(setDoc(doc(dbAs("newbie"), "users", "newbie"), registration("newbie")));
     await assertSucceeds(
-      setDoc(doc(dbAs("newbie2"), "users", "newbie2"), { ...profile("newbie2", "user"), workerRequest: "pending" })
+      setDoc(doc(dbAs("newbie2"), "users", "newbie2"), registration("newbie2", "worker"))
     );
   });
 
   it("a new account cannot register itself as a worker", async () => {
     const db = dbAs("mallory");
-    await assertFails(setDoc(doc(db, "users", "mallory"), profile("mallory", "worker")));
-    await assertFails(setDoc(doc(db, "users", "mallory"), { ...profile("mallory", "user"), activeRole: "worker" }));
-    await assertFails(setDoc(doc(db, "users", "mallory"), { ...profile("mallory", "user"), roles: ["user", "worker"] }));
-    await assertFails(setDoc(doc(db, "users", "mallory"), { ...profile("mallory", "user"), workerRequest: "approved" }));
+    await assertFails(setDoc(doc(db, "users", "mallory"), registration("mallory", "student", { role: "worker" })));
+    await assertFails(setDoc(doc(db, "users", "mallory"), { ...registration("mallory"), activeRole: "worker" }));
+    await assertFails(setDoc(doc(db, "users", "mallory"), { ...registration("mallory"), roles: ["user", "worker"] }));
+    await assertFails(setDoc(doc(db, "users", "mallory"), { ...registration("mallory"), workerRequest: "approved" }));
   });
 
   it("a user cannot approve their own worker request", async () => {
@@ -261,20 +275,20 @@ describe("role escalation", () => {
 
   it("a new account cannot register as admin", async () => {
     const db = dbAs("mallory");
-    await assertFails(setDoc(doc(db, "users", "mallory"), { ...profile("mallory", "user"), role: "admin", roles: ["admin"], activeRole: "admin" }));
-    await assertFails(setDoc(doc(db, "users", "mallory"), { ...profile("mallory", "user"), activeRole: "admin" }));
-    await assertFails(setDoc(doc(db, "users", "mallory"), { ...profile("mallory", "user"), roles: ["user", "worker", "admin"] }));
+    await assertFails(setDoc(doc(db, "users", "mallory"), { ...registration("mallory"), role: "admin", roles: ["admin"], activeRole: "admin" }));
+    await assertFails(setDoc(doc(db, "users", "mallory"), { ...registration("mallory"), activeRole: "admin" }));
+    await assertFails(setDoc(doc(db, "users", "mallory"), { ...registration("mallory"), roles: ["user", "worker", "admin"] }));
   });
 
   it("a new account cannot smuggle extra fields into its profile", async () => {
     const db = dbAs("mallory");
-    await assertFails(setDoc(doc(db, "users", "mallory"), { ...profile("mallory", "user"), earnings: 99999 }));
-    await assertFails(setDoc(doc(db, "users", "mallory"), { ...profile("mallory", "user"), isAdmin: true }));
+    await assertFails(setDoc(doc(db, "users", "mallory"), { ...registration("mallory"), earnings: 99999 }));
+    await assertFails(setDoc(doc(db, "users", "mallory"), { ...registration("mallory"), isAdmin: true }));
   });
 
   it("cannot create a profile for someone else or with someone else's email", async () => {
-    await assertFails(setDoc(doc(dbAs("mallory"), "users", "victim"), profile("victim", "user")));
-    await assertFails(setDoc(doc(dbAs("mallory"), "users", "mallory"), { ...profile("mallory", "user"), email: "admin1@example.com" }));
+    await assertFails(setDoc(doc(dbAs("mallory"), "users", "victim"), registration("victim")));
+    await assertFails(setDoc(doc(dbAs("mallory"), "users", "mallory"), { ...registration("mallory"), email: "admin1@example.com" }));
   });
 
   it("a user cannot change their own role, roles or earnings", async () => {
@@ -338,21 +352,100 @@ describe("role escalation", () => {
 });
 
 // ------------------------------------------------------------------
+describe("registration: proof of a verified contact", () => {
+  it("refuses a profile from an account with no verification proof, however valid it looks", async () => {
+    await assertFails(setDoc(doc(dbWith("noproof", {}), "users", "noproof"), registration("noproof")));
+  });
+
+  it("refuses a client that claims verification the token does not carry", async () => {
+    await assertFails(setDoc(doc(dbWith("liar", {}), "users", "liar"), registration("liar", "student", { verifiedVia: "email", emailVerified: true })));
+    await assertFails(setDoc(doc(dbWith("liar2", { contactVerified: "phone" }), "users", "liar2"), registration("liar2")));
+  });
+
+  it("an email proof only counts for the address in the token", async () => {
+    await assertFails(setDoc(doc(dbWith("x1", { contactVerified: "email" }), "users", "x1"), registration("x1", "student", { email: "someone.else@example.com" })));
+  });
+
+  it("accepts a phone-verified account whose profile phone equals the verified number, and nothing else", async () => {
+    const phoneUser = (uid: string) => dbWith(uid, { phone_number: PHONE, contactVerified: undefined });
+    await assertSucceeds(setDoc(doc(phoneUser("ph1"), "users", "ph1"), registration("ph1", "student", { verifiedVia: "phone" })));
+    await assertFails(setDoc(doc(phoneUser("ph2"), "users", "ph2"), registration("ph2", "student", { verifiedVia: "phone", phone: "+919000000000" })));
+    // A phone number in the token does not stand in for a claimed email verification.
+    await assertFails(setDoc(doc(phoneUser("ph3"), "users", "ph3"), registration("ph3", "student", { verifiedVia: "email" })));
+  });
+
+  it("requires a well-formed phone number and a known verification method", async () => {
+    await assertFails(setDoc(doc(dbAs("bad1"), "users", "bad1"), registration("bad1", "student", { phone: "98765" })));
+    await assertFails(setDoc(doc(dbAs("bad2"), "users", "bad2"), registration("bad2", "student", { phone: "+91 98765 43210" })));
+    await assertFails(setDoc(doc(dbAs("bad3"), "users", "bad3"), registration("bad3", "student", { verifiedVia: "magic" })));
+    const noPhone = registration("bad4");
+    delete noPhone.phone;
+    await assertFails(setDoc(doc(dbAs("bad4"), "users", "bad4"), noPhone));
+  });
+
+  it("clients cannot touch the server-only OTP collections", async () => {
+    for (const col of ["otpChallenges", "registrationTickets", "otpLimits", "__otpCapture"]) {
+      await assertFails(setDoc(doc(dbAs(ALICE), col, "x"), { a: 1 }));
+      await assertFails(getDoc(doc(dbAs(ALICE), col, "x")));
+      await assertFails(getDoc(doc(dbAs(ADMIN), col, "x")));
+    }
+  });
+});
+
+describe("registration: roles and requests", () => {
+  it("a worker request carries a work area, no student details, and grants nothing", async () => {
+    await assertSucceeds(setDoc(doc(dbAs("w1"), "users", "w1"), registration("w1", "worker")));
+    await assertFails(setDoc(doc(dbAs("w2"), "users", "w2"), registration("w2", "worker", { workArea: "Made Up Team" })));
+    const noArea = registration("w3", "worker");
+    delete noArea.workArea;
+    await assertFails(setDoc(doc(dbAs("w3"), "users", "w3"), noArea));
+    await assertFails(setDoc(doc(dbAs("w4"), "users", "w4"), registration("w4", "worker", { ...STUDENT_DETAILS })));
+    await assertFails(setDoc(doc(dbAs("w5"), "users", "w5"), registration("w5", "worker", { role: "worker" })));
+    await assertFails(setDoc(doc(dbAs("w6"), "users", "w6"), registration("w6", "student", { workArea: "Electrical Maintenance" })));
+  });
+
+  it("an administrator request is only ever pending, and carries no admin power", async () => {
+    await assertSucceeds(setDoc(doc(dbAs("a1"), "users", "a1"), registration("a1", "admin")));
+    await assertFails(setDoc(doc(dbAs("a2"), "users", "a2"), registration("a2", "admin", { adminRequest: "approved" })));
+    await assertFails(setDoc(doc(dbAs("a3"), "users", "a3"), registration("a3", "admin", { role: "admin", roles: ["admin"], activeRole: "admin" })));
+    await assertFails(setDoc(doc(dbAs("a4"), "users", "a4"), registration("a4", "admin", { workerRequest: "pending", workArea: "Electrical Maintenance" })));
+    await assertFails(setDoc(doc(dbAs("a5"), "users", "a5"), registration("a5", "admin", { ...STUDENT_DETAILS })));
+  });
+
+  it("the requester can neither approve their own admin request nor write the admins collection", async () => {
+    await assertSucceeds(setDoc(doc(dbAs("a6"), "users", "a6"), registration("a6", "admin")));
+    await assertFails(updateDoc(doc(dbAs("a6"), "users", "a6"), { adminRequest: "approved" }));
+    await assertFails(setDoc(doc(dbAs("a6"), "admins", "a6"), { grantedBy: "a6" }));
+    await assertFails(setDoc(doc(dbAs(ADMIN), "admins", "a6"), { grantedBy: ADMIN }));
+  });
+
+  it("a worker may change their own work area to a known team, and nothing else with it", async () => {
+    await assertSucceeds(updateDoc(doc(dbAs(WENDY), "users", WENDY), { workArea: "IT Services" }));
+    await assertFails(updateDoc(doc(dbAs(WENDY), "users", WENDY), { workArea: "Nope" }));
+    await assertFails(updateDoc(doc(dbAs(WENDY), "users", WENDY), { workArea: "IT Services", role: "admin" }));
+    await assertFails(updateDoc(doc(dbAs(ALICE), "users", ALICE), { workArea: "IT Services" }));
+    await assertFails(updateDoc(doc(dbAs(BOB), "users", WENDY), { workArea: "IT Services" }));
+  });
+});
+
 describe("student profile fields", () => {
   const student = { college: "Sultan-ul-Uloom College", rollNumber: "1604-21-001", academicYear: "3rd year", branch: "Computer Science" };
 
   it("a new student account may store all four fields with its profile", async () => {
-    await assertSucceeds(setDoc(doc(dbAs("newstudent"), "users", "newstudent"), { ...profile("newstudent", "user"), ...student }));
+    await assertSucceeds(setDoc(doc(dbAs("newstudent"), "users", "newstudent"), registration("newstudent")));
   });
 
-  it("rejects a partial, mistyped or oversized set at creation", async () => {
-    const { branch: _omit, ...partial } = student;
-    void _omit;
-    await assertFails(setDoc(doc(dbAs("p1"), "users", "p1"), { ...profile("p1", "user"), ...partial }));
-    await assertFails(setDoc(doc(dbAs("p2"), "users", "p2"), { ...profile("p2", "user"), ...student, academicYear: "9th year" }));
-    await assertFails(setDoc(doc(dbAs("p3"), "users", "p3"), { ...profile("p3", "user"), ...student, college: "x".repeat(121) }));
-    await assertFails(setDoc(doc(dbAs("p4"), "users", "p4"), { ...profile("p4", "user"), ...student, rollNumber: 12345 }));
-    await assertFails(setDoc(doc(dbAs("p5"), "users", "p5"), { ...profile("p5", "user"), ...student, branch: "" }));
+  it("rejects a partial, mistyped or oversized set at creation, and a student without details", async () => {
+    const partial = registration("p1");
+    delete partial.branch;
+    await assertFails(setDoc(doc(dbAs("p1"), "users", "p1"), partial));
+    const none = registration("p0");
+    for (const k of Object.keys(student)) delete none[k];
+    await assertFails(setDoc(doc(dbAs("p0"), "users", "p0"), none));
+    await assertFails(setDoc(doc(dbAs("p2"), "users", "p2"), registration("p2", "student", { academicYear: "9th year" })));
+    await assertFails(setDoc(doc(dbAs("p3"), "users", "p3"), registration("p3", "student", { college: "x".repeat(121) })));
+    await assertFails(setDoc(doc(dbAs("p4"), "users", "p4"), registration("p4", "student", { rollNumber: 12345 })));
+    await assertFails(setDoc(doc(dbAs("p5"), "users", "p5"), registration("p5", "student", { branch: "" })));
   });
 
   it("an existing account can complete its own profile, and nothing else in the same write", async () => {
@@ -686,13 +779,13 @@ describe("who may report an issue", () => {
       // Authenticated, profile not written yet (registration is mid-way, or was interrupted).
       await assertFails(createIssue(NEWBIE));
       // The app writes the profile exactly as the rules require.
-      await assertSucceeds(setDoc(doc(dbAs(NEWBIE), "users", NEWBIE), profile(NEWBIE, "user")));
+      await assertSucceeds(setDoc(doc(dbAs(NEWBIE), "users", NEWBIE), registration(NEWBIE)));
       await assertSucceeds(createIssue(NEWBIE, {}, "first-report"));
     });
 
     it("registration with a worker-access request: a student until an admin approves", async () => {
       const APPLICANT = "applicant";
-      await assertSucceeds(setDoc(doc(dbAs(APPLICANT), "users", APPLICANT), { ...profile(APPLICANT, "user"), workerRequest: "pending" }));
+      await assertSucceeds(setDoc(doc(dbAs(APPLICANT), "users", APPLICANT), registration(APPLICANT, "worker")));
       await assertSucceeds(createIssue(APPLICANT, {}, "while-pending"));
       // The request cannot be used to promote the account.
       await assertFails(updateDoc(doc(dbAs(APPLICANT), "users", APPLICANT), { role: "worker" }));
@@ -702,8 +795,8 @@ describe("who may report an issue", () => {
     });
 
     it("registration cannot create a worker or an admin profile directly", async () => {
-      await assertFails(setDoc(doc(dbAs("sneak1"), "users", "sneak1"), profile("sneak1", "worker")));
-      await assertFails(setDoc(doc(dbAs("sneak2"), "users", "sneak2"), { ...profile("sneak2", "user"), role: "admin" }));
+      await assertFails(setDoc(doc(dbAs("sneak1"), "users", "sneak1"), registration("sneak1", "student", { role: "worker" })));
+      await assertFails(setDoc(doc(dbAs("sneak2"), "users", "sneak2"), { ...registration("sneak2"), role: "admin" }));
       await assertFails(createIssue("sneak1", {}, "no-profile-1"));
       await assertFails(createIssue("sneak2", {}, "no-profile-2"));
     });

@@ -23,6 +23,8 @@ const MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "This email is already registered. Please sign in instead.",
   "auth/weak-password": "That password is too weak. Please choose a stronger one.",
   "auth/network-request-failed": "Network error. Please check your connection and try again.",
+  "auth/credential-already-in-use": "That email or phone number is already used by another account.",
+  "auth/provider-already-linked": "This account already has an email and PIN.",
   "auth/requires-recent-login": "Please sign in again to continue.",
   "auth/user-token-expired": "Your session has expired. Please sign in again.",
   // Firestore

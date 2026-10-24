@@ -16,7 +16,7 @@ Client (`lib/validation.ts`): trimmed, control characters removed, college 2 to 
 - The owner may set or correct them later, but only these four fields, together, and only on a plain (`role == 'user'`) account. Nothing else in the same write (role, name, earnings) is accepted. Workers, admins and other people cannot write them.
 - Nothing about roles, worker requests or admin grants changed.
 
-The rules are **backward compatible**: accounts and clients that do not send the fields keep working. The new web app, however, writes the fields at registration. Therefore:
+(That earlier rules change was backward compatible. The later registration change, see `docs/REGISTRATION_OTP.md`, is **not**: new profiles must carry proof of a verified contact, student details are mandatory, and the order of deployment there supersedes this section.) The new web app writes the fields at registration. Therefore:
 
 1. Deploy the rules first (`firebase deploy --only firestore:rules`, after `npm run test:rules` passes; save the current ruleset as a rollback first, as in `docs/FIRESTORE_RULES_FIX.md`).
 2. Then deploy the web app.

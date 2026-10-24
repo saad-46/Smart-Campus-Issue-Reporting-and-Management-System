@@ -28,6 +28,8 @@ export default function StudentProfileCard() {
 
   if (!userProfile) return null;
   const student = userProfile.student;
+  // Someone who asked to be a worker or an administrator is not a student: no student prompt for them.
+  if (!student && (userProfile.workerRequest === "pending" || userProfile.adminRequest === "pending")) return null;
   const errors = studentProfileErrors(draft);
 
   const start = () => {
