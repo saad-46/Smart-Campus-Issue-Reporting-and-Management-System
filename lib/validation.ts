@@ -57,6 +57,11 @@ export function getPasswordError(password: string): string | null {
   return null;
 }
 
+/** Keep only digits, at most six: for typing and pasting a one-time code. */
+export function sanitizeOtpInput(value: string): string {
+  return String(value ?? "").replace(/\D/g, "").slice(0, 6);
+}
+
 export interface RegistrationInput {
   name: string;
   email: string;

@@ -8,11 +8,14 @@ export default function AuthLayout({
   description,
   children,
   footer,
+  wide,
 }: {
   title: string;
   description?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** A wider card for longer forms (registration). */
+  wide?: boolean;
 }) {
   return (
     <div className="flex min-h-dvh flex-col">
@@ -21,7 +24,7 @@ export default function AuthLayout({
         <ThemeToggle />
       </header>
       <main className="flex flex-1 items-start justify-center px-4 pb-16 pt-6 sm:items-center sm:pt-0">
-        <div className="w-full max-w-[400px]">
+        <div className={wide ? "w-full max-w-[480px]" : "w-full max-w-[400px]"}>
           <h1 className="text-2xl font-semibold tracking-tight text-fg">{title}</h1>
           {description && <p className="mt-1.5 text-sm text-fg-muted">{description}</p>}
           <div className="glass depth-2 mt-6 rounded-xl p-5 sm:p-6">{children}</div>

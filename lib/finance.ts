@@ -125,6 +125,21 @@ export function subscribeToWorkerRequests(
   );
 }
 
+/** Subscribe to accounts that asked for administrator access (administrators only). */
+export function subscribeToAdminRequests(
+  callback: (users: User[]) => void,
+  onError?: ListenerErrorHandler
+) {
+  const q = query(collection(db, USERS_COLLECTION), where("adminRequest", "==", "pending"));
+  return track(
+    onSnapshot(
+      q,
+      (snapshot) => callback(snapshot.docs.map((d) => normalizeUser(d.id, d.data()))),
+      (error) => onError?.(error)
+    )
+  );
+}
+
 /**
  * Admin grants or removes worker access. The role lives in users/{uid}.role,
  * which firestore.rules lets only an admin change. The account holder is

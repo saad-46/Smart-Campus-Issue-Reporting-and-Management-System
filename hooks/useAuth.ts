@@ -5,11 +5,11 @@ import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
   signIn as authSignIn,
-  signUp as authSignUp,
+  registerAccount,
+  RegistrationRequest,
   signOut as authSignOut,
   getUserProfile,
   hasAdminGrant,
-  createMissingProfile,
   setActiveRole,
   saveStudentProfile,
 } from "@/lib/auth";
@@ -45,7 +45,8 @@ export function useAuth() {
         hasAdminGrant(user.uid),
       ]);
       const profile =
-        existingProfile ?? (signingUp.current ? null : await createMissingProfile(user));
+        // No default profile is invented for an account without one: registration must finish (verified contact, details).
+        existingProfile ?? null;
       if (generation !== authGeneration.current) return;
       setUserProfile(profile);
       setAdminGrant(isAdminGranted);
@@ -95,21 +96,26 @@ export function useAuth() {
     await authSignIn(email, password);
   }, []);
 
-  const signUp = useCallback(
-    async (email: string, password: string, name: string, role: UserRole, student?: Partial<Record<keyof StudentProfile, string>>) => {
-      signingUp.current = true;
-      try {
-        const profile = await authSignUp(email, password, name, role, student);
-        setUserProfile(profile);
-        setAdminGrant(false);
-        setProfileError(false);
-      } finally {
-        signingUp.current = false;
-        setLoading(false);
-      }
-    },
-    []
-  );
+  const signUp = useCallback(async (request: RegistrationRequest) => {
+    signingUp.current = true;
+    try {
+      const profile = await registerAccount(request);
+      setUserProfile(profile);
+      setAdminGrant(false);
+      setProfileError(false);
+    } finally {
+      signingUp.current = false;
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * While the registration page verifies a phone number, Firebase signs the
+   * browser in as that number. Hold off loading a profile for it (there is none yet).
+   */
+  const holdProfileLoad = useCallback((on: boolean) => {
+    signingUp.current = on;
+  }, []);
 
   const signOut = useCallback(async () => {
     await authSignOut();
@@ -166,6 +172,7 @@ export function useAuth() {
     reloadProfile,
     signIn,
     signUp,
+    holdProfileLoad,
     signOut,
     updateStudentProfile,
     switchRole,

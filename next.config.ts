@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
+// Phone verification loads Google's reCAPTCHA (invisible). Allowed only when the feature is switched on at build time.
+const phoneOtp = process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === "true";
 
 // Content Security Policy.
 // - 'unsafe-inline' for scripts is required by Next.js' inline bootstrap
@@ -11,13 +13,14 @@ const isDev = process.env.NODE_ENV !== "production";
 // - connect-src lists the Firebase Auth / Firestore endpoints.
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${phoneOtp ? " https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://firebasestorage.googleapis.com",
   "font-src 'self' data:",
   `connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com${
     isDev ? " http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*" : ""
   }`,
+  ...(phoneOtp ? ["frame-src https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/"] : []),
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

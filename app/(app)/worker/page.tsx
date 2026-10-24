@@ -69,7 +69,13 @@ export default function WorkerPage() {
   }, [workerId, retryKey]);
 
   const loading = (myIssues === null || poolIssues === null) && !loadError;
-  const pool = useMemo(() => poolIssues ?? [], [poolIssues]);
+  // The worker's own team's issues come first; nothing is hidden, so the rest stay one scroll away.
+  const workArea = userProfile?.workArea ?? "";
+  const pool = useMemo(() => {
+    const list = poolIssues ?? [];
+    if (!workArea) return list;
+    return [...list].sort((a, b) => Number(b.aiDepartment === workArea) - Number(a.aiDepartment === workArea));
+  }, [poolIssues, workArea]);
   const mine = useMemo(() => myIssues ?? [], [myIssues]);
 
   // Most urgent first: escalated, then by time left before the SLA deadline.
@@ -229,6 +235,8 @@ export default function WorkerPage() {
                 pool.length === 0 ? (
                   <EmptyState icon={<Inbox />} title="The open pool is empty" description="Every reported issue has been picked up. New ones will appear here." />
                 ) : (
+                  <>
+                  {workArea && <p className="border-b border-border px-4 py-2 text-[13px] text-fg-subtle sm:px-5">Showing issues for <span className="font-medium text-fg">{workArea}</span> first.</p>}
                   <ul className="divide-y divide-border">
                     {pool.map((issue) => (
                       <li key={issue.id}>
@@ -244,6 +252,7 @@ export default function WorkerPage() {
                       </li>
                     ))}
                   </ul>
+                  </>
                 )
               ) : tab === "claims" ? (
                 claimed.length === 0 ? (

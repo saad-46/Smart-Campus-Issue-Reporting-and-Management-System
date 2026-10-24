@@ -73,7 +73,13 @@ export default function LoginPage() {
       // Choosing a role proves nothing: this account does not hold it.
       setJustSignedIn(false);
       setIsLoading(false);
-      setError(NOT_GRANTED[wanted]);
+      setError(
+        wanted === "admin" && userProfile.adminRequest === "pending"
+          ? "Your administrator request is still waiting for approval. Until an administrator approves it, sign in as a Student."
+          : wanted === "worker" && userProfile.workerRequest === "pending"
+            ? "Your worker access request is still waiting for approval. Until an administrator approves it, sign in as a Student."
+            : NOT_GRANTED[wanted]
+      );
       signOut().catch((err) => logError("signOut", err));
       return;
     }
@@ -102,8 +108,9 @@ export default function LoginPage() {
     if (emailError || passwordError) return;
     setIsLoading(true);
     try {
-      if (isAuthenticated) {
-        // Already signed in from a previous attempt whose profile failed to load.
+      if (isAuthenticated && profileError) {
+        // Already signed in from a previous attempt whose profile failed to load. (A session with no
+        // profile and no load error, such as an abandoned registration, is simply replaced by this sign-in.)
         setJustSignedIn(true);
         await reloadProfile();
       } else {

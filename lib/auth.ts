@@ -5,6 +5,8 @@
 // profile documents in Firestore.
 
 import {
+  EmailAuthProvider,
+  linkWithCredential,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -16,28 +18,43 @@ import {
 import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { StudentProfile, User, UserRole } from "@/types";
-import { LIMITS } from "./constants";
-import { logError } from "./errors";
+import { DEPARTMENTS } from "./constants";
+import { ValidationError, logError } from "./errors";
+import { bindVerifiedEmail } from "./otpClient";
+import { normalizePhone } from "./phone";
 import { normalizeUser } from "./models";
-import { cleanText, validateRegistration, validateStudentProfile } from "./validation";
+import { validateRegistration, validateStudentProfile } from "./validation";
 
 const USERS_COLLECTION = "users";
 const ADMINS_COLLECTION = "admins";
 
-/** Write the Firestore profile for a freshly created account. */
+export type Verification = { via: "email"; ticket: string } | { via: "phone" };
+
+export interface RegistrationRequest {
+  /** What the person signed up to be. "admin" and "worker" are requests; neither grants anything by itself. */
+  kind: "student" | "worker" | "admin";
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  verification: Verification;
+  student?: Partial<Record<keyof StudentProfile, string>>;
+  workArea?: string;
+}
+
+/** Write the Firestore profile for a freshly created, already verified account. */
 async function createProfile(
   firebaseUser: FirebaseUser,
   name: string,
-  requestWorkerAccess: boolean,
-  student?: StudentProfile
+  extra: { phone: string; verifiedVia: "email" | "phone"; student?: StudentProfile; workArea?: string; workerRequest?: boolean; adminRequest?: boolean }
 ): Promise<User> {
   const createdAt = new Date();
   // Use the address Firebase Auth recorded: the security rules require the
   // profile's email to match the signed-in token exactly.
   const email = firebaseUser.email ?? "";
 
-  // Every account starts as a plain user. Worker access is a request an
-  // admin must approve; the rules reject anything else.
+  // Every account starts as a plain user. Worker and administrator access are
+  // requests someone with authority must approve; the rules reject anything else.
   await setDoc(doc(db, USERS_COLLECTION, firebaseUser.uid), {
     id: firebaseUser.uid,
     name,
@@ -46,8 +63,11 @@ async function createProfile(
     roles: ["user"],
     activeRole: "user",
     createdAt: createdAt.toISOString(),
-    ...(requestWorkerAccess ? { workerRequest: "pending" } : {}),
-    ...(student ?? {}),
+    phone: extra.phone,
+    verifiedVia: extra.verifiedVia,
+    ...(extra.workerRequest ? { workerRequest: "pending", workArea: extra.workArea } : {}),
+    ...(extra.adminRequest ? { adminRequest: "pending" } : {}),
+    ...(extra.student ?? {}),
   });
 
   return {
@@ -58,34 +78,66 @@ async function createProfile(
     activeRole: "user",
     createdAt,
     earnings: 0,
-    workerRequest: requestWorkerAccess ? "pending" : undefined,
-    student,
+    workerRequest: extra.workerRequest ? "pending" : undefined,
+    adminRequest: extra.adminRequest ? "pending" : undefined,
+    workArea: extra.workerRequest ? extra.workArea : undefined,
+    student: extra.student,
+    phone: extra.phone,
+    verifiedVia: extra.verifiedVia,
   };
 }
 
 /**
- * Register a new user with email/password and store their profile in Firestore.
- * Choosing "worker" files a request for worker access; the account is a
- * plain user until an admin approves it. Admin access is granted separately
- * (see firestore.rules).
+ * Create the account and its profile. The contact must already be verified:
+ *  - email: a one-time ticket from /api/otp/email/verify, spent on the server
+ *    after the account exists (it adds the claim firestore.rules require);
+ *  - phone: the browser is already signed in as that verified phone number;
+ *    the email + PIN are linked to it.
+ * Only the caller's request is trusted for what was asked, never for what is
+ * granted: the profile is always a plain user (see firestore.rules).
  */
-export async function signUp(
-  email: string,
-  password: string,
-  name: string,
-  role: UserRole = "user",
-  studentInput?: Partial<Record<keyof StudentProfile, string>>
-): Promise<User> {
-  const input = validateRegistration({ email, password, name, role });
-  // Student details are required for a student account and not collected for a worker request.
-  const student = role === "user" ? validateStudentProfile(studentInput ?? {}) : undefined;
+export async function registerAccount(req: RegistrationRequest): Promise<User> {
+  const input = validateRegistration({ email: req.email, password: req.password, name: req.name, role: req.kind === "worker" ? "worker" : "user" });
+  const phone = normalizePhone(req.phone);
+  if (!phone) throw new ValidationError("Enter a valid phone number.");
+  const student = req.kind === "student" ? validateStudentProfile(req.student ?? {}) : undefined;
+  if (req.kind === "worker" && !DEPARTMENTS.includes(req.workArea ?? "")) throw new ValidationError("Choose the team you work with.");
 
-  const credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
-  await updateProfile(credential.user, { displayName: input.name });
-  const profile = await createProfile(credential.user, input.name, input.role === "worker", student);
+  let user: FirebaseUser;
+  if (req.verification.via === "email") {
+    try {
+      user = (await createUserWithEmailAndPassword(auth, input.email, input.password)).user;
+    } catch (err) {
+      // An earlier attempt created the account but never finished its profile: pick it up where it stopped.
+      if ((err as { code?: string }).code !== "auth/email-already-in-use") throw err;
+      const existing = (await signInWithEmailAndPassword(auth, input.email, input.password).catch(() => null))?.user;
+      if (!existing || (await getDoc(doc(db, USERS_COLLECTION, existing.uid)).then((d) => d.exists()).catch(() => true))) {
+        if (existing) await firebaseSignOut(auth).catch(() => undefined);
+        throw err;
+      }
+      user = existing;
+    }
+    await bindVerifiedEmail(req.verification.ticket);
+  } else {
+    const current = auth.currentUser;
+    if (!current || !current.phoneNumber || current.phoneNumber !== phone) throw new ValidationError("Verify your phone number first.");
+    if (!current.email) await linkWithCredential(current, EmailAuthProvider.credential(input.email, input.password));
+    await current.getIdToken(true);
+    user = current;
+  }
 
-  // Best effort: a failed email must not undo a successful registration.
-  sendEmailVerification(credential.user).catch((err) => logError("sendEmailVerification", err));
+  await updateProfile(user, { displayName: input.name });
+  const profile = await createProfile(user, input.name, {
+    phone,
+    verifiedVia: req.verification.via,
+    student,
+    workArea: req.workArea,
+    workerRequest: req.kind === "worker",
+    adminRequest: req.kind === "admin",
+  });
+
+  // A phone-verified account has not proved its email yet; send the standard link (best effort).
+  if (req.verification.via === "phone") sendEmailVerification(user).catch((err) => logError("sendEmailVerification", err));
   return profile;
 }
 
@@ -110,17 +162,6 @@ export async function refreshEmailVerified(): Promise<boolean> {
   if (!auth.currentUser) return false;
   await auth.currentUser.reload();
   return auth.currentUser.emailVerified;
-}
-
-/**
- * Create a default profile for an account that has none — e.g. registration
- * was interrupted after the Auth user was created but before the profile
- * was written. Without this the account would be permanently unusable.
- */
-export async function createMissingProfile(firebaseUser: FirebaseUser): Promise<User> {
-  const fallbackName = firebaseUser.email?.split("@")[0] ?? "User";
-  const name = cleanText(firebaseUser.displayName || fallbackName).slice(0, LIMITS.name) || "User";
-  return createProfile(firebaseUser, name, false);
 }
 
 /**

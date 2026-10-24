@@ -1,0 +1,26 @@
+{
+  "note": "Colleges come from data/campuses/sues-hyderabad/institutions.json (the institutions on the SUES campus). Branch lists are only given where a source supports them; every other case goes through the explicit \"Other\" choice instead of an invented list. Update this file (and its sources) when a college's programmes change.",
+  "branches": {
+    "mjcet": {
+      "source": "https://www.mjcollege.ac.in/about-mjcet",
+      "checked": "2026-10-24",
+      "options": [
+        { "label": "Civil Engineering" },
+        { "label": "Computer Science and Engineering" },
+        { "label": "Computer Science and Engineering (AI)" },
+        { "label": "Computer Science and Engineering (AI & ML)" },
+        { "label": "Computer Science and Engineering (Data Science)" },
+        { "label": "Electronics and Communication Engineering" },
+        { "label": "Mechanical Engineering" },
+        { "label": "Electrical and Electronics Engineering", "hint": "Earlier programme" },
+        { "label": "Information Technology", "hint": "Earlier programme" },
+        { "label": "Instrumentation Engineering", "hint": "Earlier programme" },
+        { "label": "Production Engineering", "hint": "Earlier programme" }
+      ]
+    },
+    "sucp": { "source": "institution name", "checked": "2026-10-24", "options": [{ "label": "Pharmacy" }] },
+    "law": { "source": "institution name", "checked": "2026-10-24", "options": [{ "label": "Law" }] },
+    "aakcba": { "source": "institution name", "checked": "2026-10-24", "options": [{ "label": "Business Administration" }] },
+    "gacoe": { "source": "institution name", "checked": "2026-10-24", "options": [{ "label": "Education" }] }
+  }
+}

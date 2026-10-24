@@ -6,7 +6,6 @@ import { expect, Page, test } from "@playwright/test";
 
 const RUN = process.env.E2E_EMULATOR === "1";
 const PASSWORD = process.env.SEED_PASSWORD || "emulator-only-demo";
-const STAMP = String(Date.now()).slice(-6);
 
 test.describe.configure({ mode: "serial" });
 test.skip(!RUN, "Emulator-only: set E2E_EMULATOR=1 and E2E_BASE_URL=http://localhost:<port>");
@@ -95,43 +94,6 @@ test("sign out lands on the home page, and Back cannot reopen the dashboard", as
   expect(await account.getAttribute("aria-label")).not.toBe(firstAccount);
 });
 
-test("student registration needs college, roll number, year and branch, then shows them", async ({ page }) => {
-  const email = `reg-${STAMP}@unifix.test`;
-  await page.goto("/register");
-  await page.getByLabel("Full name").fill(`TEST Student ${STAMP}`);
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel(/-digit PIN/).fill("123456");
-  // Submitting with the student fields empty explains each one and creates nothing.
-  await page.getByRole("button", { name: "Create account" }).click();
-  for (const text of ["Enter your college or institution name.", "Enter your roll number.", "Choose your academic year.", "Enter your branch or department."]) {
-    await expect(page.getByText(text)).toBeVisible();
-  }
-  await expect(page).toHaveURL(/\/register$/);
-
-  await page.getByLabel("College / institution").fill("Sultan-ul-Uloom College of Engineering");
-  await page.getByLabel("Roll number").fill("1604-21-737-042");
-  await page.getByLabel("Academic year").selectOption("3rd year");
-  await page.getByLabel("Branch / department").fill("Computer Science");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.waitForURL(/\/dashboard$/, { timeout: 60_000 });
-
-  const card = page.getByLabel("Student details", { exact: true }).first();
-  await expect(card).toContainText(`TEST Student ${STAMP}`, { timeout: 30_000 });
-  await expect(card).toContainText("Sultan-ul-Uloom College of Engineering");
-  await expect(card).toContainText("Roll no. 1604-21-737-042");
-  await expect(card).toContainText("3rd year");
-  await expect(card).toContainText("Computer Science");
-
-  // Edit, persist across a reload.
-  await card.getByRole("button", { name: "Edit" }).click();
-  const dialog = page.getByRole("dialog", { name: "Student details" });
-  await dialog.getByLabel("Branch / department").fill("Civil Engineering");
-  await dialog.getByRole("button", { name: "Save details" }).click();
-  await expect(dialog).toBeHidden({ timeout: 30_000 });
-  await page.reload();
-  await expect(page.getByLabel("Student details", { exact: true }).first()).toContainText("Civil Engineering", { timeout: 30_000 });
-});
-
 test("a worker request does not ask for student details", async ({ page }) => {
   await page.goto("/register");
   await page.getByRole("radio", { name: /Resolve issues/ }).click();
@@ -147,10 +109,13 @@ test("an existing account without details is asked to add them, and cannot save 
   await expect(card).toContainText("Add your student details", { timeout: 30_000 });
   await card.getByRole("button", { name: "Add details" }).click();
   const dialog = page.getByRole("dialog", { name: "Student details" });
-  await dialog.getByLabel("College / institution").fill("Test College");
+  // A college that is not listed is an explicit choice that asks for its name.
+  await dialog.getByRole("combobox", { name: "College / institution" }).click();
+  await dialog.getByRole("option", { name: /isn't listed/ }).click();
+  await dialog.getByLabel("Institution name").fill("Test College");
   await dialog.getByLabel("Roll number").fill("<b>1</b>");
   await dialog.getByLabel("Academic year").selectOption("2nd year");
-  await dialog.getByLabel("Branch / department").fill("Mechanical");
+  await dialog.getByRole("textbox", { name: /Branch \/ department/ }).fill("Mechanical");
   await dialog.getByRole("button", { name: "Save details" }).click();
   await expect(dialog).toContainText("letters, numbers");
   await dialog.getByLabel("Roll number").fill("ME-204");

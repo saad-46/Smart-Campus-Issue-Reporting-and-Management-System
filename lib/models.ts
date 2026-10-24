@@ -231,6 +231,10 @@ export function normalizeUser(id: string, data: Doc | undefined | null): User {
       ? (d.workerRequest as WorkerRequestStatus)
       : undefined,
     student,
+    phone: str(d.phone) || undefined,
+    verifiedVia: d.verifiedVia === "email" || d.verifiedVia === "phone" ? d.verifiedVia : undefined,
+    workArea: str(d.workArea) || undefined,
+    adminRequest: ["pending", "approved", "rejected"].includes(d.adminRequest as string) ? (d.adminRequest as WorkerRequestStatus) : undefined,
   };
 }
 

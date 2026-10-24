@@ -7,7 +7,8 @@
 
 import React, { createContext, useContext, ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { StudentProfile, User, UserRole } from "@/types";
+import { StudentProfile, UserRole, User } from "@/types";
+import type { RegistrationRequest } from "@/lib/auth";
 import { User as FirebaseUser } from "firebase/auth";
 import StatusScreen from "./shell/StatusScreen";
 import Button from "./ui/Button";
@@ -22,7 +23,8 @@ interface AuthContextType {
   initStalled: boolean;
   reloadProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, role: UserRole, student?: Partial<Record<keyof StudentProfile, string>>) => Promise<void>;
+  signUp: (request: RegistrationRequest) => Promise<void>;
+  holdProfileLoad: (on: boolean) => void;
   updateStudentProfile: (input: Partial<Record<keyof StudentProfile, string>>) => Promise<void>;
   signOut: () => Promise<void>;
   /** The role the UI is currently presenting (always one of availableRoles). */
